@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     return (
       <div style={{ minHeight: "100vh" }}>
       <Header email={user.email} userId={user.id} companies={[]} activeCompanyId={null} />
-        <div style={{ maxWidth: 1000, margin: "0 auto", padding: "0 20px 60px" }}>
+        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
           <CompanySetup />
         </div>
       </div>
@@ -56,9 +56,10 @@ export default async function DashboardPage() {
   return (
     <div style={{ minHeight: "100vh" }}>
       <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "0 20px 60px" }}>
+      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
         <AccountsBoard companyId={activeCompanyId} />
       </div>
     </div>
   );
 }
+

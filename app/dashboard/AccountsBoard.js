@@ -716,6 +716,7 @@ export default function AccountsBoard({ companyId }) {
   const [uploadingFor, setUploadingFor] = useState(null);
   const [addingReadingFor, setAddingReadingFor] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [expandedTab, setExpandedTab] = useState("details");
   const [menuForId, setMenuForId] = useState(null);
   const [readingsByAccount, setReadingsByAccount] = useState({});
   const [benchmarks, setBenchmarks] = useState([]);
@@ -823,6 +824,7 @@ export default function AccountsBoard({ companyId }) {
       return;
     }
     setExpandedId(accountId);
+    setExpandedTab("details");
     if (!readingsByAccount[accountId]) {
       const { data } = await supabase
         .from("readings")
@@ -1267,9 +1269,34 @@ export default function AccountsBoard({ companyId }) {
                 {isExpanded && (
                   <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
 
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginTop: 14, marginBottom: 8 }}>
-                      DETAILS
+                    <div style={{ display: "flex", gap: 4, marginTop: 14, marginBottom: 14, borderBottom: "1px solid var(--border)" }}>
+                      {[
+                        { key: "details", label: "Details" },
+                        { key: "market", label: "Market rate" },
+                        { key: "history", label: "History" },
+                      ].map((t) => (
+                        <button
+                          key={t.key}
+                          onClick={() => setExpandedTab(t.key)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            borderBottom: expandedTab === t.key ? "2px solid var(--teal)" : "2px solid transparent",
+                            color: expandedTab === t.key ? "var(--text)" : "var(--muted)",
+                            fontWeight: expandedTab === t.key ? 600 : 400,
+                            padding: "6px 10px",
+                            cursor: "pointer",
+                            fontSize: 12.5,
+                            marginBottom: -1,
+                          }}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
                     </div>
+
+                    {expandedTab === "details" && (
+                    <>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       {a.fuel_type === "gas" ? <Flame size={13} color="var(--muted)" /> : <Zap size={13} color="var(--muted)" />}
                       <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
@@ -1359,9 +1386,11 @@ export default function AccountsBoard({ companyId }) {
                       </div>
                     )}
 
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginTop: 18, marginBottom: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
-                      MARKET RATE
-                    </div>
+                    </>
+                    )}
+
+                    {expandedTab === "market" && (
+                    <>
                     {(() => {
                       const rec = recommendationFor(a);
                       return (
@@ -1516,9 +1545,10 @@ export default function AccountsBoard({ companyId }) {
                       )}
                     </div>
 
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginTop: 18, marginBottom: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
-                      READING HISTORY
-                    </div>
+                    </>
+                    )}
+
+                    {expandedTab === "history" && (
                     <div style={{ background: "var(--bg)", borderRadius: 6, padding: "10px 12px" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 8 }}>
                         <button
@@ -1554,6 +1584,7 @@ export default function AccountsBoard({ companyId }) {
                         </>
                       )}
                     </div>
+                    )}
                   </div>
                 )}
               </div>
