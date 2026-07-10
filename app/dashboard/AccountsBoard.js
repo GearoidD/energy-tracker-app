@@ -623,6 +623,59 @@ function ManualReadingForm({ onSave, onCancel }) {
   );
 }
 
+function recommendationFor(a) {
+  if (!a.comparison) {
+    return { verdict: "unknown", label: "No comparison yet", detail: "Pull a market rate or add a quote to get a recommendation.", color: "var(--muted)" };
+  }
+  const saving = a.saving;
+  const strongSource = a.comparison.source === "verified" || a.comparison.source === "quoted";
+
+  if (saving === null) {
+    return { verdict: "unknown", label: "Not enough data", detail: "Add your current rate and usage to get a recommendation.", color: "var(--muted)" };
+  }
+  if (saving <= 20) {
+    return { verdict: "stay", label: "Stay put", detail: "Your current rate already looks competitive — switching wouldn't meaningfully help.", color: "var(--green)" };
+  }
+  if (saving <= 100) {
+    return {
+      verdict: "marginal",
+      label: "Marginal — your call",
+      detail: `Switching could save ~${fmtMoney(saving)}/yr, but that's a small gain${strongSource ? "" : ", and this is only an estimate"}.`,
+      color: "var(--amber)",
+    };
+  }
+  return {
+    verdict: "switch",
+    label: strongSource ? "Worth switching" : "Likely worth switching",
+    detail: `Switching could save ~${fmtMoney(saving)}/yr${strongSource ? "" : " — based on an estimate, worth confirming with a real quote before you commit"}.`,
+    color: "var(--teal)",
+  };
+}
+
+function providerNegotiationMailto(acc, providerEmail, comparison) {
+  const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
+  const subject = `Renewal check-in — ${acc.name}${acc.account_number ? ` (${acc.account_number})` : ""}`;
+
+  const lines = [
+    "Hi,",
+    "",
+    `Ahead of my ${fuel} contract renewal, I wanted to check in on the account below:`,
+    "",
+    `Site: ${acc.name}`,
+    acc.account_number ? `${fuel === "gas" ? "GPRN" : "MPRN"}: ${acc.account_number}` : null,
+    acc.rate ? `Current rate: ${acc.rate}c/kWh` : null,
+    acc.contract_end ? `Contract end date: ${acc.contract_end}` : null,
+    "",
+    comparison && comparison.rate < acc.rate
+      ? `I've seen current market rates around ${comparison.rate}c/kWh for a similar account. Could you match or improve on this ahead of my renewal?`
+      : "Could you let me know what rate you can offer for the upcoming renewal period?",
+    "",
+    "Thanks,",
+  ].filter(Boolean);
+
+  return `mailto:${providerEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
+}
+
 function quoteRequestMailto(acc, supplierEmail) {
   const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
   const tariff = gasTariffFor(acc);
@@ -934,6 +987,23 @@ export default function AccountsBoard({ companyId }) {
       });
   }, [accounts, search, benchmarks, masterRates, readingSummaries]);
 
+  const summaryStats = useMemo(() => {
+    const needAttention = enriched.filter((a) => {
+      const c = overallStatusFor(a).color;
+      return c === "var(--red)" || c === "var(--amber)";
+    }).length;
+
+    const potentialSavings = enriched.reduce((sum, a) => (a.saving && a.saving > 20 ? sum + a.saving : sum), 0);
+    const totalSpend = enriched.reduce((sum, a) => (a.cost ? sum + a.cost : sum), 0);
+
+    return {
+      total: enriched.length,
+      needAttention,
+      potentialSavings,
+      totalSpend,
+    };
+  }, [enriched]);
+
   const attentionItems = useMemo(() => {
     const items = [];
     enriched.forEach((a) => {
@@ -1088,17 +1158,22 @@ export default function AccountsBoard({ companyId }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
-        {[
-          { label: "Out of contract", val: counts.overdue, color: "var(--red)" },
-          { label: "Renew now (≤30d)", val: counts.urgent, color: "var(--red)" },
-          { label: "Renewing soon (≤90d)", val: counts.soon, color: "var(--amber)" },
-          { label: "Active", val: counts.ok, color: "var(--green)" },
-        ].map((s) => (
-          <div key={s.label} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: s.color }}>{s.val}</div>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
+        <div style={{ background: "var(--panel)", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>{summaryStats.total}</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Accounts tracked</div>
+        </div>
+        <div style={{ background: "var(--panel)", borderLeft: "3px solid var(--red)", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--red)" }}>{summaryStats.needAttention}</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Need attention</div>
+        </div>
+        <div style={{ background: "var(--panel)", borderLeft: "3px solid var(--green)", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--green)" }}>{fmtMoney(summaryStats.potentialSavings)}</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Potential savings/yr</div>
+        </div>
+        <div style={{ background: "var(--panel)", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Est. annual spend</div>
+        </div>
       </div>
 
       <div style={{ position: "relative", marginBottom: 18, maxWidth: 320 }}>
@@ -1281,6 +1356,23 @@ export default function AccountsBoard({ companyId }) {
                     <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginTop: 18, marginBottom: 8, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
                       MARKET RATE
                     </div>
+                    {(() => {
+                      const rec = recommendationFor(a);
+                      return (
+                        <div
+                          style={{
+                            background: "var(--bg)",
+                            border: `1px solid ${rec.color}55`,
+                            borderRadius: 8,
+                            padding: "10px 12px",
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 700, color: rec.color, marginBottom: 3 }}>{rec.label}</div>
+                          <div style={{ fontSize: 12, color: "var(--muted)" }}>{rec.detail}</div>
+                        </div>
+                      );
+                    })()}
                     {a.comparison && (
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, color: a.comparison.rate < a.rate ? "var(--green)" : "var(--muted)", fontSize: 12.5, flexWrap: "wrap" }}>
                         <TrendingDown size={13} />
@@ -1327,6 +1419,18 @@ export default function AccountsBoard({ companyId }) {
                       >
                         <Mail size={12} /> Request a quote
                       </button>
+                      {a.provider && (
+                        <a
+                          href={providerNegotiationMailto(
+                            a,
+                            suppliers.find((s) => s.name.toLowerCase() === a.provider.toLowerCase())?.contact_email,
+                            a.comparison
+                          )}
+                          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", color: "var(--muted)", cursor: "pointer", fontSize: 12, textDecoration: "none" }}
+                        >
+                          <Mail size={12} /> Email {a.provider}
+                        </a>
+                      )}
                     </div>
 
                     {quotePickerFor === a.id && (
