@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +9,8 @@ import { authStyles as s } from "../authStyles";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -25,7 +27,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    router.push("/dashboard");
+    router.push(next);
     router.refresh();
   };
 
@@ -55,7 +57,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p style={s.footNote}>
-          No account yet? <Link href="/signup">Create one</Link>
+          No account yet? <Link href={`/signup${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}>Create one</Link>
         </p>
       </div>
     </div>

@@ -15,7 +15,7 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
 
   const { data: memberships } = await supabase
     .from("company_members")
@@ -35,6 +35,17 @@ export default async function DashboardPage() {
         </div>
       </div>
     );
+  }
+
+  let profile = profileData;
+
+  if (!profile && companies.length > 0) {
+    const { data: healedProfile } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, email: user.email, active_company_id: companies[0].id })
+      .select()
+      .maybeSingle();
+    profile = healedProfile;
   }
 
   const activeCompanyId =

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2 } from "lucide-react";
+import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import UploadReading from "./UploadReading";
@@ -195,15 +195,45 @@ function severityRank(a) {
   return 5; // being-handled: Quote requested / Switching
 }
 
-function marketComparisonFor(acc, benchmarks) {
+function masterRateFor(acc, masterRates) {
+  const fuel = acc.fuel_type || "electricity";
+  const candidates = masterRates.filter((r) => r.fuel_type === fuel);
+  if (candidates.length === 0) return null;
+
+  const tier = fuel === "gas" ? gasTariffFor(acc) : acc.mic_kva ? "MIC" : "standard";
+  const tierMatch = candidates.find((r) => r.tariff_tier === tier);
+  if (tierMatch) return tierMatch;
+
+  const usage = parseFloat(acc.usage);
+  if (isNaN(usage)) return null;
+  return (
+    candidates.find(
+      (r) => !r.tariff_tier && usage >= (r.min_usage || 0) && (r.max_usage === null || r.max_usage === undefined || usage <= r.max_usage)
+    ) || null
+  );
+}
+
+function marketComparisonFor(acc, benchmarks, masterRates = []) {
   const usage = parseFloat(acc.usage);
   const accRate = parseFloat(acc.rate);
   if (isNaN(accRate)) return null;
 
-  // A manually entered quote always wins over an estimate
+  // A manually entered quote always wins over anything else
   const manualRate = parseFloat(acc.market_rate);
   if (!isNaN(manualRate)) {
     return { rate: manualRate, source: "quoted" };
+  }
+
+  // A rate you've manually verified beats a company-specific benchmark or an AI estimate
+  const master = masterRateFor(acc, masterRates);
+  if (master) {
+    return {
+      rate: parseFloat(master.rate),
+      source: "verified",
+      note: master.note,
+      supplierName: master.suppliers?.name,
+      updatedAt: master.updated_at,
+    };
   }
 
   if (isNaN(usage)) return null;
@@ -593,6 +623,35 @@ function ManualReadingForm({ onSave, onCancel }) {
   );
 }
 
+function quoteRequestMailto(acc, supplierEmail) {
+  const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
+  const tariff = gasTariffFor(acc);
+
+  const subject = `Rate quote request — ${acc.name}${acc.account_number ? ` (${acc.account_number})` : ""}`;
+
+  const lines = [
+    "Hi,",
+    "",
+    `I'd like a current business ${fuel} rate quote for the following account:`,
+    "",
+    `Site: ${acc.name}`,
+    acc.account_number ? `${fuel === "gas" ? "GPRN" : "MPRN"}: ${acc.account_number}` : null,
+    acc.provider ? `Current supplier: ${acc.provider}` : null,
+    acc.rate ? `Current rate: ${acc.rate}c/kWh` : null,
+    acc.usage ? `Annual usage: ${acc.usage} kWh` : null,
+    fuel === "gas" && tariff ? `Tariff tier: ${tariff}` : null,
+    fuel === "gas" && acc.spc_kwh ? `Supply Point Capacity: ${acc.spc_kwh} kWh` : null,
+    fuel !== "gas" && acc.mic_kva ? `MIC: ${acc.mic_kva} kVA` : null,
+    acc.contract_end ? `Current contract end date: ${acc.contract_end}` : null,
+    "",
+    "Could you send over your best current rate for this account?",
+    "",
+    "Thanks,",
+  ].filter(Boolean);
+
+  return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
+}
+
 export default function AccountsBoard({ companyId }) {
   const supabase = createClient();
   const [accounts, setAccounts] = useState([]);
@@ -607,6 +666,9 @@ export default function AccountsBoard({ companyId }) {
   const [menuForId, setMenuForId] = useState(null);
   const [readingsByAccount, setReadingsByAccount] = useState({});
   const [benchmarks, setBenchmarks] = useState([]);
+  const [masterRates, setMasterRates] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [quotePickerFor, setQuotePickerFor] = useState(null);
   const [showBenchmarks, setShowBenchmarks] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [ratePullFor, setRatePullFor] = useState(null);
@@ -686,9 +748,21 @@ export default function AccountsBoard({ companyId }) {
     setBenchmarks(data || []);
   }, [companyId]);
 
+  const loadMasterRates = useCallback(async () => {
+    const { data } = await supabase.from("master_rates").select("*, suppliers(name)");
+    setMasterRates(data || []);
+  }, []);
+
+  const loadSuppliers = useCallback(async () => {
+    const { data } = await supabase.from("suppliers").select("*").order("name");
+    setSuppliers(data || []);
+  }, []);
+
   useEffect(() => {
     loadBenchmarks();
-  }, [loadBenchmarks]);
+    loadMasterRates();
+    loadSuppliers();
+  }, [loadBenchmarks, loadMasterRates, loadSuppliers]);
 
   const toggleReadings = async (accountId) => {
     if (expandedId === accountId) {
@@ -828,7 +902,7 @@ export default function AccountsBoard({ companyId }) {
       .map((a) => {
         const daysLeft = daysUntil(a.contract_end);
         const status = statusOf(daysLeft);
-        const comparison = marketComparisonFor(a, benchmarks);
+        const comparison = marketComparisonFor(a, benchmarks, masterRates);
         const usageNum = parseFloat(a.usage);
         const rateNum = parseFloat(a.rate);
         const saving =
@@ -858,7 +932,7 @@ export default function AccountsBoard({ companyId }) {
         if (rankDiff !== 0) return rankDiff;
         return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
       });
-  }, [accounts, search, benchmarks, readingSummaries]);
+  }, [accounts, search, benchmarks, masterRates, readingSummaries]);
 
   const attentionItems = useMemo(() => {
     const items = [];
@@ -1208,17 +1282,37 @@ export default function AccountsBoard({ companyId }) {
                       MARKET RATE
                     </div>
                     {a.comparison && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, color: a.comparison.rate < a.rate ? "var(--green)" : "var(--muted)", fontSize: 12.5 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, color: a.comparison.rate < a.rate ? "var(--green)" : "var(--muted)", fontSize: 12.5, flexWrap: "wrap" }}>
                         <TrendingDown size={13} />
                         Market rate: {a.comparison.rate}c/kWh
-                        <span style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px" }}>
-                          {a.comparison.source === "quoted" ? "quoted" : "estimated"}
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 600,
+                            textTransform: "uppercase",
+                            color: a.comparison.source === "verified" ? "var(--teal)" : "var(--muted)",
+                            border: `1px solid ${a.comparison.source === "verified" ? "var(--teal)" : "var(--border)"}`,
+                            borderRadius: 4,
+                            padding: "1px 5px",
+                          }}
+                        >
+                          {a.comparison.source === "quoted" ? "quoted" : a.comparison.source === "verified" ? "Wattpryce verified" : "estimated"}
                         </span>
                         {a.saving !== null && a.saving > 20 && ` · switching could save ~${fmtMoney(a.saving)}/yr`}
                       </div>
                     )}
+                    {a.comparison?.source === "verified" && (a.comparison.supplierName || a.comparison.note) && (
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10 }}>
+                        {a.comparison.supplierName ? `${a.comparison.supplierName}` : ""}
+                        {a.comparison.supplierName && a.comparison.note ? " · " : ""}
+                        {a.comparison.note || ""}
+                        {" · updated "}
+                        {new Date(a.comparison.updatedAt).toLocaleDateString("en-IE")}
+                      </div>
+                    )}
 
                     <div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {ratePullFor !== a.id && (
                         <button
                           onClick={() => pullMarketRate(a)}
@@ -1227,6 +1321,46 @@ export default function AccountsBoard({ companyId }) {
                           <Search size={12} /> Pull current market rate
                         </button>
                       )}
+                      <button
+                        onClick={() => setQuotePickerFor(quotePickerFor === a.id ? null : a.id)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", color: "var(--muted)", cursor: "pointer", fontSize: 12 }}
+                      >
+                        <Mail size={12} /> Request a quote
+                      </button>
+                    </div>
+
+                    {quotePickerFor === a.id && (
+                      <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", marginTop: 8 }}>
+                        {(() => {
+                          const fuel = a.fuel_type || "electricity";
+                          const matching = suppliers.filter((s) => s.fuel_types.includes(fuel));
+                          if (matching.length === 0) {
+                            return <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No suppliers saved yet for {fuel}. Add some in the admin rates page.</div>;
+                          }
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              {matching.map((s) => (
+                                <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
+                                  <span style={{ color: "var(--text)" }}>{s.name}</span>
+                                  {s.accepts_email_quotes && s.contact_email ? (
+                                    <a
+                                      href={quoteRequestMailto(a, s.contact_email)}
+                                      style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+                                    >
+                                      <Mail size={11} /> Email
+                                    </a>
+                                  ) : (
+                                    <span style={{ color: "var(--muted)", fontSize: 11.5 }}>
+                                      Call {s.contact_phone || "— no number saved"}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                       {ratePullFor === a.id && ratePullLoading && (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12.5 }}>
                           <Loader2 size={13} className="animate-spin" /> Checking current rates for {a.usage ? `${a.usage} kWh/yr` : "this account"}…

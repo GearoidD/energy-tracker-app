@@ -12,17 +12,27 @@ export async function POST(request) {
       return NextResponse.json({ error: "Not logged in" }, { status: 401 });
     }
 
-    const { base64, mediaType } = await request.json();
+    const { fuelType, usageBand, micKva, gasTariff } = await request.json();
 
-    if (!base64 || !mediaType) {
-      return NextResponse.json({ error: "Missing file data" }, { status: 400 });
+    if (!fuelType) {
+      return NextResponse.json({ error: "Missing fuel type" }, { status: 400 });
     }
 
-    const isPdf = mediaType === "application/pdf";
-
-    const contentBlock = isPdf
-      ? { type: "document", source: { type: "base64", media_type: mediaType, data: base64 } }
-      : { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } };
+    let supplyContext;
+    if (fuelType === "gas" && gasTariff) {
+      const tariffExplainer = {
+        SBU: "SBU (Small Business User) — under 73,000 kWh/year, priced as a standing charge plus a commodity unit rate, no separate capacity charge",
+        MBU: "MBU (Medium Business User) — 73,000 to 750,000 kWh/year with Supply Point Capacity under 3,750 kWh, priced as a standing charge, unit rate, AND a separate capacity charge",
+        FVT: "FVT (Fuel Variation Tariff) — over 750,000 kWh/year or SPC over 3,750 kWh, complex high-demand billing",
+      };
+      supplyContext = `This business is classified as an Irish ${tariffExplainer[gasTariff] || gasTariff} gas tariff. Search specifically for current ${gasTariff} gas rates — not a generic business gas rate, since the pricing structure genuinely differs between SBU, MBU, and FVT tiers.`;
+    } else if (fuelType !== "gas" && micKva) {
+      supplyContext = `This business has a Maximum Import Capacity (MIC) of ${micKva} kVA, which in Ireland means its electricity pricing structure includes both a per-unit rate AND a separate MIC/capacity charge (typically billed per kVA per year or month), not just a flat unit rate — search for both parts, not only the unit rate.`;
+    } else if (fuelType !== "gas") {
+      supplyContext = `This is a standard small/medium business account without a separate MIC capacity charge — search for its typical all-in unit rate, the way most SME accounts under ~30kVA are priced in Ireland.`;
+    } else {
+      supplyContext = `This is a standard small business gas account — search for typical SBU (Small Business User) gas rates, since that's the default tier for lower-usage gas accounts in Ireland.`;
+    }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -33,32 +43,25 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 500,
+        max_tokens: 1500,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [
           {
             role: "user",
-            content: [
-              contentBlock,
-              {
-                type: "text",
-                text: `This is an energy bill (electricity or gas). Read it and return ONLY a JSON object, no other text, no markdown fences, with these exact keys:
+            content: `Search for the current typical unit rate for small/medium business ${fuelType} in Ireland${
+              usageBand ? ` for a business using around ${usageBand} kWh per year` : ""
+            }. ${supplyContext} Note that Irish SME energy pricing is usually quoted per business rather than published as a fixed rate card, so if you can't find an SME-specific figure, use published residential rates as a reasonable proxy and say so clearly in the note.
+
+After searching, respond with ONLY a JSON object, no other text, no markdown fences, with these exact keys:
 {
-  "reading_date": "YYYY-MM-DD or null, the billing period end date",
-  "usage": number or null, the energy used in kWh for this billing period,
-  "rate": number or null, the unit rate charged in cents per kWh (convert if shown in a different unit). If the bill shows separate day/night/peak rates rather than one flat rate, put the day rate here,
-  "standing_charge": number or null, the daily standing charge in cents,
-  "provider": "string or null, the supplier name",
-  "account_number": "string or null, the MPRN (electricity) or GPRN (gas) shown on the bill — this is the meter point reference number, not the supplier's customer/account number",
-  "fuel_type": "electricity or gas — read this from the bill itself, don't guess",
-  "contract_end": "YYYY-MM-DD or null — only if the bill explicitly states a contract end/renewal/expiry date, not the billing period date",
-  "mic_kva": number or null — only for electricity bills, the Maximum Import Capacity in kVA if shown,
-  "spc_kwh": number or null — only for gas bills, the Supply Point Capacity in kWh if shown,
-  "rate_note": "string or null — if the bill shows more than one rate (e.g. day/night/peak, or a tiered rate), briefly describe them here so the user knows the single 'rate' field above is a simplification. Otherwise null",
-  "confidence": "high, medium, or low — how confident you are these numbers are read correctly"
+  "typical_rate": number, the typical unit rate in cents per kWh,
+  "typical_standing_charge": number or null, typical daily standing charge in cents if you found one,
+  "typical_mic_charge": number or null, only if a MIC/capacity charge is relevant — typical charge per kVA (state the unit, e.g. "per kVA per annum", within source_note) — otherwise null,
+  "supplier": "string or null — if the figure you found is attributed to a specific named supplier (e.g. Energia, Electric Ireland, Bord Gáis, SSE Airtricity, Pinergy), name them here. If it's a blended/average figure from a comparison site with no single supplier attached, set this to null",
+  "source_note": "a short string naming the website/source you found this on, and whether this is an SME figure or a residential proxy, e.g. 'Selectra.ie, residential proxy, July 2026'",
+  "as_of": "the month/year this data reflects, as a string"
 }
-If a field isn't visible on the bill, use null for it. Do not guess or estimate a number that isn't shown.`,
-              },
-            ],
+Do not fabricate a number if you found nothing relevant — in that case set typical_rate to null and explain briefly in source_note instead.`,
           },
         ],
       }),
@@ -70,20 +73,30 @@ If a field isn't visible on the bill, use null for it. Do not guess or estimate 
       return NextResponse.json({ error: data.error?.message || "Claude API error" }, { status: 500 });
     }
 
-    const textBlock = data.content?.find((c) => c.type === "text");
+    const textBlock = [...(data.content || [])].reverse().find((c) => c.type === "text");
     if (!textBlock) {
       return NextResponse.json({ error: "No response from Claude" }, { status: 500 });
     }
 
     const cleaned = textBlock.text.replace(/```json|```/g, "").trim();
-    let extracted;
+    let suggestion;
     try {
-      extracted = JSON.parse(cleaned);
+      suggestion = JSON.parse(cleaned);
     } catch (e) {
-      return NextResponse.json({ error: "Couldn't parse the extracted data" }, { status: 500 });
+      // Fall back to pulling out just the {...} object in case there's stray text around it
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          suggestion = JSON.parse(match[0]);
+        } catch (e2) {
+          return NextResponse.json({ error: "Couldn't parse the suggested rate. Raw response: " + cleaned.slice(0, 300) }, { status: 500 });
+        }
+      } else {
+        return NextResponse.json({ error: "Couldn't parse the suggested rate. Raw response: " + cleaned.slice(0, 300) }, { status: 500 });
+      }
     }
 
-    return NextResponse.json({ extracted });
+    return NextResponse.json({ suggestion });
   } catch (err) {
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 });
   }

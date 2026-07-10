@@ -87,7 +87,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
           setTargetMode("existing");
           setSelectedAccountId(matched.id);
         } else {
-          setTargetMode("new");
+          setTargetMode("choose");
           setNewSiteName(data.extracted.provider ? `${data.extracted.provider} account` : "");
           setNewSiteAccountNumber(data.extracted.account_number || "");
           setNewSiteFuelType(data.extracted.fuel_type === "gas" ? "gas" : "electricity");

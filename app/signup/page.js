@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +9,8 @@ import { authStyles as s } from "../authStyles";
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -28,13 +30,15 @@ export default function SignupPage() {
     }
     if (data.session) {
       // email confirmation is off in this Supabase project — go straight in
-      router.push("/dashboard");
+      router.push(next);
       router.refresh();
     } else {
       // email confirmation is on — user needs to click the link first
       setCheckEmail(true);
     }
   };
+
+  const loginHref = `/login${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`;
 
   if (checkEmail) {
     return (
@@ -49,7 +53,8 @@ export default function SignupPage() {
           <h1 style={s.h1}>Check your email</h1>
           <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6 }}>
             We sent a confirmation link to <strong style={{ color: "var(--text)" }}>{email}</strong>. Click it, then{" "}
-            <Link href="/login">log in</Link>.
+            <Link href={loginHref}>log in</Link>
+            {next !== "/dashboard" ? " to finish joining the company you were invited to." : "."}
           </p>
         </div>
       </div>
@@ -89,7 +94,7 @@ export default function SignupPage() {
           </button>
         </form>
         <p style={s.footNote}>
-          Already have an account? <Link href="/login">Log in</Link>
+          Already have an account? <Link href={loginHref}>Log in</Link>
         </p>
       </div>
     </div>
