@@ -717,6 +717,8 @@ export default function AccountsBoard({ companyId }) {
   const [addingReadingFor, setAddingReadingFor] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [expandedTab, setExpandedTab] = useState("details");
+  const [notesByAccount, setNotesByAccount] = useState({});
+  const [newNoteText, setNewNoteText] = useState({});
   const [menuForId, setMenuForId] = useState(null);
   const [readingsByAccount, setReadingsByAccount] = useState({});
   const [benchmarks, setBenchmarks] = useState([]);
@@ -833,6 +835,46 @@ export default function AccountsBoard({ companyId }) {
         .order("reading_date", { ascending: false });
       setReadingsByAccount((prev) => ({ ...prev, [accountId]: data || [] }));
     }
+  };
+
+  const loadNotes = async (accountId) => {
+    const { data, error } = await supabase
+      .from("account_notes")
+      .select("*, profiles(email)")
+      .eq("account_id", accountId)
+      .order("created_at", { ascending: false });
+    if (!error) {
+      setNotesByAccount((prev) => ({ ...prev, [accountId]: data || [] }));
+    }
+  };
+
+  const addNote = async (accountId) => {
+    const text = (newNoteText[accountId] || "").trim();
+    if (!text) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase.from("account_notes").insert({
+      account_id: accountId,
+      company_id: companyId,
+      body: text,
+      created_by: user.id,
+    });
+    if (error) {
+      alert("Couldn't save note: " + error.message);
+      return;
+    }
+    setNewNoteText((prev) => ({ ...prev, [accountId]: "" }));
+    loadNotes(accountId);
+  };
+
+  const deleteNote = async (noteId, accountId) => {
+    const { error } = await supabase.from("account_notes").delete().eq("id", noteId);
+    if (error) {
+      alert("Couldn't delete: " + error.message);
+      return;
+    }
+    loadNotes(accountId);
   };
 
   const refetchReadings = async (accountId) => {
@@ -1274,10 +1316,14 @@ export default function AccountsBoard({ companyId }) {
                         { key: "details", label: "Details" },
                         { key: "market", label: "Market rate" },
                         { key: "history", label: "History" },
+                        { key: "notes", label: "Notes" },
                       ].map((t) => (
                         <button
                           key={t.key}
-                          onClick={() => setExpandedTab(t.key)}
+                          onClick={() => {
+                            setExpandedTab(t.key);
+                            if (t.key === "notes" && !notesByAccount[a.id]) loadNotes(a.id);
+                          }}
                           style={{
                             background: "none",
                             border: "none",
@@ -1584,6 +1630,61 @@ export default function AccountsBoard({ companyId }) {
                         </>
                       )}
                     </div>
+                    )}
+
+                    {expandedTab === "notes" && (
+                      <div>
+                        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                          <textarea
+                            value={newNoteText[a.id] || ""}
+                            onChange={(e) => setNewNoteText((prev) => ({ ...prev, [a.id]: e.target.value }))}
+                            placeholder="e.g. Spoke to Energia, they'll call back Thursday"
+                            rows={2}
+                            style={{
+                              flex: 1,
+                              background: "var(--bg)",
+                              border: "1px solid var(--border)",
+                              borderRadius: 6,
+                              padding: "8px 10px",
+                              color: "var(--text)",
+                              fontSize: 13,
+                              outline: "none",
+                              resize: "vertical",
+                              fontFamily: "inherit",
+                            }}
+                          />
+                          <button
+                            onClick={() => addNote(a.id)}
+                            style={{ background: "var(--teal)", border: "none", color: "#06201d", borderRadius: 6, padding: "0 16px", cursor: "pointer", fontWeight: 600, fontSize: 12.5, flexShrink: 0 }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {!notesByAccount[a.id] ? (
+                          <div style={{ fontSize: 12, color: "var(--muted)" }}>Loading…</div>
+                        ) : notesByAccount[a.id].length === 0 ? (
+                          <div style={{ fontSize: 12, color: "var(--muted)" }}>No notes yet for this account.</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {notesByAccount[a.id].map((n) => (
+                              <div key={n.id} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
+                                <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 6, whiteSpace: "pre-wrap" }}>{n.body}</div>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                                    {n.profiles?.email || "Unknown"} · {new Date(n.created_at).toLocaleString("en-IE")}
+                                  </span>
+                                  <button
+                                    onClick={() => deleteNote(n.id, a.id)}
+                                    style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 2, display: "flex" }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
