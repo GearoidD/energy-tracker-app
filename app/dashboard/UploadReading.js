@@ -38,6 +38,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
   const [capacityValue, setCapacityValue] = useState("");
   const [syncCapacity, setSyncCapacity] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [fuelTypeUncertain, setFuelTypeUncertain] = useState(false);
 
   // Batch upload state — lets someone pick or drop several bills at once
   const [fileQueue, setFileQueue] = useState([]);
@@ -59,6 +60,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
     setCapacityValue("");
     setSyncCapacity(true);
     setError(null);
+    setFuelTypeUncertain(false);
   };
 
   const handleFile = async (file) => {
@@ -77,6 +79,8 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       setExtracted(data.extracted);
       setContractEndValue(data.extracted.contract_end || "");
       setCapacityValue(data.extracted.fuel_type === "gas" ? data.extracted.spc_kwh || "" : data.extracted.mic_kva || "");
+      const uncertainFuel = data.extracted.fuel_type !== "gas" && data.extracted.fuel_type !== "electricity";
+      setFuelTypeUncertain(uncertainFuel);
 
       if (!accountId) {
         const matched = data.extracted.account_number
@@ -87,7 +91,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
           setTargetMode("existing");
           setSelectedAccountId(matched.id);
         } else {
-          setTargetMode("choose");
+          setTargetMode("new");
           setNewSiteName(data.extracted.provider ? `${data.extracted.provider} account` : "");
           setNewSiteAccountNumber(data.extracted.account_number || "");
           setNewSiteFuelType(data.extracted.fuel_type === "gas" ? "gas" : "electricity");
@@ -355,9 +359,22 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
                         placeholder="e.g. Warehouse 3 — Galway"
                       />
                     </label>
-                    <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
-                      Fuel type
-                      <select style={inputStyle} value={newSiteFuelType} onChange={(e) => setNewSiteFuelType(e.target.value)}>
+                    {fuelTypeUncertain && (
+                      <div style={{ display: "flex", gap: 6, alignItems: "flex-start", color: "var(--amber)", fontSize: 12.5, marginBottom: 12, background: "var(--bg)", padding: "8px 10px", borderRadius: 6 }}>
+                        <AlertTriangle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+                        Couldn't tell from the bill whether this is gas or electricity — everything else was read fine, just confirm below.
+                      </div>
+                    )}
+                    <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: fuelTypeUncertain ? "var(--amber)" : "var(--muted)", marginBottom: 10, fontWeight: fuelTypeUncertain ? 600 : 400 }}>
+                      Fuel type{fuelTypeUncertain ? " — please confirm" : ""}
+                      <select
+                        style={{ ...inputStyle, borderColor: fuelTypeUncertain ? "var(--amber)" : "var(--border)" }}
+                        value={newSiteFuelType}
+                        onChange={(e) => {
+                          setNewSiteFuelType(e.target.value);
+                          setFuelTypeUncertain(false);
+                        }}
+                      >
                         <option value="electricity">Electricity</option>
                         <option value="gas">Gas</option>
                       </select>
