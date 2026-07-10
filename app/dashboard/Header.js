@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus } from "lucide-react";
+import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import CompanySetup from "./CompanySetup";
+import TeamMembers from "./TeamMembers";
 
 export default function Header({ email, userId, companies = [], activeCompanyId }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
   const [inviteLink, setInviteLink] = useState(null);
   const [inviteError, setInviteError] = useState(null);
 
@@ -97,15 +99,35 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
         justifyContent: "space-between",
         alignItems: "center",
         marginBottom: 24,
+        flexWrap: "wrap",
+        rowGap: 10,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", rowGap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Zap size={18} color="var(--teal)" />
           <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15 }}>
             Watt<span style={{ color: "var(--teal)" }}>pryce</span>
           </span>
         </div>
+
+        <button
+          onClick={() => setShowTeam(true)}
+          style={{
+            background: "none",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            padding: "6px 10px",
+            color: "var(--muted)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+          }}
+        >
+          <Users size={13} /> Team
+        </button>
 
         {activeCompany?.role === "admin" && (
           <button
@@ -332,6 +354,14 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
             </div>
           </div>
         </div>
+      )}
+      {showTeam && (
+        <TeamMembers
+          companyId={activeCompanyId}
+          currentUserId={userId}
+          isAdmin={activeCompany?.role === "admin"}
+          onClose={() => setShowTeam(false)}
+        />
       )}
     </div>
   );

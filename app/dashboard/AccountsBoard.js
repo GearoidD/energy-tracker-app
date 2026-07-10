@@ -1070,6 +1070,12 @@ export default function AccountsBoard({ companyId }) {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 640px) {
+          .wp-summary-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .wp-row-collapsed { flex-wrap: wrap !important; }
+        }
+      `}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 14 }}>
         <div>
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Accounts</h1>
@@ -1157,7 +1163,7 @@ export default function AccountsBoard({ companyId }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
+      <div className="wp-summary-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
         <div style={{ background: "var(--panel)", borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>{summaryStats.total}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Accounts tracked</div>
