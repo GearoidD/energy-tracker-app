@@ -1308,7 +1308,7 @@ export default function AccountsBoard({ companyId }) {
             const overall = overallStatusFor(a);
             const isExpanded = expandedId === a.id;
             return (
-              <div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderLeft: `3px solid ${overall.color}`, borderRadius: 10, overflow: "hidden" }}>
+              <div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderLeft: `3px solid ${overall.color}`, borderRadius: 10 }}>
                 <div
                   onClick={() => toggleReadings(a.id)}
                   style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer" }}
