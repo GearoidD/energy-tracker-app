@@ -747,6 +747,7 @@ export default function AccountsBoard({ companyId }) {
   const [quotePickerFor, setQuotePickerFor] = useState(null);
   const [showBenchmarks, setShowBenchmarks] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [ratePullFor, setRatePullFor] = useState(null);
   const [ratePullLoading, setRatePullLoading] = useState(false);
@@ -1058,12 +1059,15 @@ export default function AccountsBoard({ companyId }) {
       return c === "var(--red)" || c === "var(--amber)";
     }).length;
 
+    const renewingSoon90 = enriched.filter((a) => a.daysLeft !== null && a.daysLeft >= 0 && a.daysLeft <= 90).length;
+
     const potentialSavings = enriched.reduce((sum, a) => (a.saving && a.saving > 20 ? sum + a.saving : sum), 0);
     const totalSpend = enriched.reduce((sum, a) => (a.cost ? sum + a.cost : sum), 0);
 
     return {
       total: enriched.length,
       needAttention,
+      renewingSoon90,
       potentialSavings,
       totalSpend,
     };
@@ -1146,31 +1150,7 @@ export default function AccountsBoard({ companyId }) {
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Accounts</h1>
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Everyone on your team sees this same list.</p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={() => setShowOverview(true)}
-            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-          >
-            <BarChart3 size={16} /> Overview
-          </button>
-          <button
-            onClick={() => setShowImport(true)}
-            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-          >
-            <Upload size={16} /> Import accounts
-          </button>
-          <button
-            onClick={() => exportAccountsCSV(accounts)}
-            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-          >
-            <Download size={16} /> Export CSV
-          </button>
-          <button
-            onClick={() => setShowBenchmarks(true)}
-            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-          >
-            <LineChartIcon size={16} /> Market rates
-          </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", position: "relative" }}>
           <button
             onClick={() => setUploadingFor("new")}
             style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
@@ -1186,6 +1166,59 @@ export default function AccountsBoard({ companyId }) {
           >
             <Plus size={16} /> Add account
           </button>
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowMoreMenu((v) => !v)}
+              style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--muted)", padding: "10px 12px", borderRadius: 8, display: "flex", alignItems: "center", cursor: "pointer" }}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+            {showMoreMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: "calc(100% + 6px)",
+                  background: "var(--panel)",
+                  border: "1px solid var(--border-light)",
+                  borderRadius: 8,
+                  minWidth: 180,
+                  zIndex: 30,
+                  overflow: "hidden",
+                }}
+              >
+                {[
+                  { icon: BarChart3, label: "Overview", onClick: () => setShowOverview(true) },
+                  { icon: Upload, label: "Import accounts", onClick: () => setShowImport(true) },
+                  { icon: Download, label: "Export CSV", onClick: () => exportAccountsCSV(accounts) },
+                  { icon: LineChartIcon, label: "Market rates", onClick: () => setShowBenchmarks(true) },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      item.onClick();
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      textAlign: "left",
+                      background: "none",
+                      border: "none",
+                      padding: "10px 14px",
+                      color: "var(--text)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    <item.icon size={15} color="var(--muted)" /> {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1239,9 +1272,9 @@ export default function AccountsBoard({ companyId }) {
           <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>{summaryStats.total}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Accounts tracked</div>
         </div>
-        <div style={{ background: "var(--panel)", borderLeft: "3px solid var(--red)", borderRadius: 10, padding: "14px 16px" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--red)" }}>{summaryStats.needAttention}</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Need attention</div>
+        <div style={{ background: "var(--panel)", borderLeft: "3px solid var(--amber)", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--amber)" }}>{summaryStats.renewingSoon90}</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Renewing within 90 days</div>
         </div>
         <div style={{ background: "var(--panel)", borderLeft: "3px solid var(--green)", borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--green)" }}>{fmtMoney(summaryStats.potentialSavings)}</div>
