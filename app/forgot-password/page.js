@@ -1,35 +1,32 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { authStyles as s } from "../authStyles";
 import { HeroCard } from "../AuthHero";
 
-function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/dashboard";
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
     setLoading(false);
     if (error) {
       setError(error.message);
       return;
     }
-    router.push(next);
-    router.refresh();
+    setSent(true);
   };
 
   return (
@@ -65,40 +62,36 @@ function LoginForm() {
               Watt<span style={{ color: "var(--teal)" }}>pryce</span>
             </span>
           </div>
-          <h1 style={s.h1}>Log in</h1>
-          <p style={s.tagline}>Welcome back.</p>
-          <form onSubmit={handleSubmit} style={s.form}>
-            <label style={s.label}>
-              Email
-              <input style={s.input} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            <label style={s.label}>
-              Password
-              <input style={s.input} type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </label>
-            <div style={{ marginTop: -10, marginBottom: -4 }}>
-              <Link href="/forgot-password" style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                Forgot password?
-              </Link>
-            </div>
-            {error && <div style={s.error}>{error}</div>}
-            <button style={s.button} type="submit" disabled={loading}>
-              {loading ? "Logging in…" : "Log in"}
-            </button>
-          </form>
+
+          {sent ? (
+            <>
+              <h1 style={s.h1}>Check your email</h1>
+              <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6 }}>
+                If an account exists for <strong style={{ color: "var(--text)" }}>{email}</strong>, a password reset link is
+                on its way. Click it to set a new password.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 style={s.h1}>Reset your password</h1>
+              <p style={s.tagline}>We'll email you a link to set a new one.</p>
+              <form onSubmit={handleSubmit} style={s.form}>
+                <label style={s.label}>
+                  Email
+                  <input style={s.input} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                </label>
+                {error && <div style={s.error}>{error}</div>}
+                <button style={s.button} type="submit" disabled={loading}>
+                  {loading ? "Sending…" : "Send reset link"}
+                </button>
+              </form>
+            </>
+          )}
           <p style={s.footNote}>
-            No account yet? <Link href={`/signup${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}>Create one</Link>
+            <Link href="/login">Back to log in</Link>
           </p>
         </div>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
   );
 }

@@ -62,10 +62,10 @@ function SignupForm() {
   if (checkEmail) {
     return (
       <div style={s.page}>
-        <style>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
           @media (max-width: 900px) { .wp-auth-left { display: none !important; } }
-        `}</style>
+        ` }} />
         {LeftPanel}
         <div style={s.rightPanel}>
           <div style={s.card}>
@@ -89,10 +89,10 @@ function SignupForm() {
 
   return (
     <div style={s.page}>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
         @media (max-width: 900px) { .wp-auth-left { display: none !important; } }
-      `}</style>
+      ` }} />
       {LeftPanel}
       <div style={s.rightPanel}>
         <div style={s.card}>

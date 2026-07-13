@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Zap,
@@ -14,79 +14,7 @@ import {
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
 
-function HeroGauge() {
-  const [fill, setFill] = useState(0);
-  useEffect(() => {
-    const t = setTimeout(() => setFill(0.62), 200);
-    return () => clearTimeout(t);
-  }, []);
-
-  const size = 160;
-  const stroke = 10;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-
-  return (
-    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#24403F" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke="#E8A33D"
-          strokeWidth={stroke}
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - fill)}
-          strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.16, 1, 0.3, 1)" }}
-        />
-      </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 34, fontWeight: 600, color: "#EDF3F1", lineHeight: 1 }}>62</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#8FA6A3", letterSpacing: 1 }}>DAYS LEFT</span>
-      </div>
-    </div>
-  );
-}
-
-function HeroCard() {
-  return (
-    <div
-      style={{
-        background: "#142A2E",
-        border: "1px solid #2E4C4A",
-        borderLeft: "3px solid #E8A33D",
-        borderRadius: 12,
-        padding: "22px 26px",
-        display: "flex",
-        alignItems: "center",
-        gap: 24,
-        width: 380,
-        maxWidth: "100%",
-        boxShadow: "0 24px 60px -20px rgba(0,0,0,0.5)",
-      }}
-    >
-      <HeroGauge />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16, color: "#EDF3F1" }}>
-            Warehouse 2 — Cork
-          </span>
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#0E1A1D", background: "#E8A33D", display: "inline-flex", alignItems: "center", gap: 4, borderRadius: 5, padding: "3px 8px", marginBottom: 10 }}>
-          Renewing soon
-        </div>
-        <div style={{ fontSize: 12.5, color: "#8FA6A3", marginBottom: 4 }}>Energia · 24.9c/kWh</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#4C9A6A", fontSize: 12.5 }}>
-          <TrendingDown size={13} />
-          Switching could save ~€410/yr
-        </div>
-      </div>
-    </div>
-  );
-}
+import { HeroCard } from "./AuthHero";
 
 const sectionStyle = { maxWidth: 1080, margin: "0 auto", padding: "0 24px" };
 
@@ -124,8 +52,8 @@ export default function HomePage() {
 
   return (
     <div style={{ background: "#0E1A1D", minHeight: "100vh", color: "#EDF3F1", fontFamily: "Inter, sans-serif" }}>
-      <style>{FONT_IMPORT}</style>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: FONT_IMPORT }} />
+      <style dangerouslySetInnerHTML={{ __html: `
         .wp-nav-link { color: #8FA6A3; text-decoration: none; font-size: 14px; transition: color 0.15s ease; }
         .wp-nav-link:hover { color: #EDF3F1; }
         .wp-cta { transition: transform 0.15s ease, opacity 0.15s ease; }
@@ -138,7 +66,7 @@ export default function HomePage() {
           .wp-desktop-nav { display: none !important; }
           .wp-mobile-toggle { display: flex !important; }
         }
-      `}</style>
+      ` }} />
 
       {/* Nav */}
       <header style={{ borderBottom: "1px solid #24403F", position: "sticky", top: 0, background: "#0E1A1Dcc", backdropFilter: "blur(8px)", zIndex: 20 }}>
@@ -297,6 +225,14 @@ export default function HomePage() {
             </span>
           </div>
           <span style={{ fontSize: 12, color: "#8FA6A3" }}>Know before your contract renews.</span>
+          <div style={{ display: "flex", gap: 16 }}>
+            <Link href="/legal/terms" style={{ fontSize: 12, color: "#8FA6A3", textDecoration: "none" }}>
+              Terms
+            </Link>
+            <Link href="/legal/privacy-policy" style={{ fontSize: 12, color: "#8FA6A3", textDecoration: "none" }}>
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

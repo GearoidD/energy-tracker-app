@@ -1,35 +1,35 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { authStyles as s } from "../authStyles";
 import { HeroCard } from "../AuthHero";
 
-function LoginForm() {
+export default function ResetPasswordPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/dashboard";
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) {
       setError(error.message);
       return;
     }
-    router.push(next);
-    router.refresh();
+    setDone(true);
+    setTimeout(() => {
+      router.push("/dashboard");
+      router.refresh();
+    }, 1500);
   };
 
   return (
@@ -65,40 +65,37 @@ function LoginForm() {
               Watt<span style={{ color: "var(--teal)" }}>pryce</span>
             </span>
           </div>
-          <h1 style={s.h1}>Log in</h1>
-          <p style={s.tagline}>Welcome back.</p>
-          <form onSubmit={handleSubmit} style={s.form}>
-            <label style={s.label}>
-              Email
-              <input style={s.input} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            <label style={s.label}>
-              Password
-              <input style={s.input} type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </label>
-            <div style={{ marginTop: -10, marginBottom: -4 }}>
-              <Link href="/forgot-password" style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                Forgot password?
-              </Link>
-            </div>
-            {error && <div style={s.error}>{error}</div>}
-            <button style={s.button} type="submit" disabled={loading}>
-              {loading ? "Logging in…" : "Log in"}
-            </button>
-          </form>
-          <p style={s.footNote}>
-            No account yet? <Link href={`/signup${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}>Create one</Link>
-          </p>
+
+          {done ? (
+            <>
+              <h1 style={s.h1}>Password updated</h1>
+              <p style={{ color: "var(--muted)", fontSize: 14 }}>Taking you to your dashboard…</p>
+            </>
+          ) : (
+            <>
+              <h1 style={s.h1}>Set a new password</h1>
+              <p style={s.tagline}>Choose something you haven't used before.</p>
+              <form onSubmit={handleSubmit} style={s.form}>
+                <label style={s.label}>
+                  New password
+                  <input
+                    style={s.input}
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </label>
+                {error && <div style={s.error}>{error}</div>}
+                <button style={s.button} type="submit" disabled={loading}>
+                  {loading ? "Saving…" : "Save new password"}
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
   );
 }

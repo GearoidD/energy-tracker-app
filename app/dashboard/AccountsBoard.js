@@ -5,6 +5,7 @@ import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Penci
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import UploadReading from "./UploadReading";
+import ImportAccounts from "./ImportAccounts";
 import BenchmarksBoard from "./BenchmarksBoard";
 import CompanyOverview from "./CompanyOverview";
 
@@ -727,6 +728,7 @@ export default function AccountsBoard({ companyId }) {
   const [quotePickerFor, setQuotePickerFor] = useState(null);
   const [showBenchmarks, setShowBenchmarks] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [ratePullFor, setRatePullFor] = useState(null);
   const [ratePullLoading, setRatePullLoading] = useState(false);
   const [ratePullResult, setRatePullResult] = useState(null);
@@ -1114,12 +1116,12 @@ export default function AccountsBoard({ companyId }) {
 
   return (
     <div>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 640px) {
           .wp-summary-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .wp-row-collapsed { flex-wrap: wrap !important; }
         }
-      `}</style>
+      ` }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 14 }}>
         <div>
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Accounts</h1>
@@ -1131,6 +1133,12 @@ export default function AccountsBoard({ companyId }) {
             style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             <BarChart3 size={16} /> Overview
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+          >
+            <Upload size={16} /> Import accounts
           </button>
           <button
             onClick={() => exportAccountsCSV(accounts)}
@@ -1744,6 +1752,18 @@ export default function AccountsBoard({ companyId }) {
 
       {showOverview && (
         <CompanyOverview accounts={accounts} readingSummaries={readingSummaries} onClose={() => setShowOverview(false)} />
+      )}
+
+      {showImport && (
+        <ImportAccounts
+          companyId={companyId}
+          existingAccounts={accounts}
+          onCancel={() => setShowImport(false)}
+          onDone={() => {
+            setShowImport(false);
+            loadAccounts();
+          }}
+        />
       )}
     </div>
   );
