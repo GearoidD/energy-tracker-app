@@ -250,12 +250,21 @@ function marketComparisonFor(acc, benchmarks, masterRates = []) {
 
 function estimatedAnnualSpend(acc, readings) {
   const rated = (readings || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
-  if (rated.length === 0) return null;
+
+  if (rated.length === 0) {
+    // No bill history yet — fall back to whatever was entered directly on the account,
+    // rather than showing €0 next to a non-zero savings figure, which is actively misleading.
+    const rate = parseFloat(acc.rate);
+    const usage = parseFloat(acc.usage);
+    const standing = parseFloat(acc.standing_charge) || 0;
+    if (isNaN(rate) || isNaN(usage)) return null;
+    return (rate / 100) * usage + (standing / 100) * 365;
+  }
 
   const sorted = [...rated].sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
   const first = new Date(sorted[0].reading_date);
   const last = new Date(sorted[sorted.length - 1].reading_date);
-  const daySpan = Math.max((last - first) / 86400000, 30); // assume at least a month's worth per bill
+  const daySpan = Math.max((last - first) / 86400000, 30);
 
   const totalEnergyCost = sorted.reduce((sum, r) => sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage), 0);
   const scaleFactor = 365 / daySpan;
