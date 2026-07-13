@@ -1141,7 +1141,8 @@ export default function AccountsBoard({ companyId }) {
     <div>
       <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 640px) {
-          .wp-summary-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .wp-summary-grid { flex-wrap: wrap !important; row-gap: 16px !important; }
+          .wp-summary-grid > div { border-left: none !important; padding-left: 0 !important; padding-right: 24px !important; width: 45% !important; }
           .wp-row-collapsed { flex-wrap: wrap !important; }
         }
       ` }} />
@@ -1224,21 +1225,19 @@ export default function AccountsBoard({ companyId }) {
 
       <div
         style={{
-          background: attentionItems.length === 0 ? "var(--panel)" : "var(--panel)",
-          border: `1px solid ${attentionItems.length === 0 ? "var(--border)" : "var(--amber)55"}`,
-          borderRadius: 10,
-          padding: "16px 18px",
-          marginBottom: 22,
+          borderLeft: `3px solid ${attentionItems.length === 0 ? "var(--green)" : "var(--amber)"}`,
+          padding: "4px 0 4px 16px",
+          marginBottom: 28,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: attentionItems.length === 0 ? 0 : 10 }}>
-          <AlertTriangle size={16} color={attentionItems.length === 0 ? "var(--green)" : "var(--amber)"} />
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: 600 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: attentionItems.length === 0 ? 0 : 8 }}>
+          <AlertTriangle size={15} color={attentionItems.length === 0 ? "var(--green)" : "var(--amber)"} />
+          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 13.5, fontWeight: 600 }}>
             {attentionItems.length === 0 ? "Nothing needs attention right now" : `${attentionItems.length} thing${attentionItems.length === 1 ? "" : "s"} need attention`}
           </span>
         </div>
         {attentionItems.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {attentionItems.slice(0, 8).map((item) => (
               <button
                 key={item.id}
@@ -1253,10 +1252,10 @@ export default function AccountsBoard({ companyId }) {
                   cursor: "pointer",
                   textAlign: "left",
                   fontSize: 12.5,
-                  color: "var(--text)",
+                  color: "var(--muted)",
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
                 {item.message}
               </button>
             ))}
@@ -1267,21 +1266,24 @@ export default function AccountsBoard({ companyId }) {
         )}
       </div>
 
-      <div className="wp-summary-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
-        <div style={{ background: "var(--panel)", borderRadius: 10, padding: "14px 16px" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>{summaryStats.total}</div>
+      <div
+        className="wp-summary-grid"
+        style={{ display: "flex", gap: 0, marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}
+      >
+        <div style={{ padding: "0 24px 0 0" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: "var(--text)" }}>{summaryStats.total}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Accounts tracked</div>
         </div>
-        <div style={{ background: "var(--panel)", borderLeft: "3px solid var(--amber)", borderRadius: 10, padding: "14px 16px" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--amber)" }}>{summaryStats.renewingSoon90}</div>
+        <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: summaryStats.renewingSoon90 > 0 ? "var(--amber)" : "var(--text)" }}>{summaryStats.renewingSoon90}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Renewing within 90 days</div>
         </div>
-        <div style={{ background: "var(--panel)", borderLeft: "3px solid var(--green)", borderRadius: 10, padding: "14px 16px" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--green)" }}>{fmtMoney(summaryStats.potentialSavings)}</div>
+        <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>{fmtMoney(summaryStats.potentialSavings)}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Potential savings/yr</div>
         </div>
-        <div style={{ background: "var(--panel)", borderRadius: 10, padding: "14px 16px" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</div>
+        <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</div>
           <div title="Extrapolated from the bills you've entered — the more history an account has, the more accurate this is" style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, cursor: "help", textDecoration: "underline dotted" }}>Est. annual spend</div>
         </div>
       </div>
