@@ -248,12 +248,22 @@ function marketComparisonFor(acc, benchmarks, masterRates = []) {
   return { rate: parseFloat(match.typical_rate), source: "estimated" };
 }
 
-function annualCost(acc) {
-  const rate = parseFloat(acc.rate);
-  const usage = parseFloat(acc.usage);
+function estimatedAnnualSpend(acc, readings) {
+  const rated = (readings || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
+  if (rated.length === 0) return null;
+
+  const sorted = [...rated].sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
+  const first = new Date(sorted[0].reading_date);
+  const last = new Date(sorted[sorted.length - 1].reading_date);
+  const daySpan = Math.max((last - first) / 86400000, 30); // assume at least a month's worth per bill
+
+  const totalEnergyCost = sorted.reduce((sum, r) => sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage), 0);
+  const scaleFactor = 365 / daySpan;
+
   const standing = parseFloat(acc.standing_charge) || 0;
-  if (isNaN(rate) || isNaN(usage)) return null;
-  return (rate / 100) * usage + (standing / 100) * 365;
+  const annualStanding = (standing / 100) * 365;
+
+  return totalEnergyCost * scaleFactor + annualStanding;
 }
 
 function annualSaving(acc) {
@@ -1020,7 +1030,7 @@ export default function AccountsBoard({ companyId }) {
           }
         }
 
-        return { ...a, daysLeft, status, saving, cost: annualCost(a), comparison, confidence, rateChange };
+        return { ...a, daysLeft, status, saving, cost: estimatedAnnualSpend(a, readingSummaries[a.id]), comparison, confidence, rateChange };
       })
       .filter((a) => {
         const q = search.toLowerCase();
@@ -1230,7 +1240,7 @@ export default function AccountsBoard({ companyId }) {
         </div>
         <div style={{ background: "var(--panel)", borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Est. annual spend</div>
+          <div title="Extrapolated from the bills you've entered — the more history an account has, the more accurate this is" style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, cursor: "help", textDecoration: "underline dotted" }}>Est. annual spend</div>
         </div>
       </div>
 

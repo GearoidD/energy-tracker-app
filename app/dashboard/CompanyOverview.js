@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from "recharts";
 
 const RANGE_OPTIONS = [
   { label: "3 months", months: 3 },
@@ -160,29 +160,39 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
               </button>
             ))}
           </div>
-          <div style={{ width: "100%", height: 200, marginBottom: 24 }}>
+          <div style={{ width: "100%", height: 280, marginBottom: 24 }}>
             <ResponsiveContainer>
-              <LineChart data={monthly} margin={{ top: 6, right: 6, left: -8, bottom: 0 }}>
+              <LineChart data={monthly} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
                 <CartesianGrid stroke="#24403F" strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#8FA6A3" }} />
+                <XAxis dataKey="label" tick={{ fontSize: 13, fill: "#B8C7C4" }} tickLine={false} axisLine={{ stroke: "#24403F" }} />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "#8FA6A3" }}
-                  width={50}
-                  label={{ value: metric === "cost" ? "€" : "kWh", angle: -90, position: "insideLeft", fontSize: 10, fill: "#8FA6A3" }}
+                  tick={{ fontSize: 12, fill: "#B8C7C4" }}
+                  width={64}
+                  tickLine={false}
+                  axisLine={{ stroke: "#24403F" }}
+                  label={{ value: metric === "cost" ? "€" : "kWh", angle: -90, position: "insideLeft", fontSize: 12, fill: "#8FA6A3" }}
                 />
                 <Tooltip
-                  contentStyle={{ background: "var(--panel)", border: "1px solid var(--border-light)", fontSize: 12 }}
-                  labelStyle={{ color: "var(--text)" }}
-                  formatter={(v) => [metric === "cost" ? `€${v}` : `${v} kWh`, metric === "cost" ? "Estimated cost" : "Usage"]}
+                  contentStyle={{ background: "var(--panel)", border: "1px solid var(--border-light)", fontSize: 13, borderRadius: 8 }}
+                  labelStyle={{ color: "var(--text)", fontWeight: 600 }}
+                  formatter={(v) => [metric === "cost" ? `€${v.toLocaleString()}` : `${v.toLocaleString()} kWh`, metric === "cost" ? "Estimated cost" : "Usage"]}
                 />
                 <Line
                   type="monotone"
                   dataKey={metric}
                   name={metric === "cost" ? "Estimated cost" : "Usage"}
                   stroke={metric === "cost" ? "#2FA79A" : "#E8A33D"}
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
+                  strokeWidth={2.5}
+                  dot={{ r: 4, strokeWidth: 0, fill: metric === "cost" ? "#2FA79A" : "#E8A33D" }}
+                  activeDot={{ r: 6 }}
+                >
+                  <LabelList
+                    dataKey={metric}
+                    position="top"
+                    formatter={(v) => (metric === "cost" ? `€${v.toLocaleString()}` : v.toLocaleString())}
+                    style={{ fontSize: 12, fill: "#EDF3F1", fontWeight: 600 }}
+                  />
+                </Line>
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -130,10 +130,24 @@ export default function MasterRatesBoard() {
         <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>
           Master rates
         </h1>
-        <p style={{ color: "var(--muted)", fontSize: 13.5, marginBottom: 28 }}>
+        <p style={{ color: "var(--muted)", fontSize: 13.5, marginBottom: 12 }}>
           These feed into every customer's market comparison automatically — labeled "Wattpryce verified" — ahead of the AI
           estimate. Keep the date current; a stale rate is worse than an honest AI estimate.
         </p>
+
+        <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "14px 16px", marginBottom: 24, fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6 }}>
+          <strong style={{ color: "var(--text)" }}>How matching actually works:</strong> every customer's account is
+          automatically classified — gas accounts by usage and SPC into <strong style={{ color: "var(--text)" }}>SBU / MBU / FVT</strong>,
+          electricity accounts by whether they have a MIC set (<strong style={{ color: "var(--text)" }}>MIC</strong> vs{" "}
+          <strong style={{ color: "var(--text)" }}>standard</strong>). Set a <strong style={{ color: "var(--text)" }}>Tariff tier</strong> below
+          and this rate applies to every matching account automatically — no manual linking needed. Only use{" "}
+          <strong style={{ color: "var(--text)" }}>Min/Max usage</strong> instead if you want a plain usage-band fallback with no tier
+          logic. A tier match always takes priority over a usage-band match.
+          <br />
+          <br />
+          Example: adding a <strong style={{ color: "var(--text)" }}>Gas / MBU</strong> rate instantly applies to every gas account
+          across every customer that's currently classified as MBU — you don't pick which ones.
+        </div>
 
         {error && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
 
@@ -170,6 +184,14 @@ export default function MasterRatesBoard() {
               Max usage (kWh, optional)
               <input style={inputStyle} type="number" value={form.max_usage} onChange={set("max_usage")} />
             </label>
+          </div>
+
+          <div style={{ background: "var(--panel2, var(--bg))", border: "1px dashed var(--border-light)", borderRadius: 6, padding: "8px 12px", fontSize: 12, color: "var(--teal)", marginBottom: 12 }}>
+            This rate will apply to: {form.tariff_tier
+              ? `every ${form.fuel_type} account classified as ${form.tariff_tier}`
+              : form.min_usage || form.max_usage
+              ? `every ${form.fuel_type} account using between ${form.min_usage || "0"} and ${form.max_usage || "∞"} kWh/yr with no tariff tier set`
+              : "nothing yet — set a tariff tier or a usage range above"}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
