@@ -736,6 +736,9 @@ export default function AccountsBoard({ companyId }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState("");
+  const [filterFuel, setFilterFuel] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterRenewal, setFilterRenewal] = useState("all");
   const [uploadingFor, setUploadingFor] = useState(null);
   const [addingReadingFor, setAddingReadingFor] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -1085,14 +1088,18 @@ export default function AccountsBoard({ companyId }) {
       })
       .filter((a) => {
         const q = search.toLowerCase();
-        return !q || a.name.toLowerCase().includes(q) || (a.provider || "").toLowerCase().includes(q);
+        const matchesSearch = !q || a.name.toLowerCase().includes(q) || (a.provider || "").toLowerCase().includes(q);
+        const matchesFuel = filterFuel === "all" || (a.fuel_type || "electricity") === filterFuel;
+        const matchesStatus = filterStatus === "all" || overallStatusFor(a).label === filterStatus;
+        const matchesRenewal = filterRenewal === "all" || (a.renewal_status || "not_started") === filterRenewal;
+        return matchesSearch && matchesFuel && matchesStatus && matchesRenewal;
       })
       .sort((a, b) => {
         const rankDiff = severityRank(a) - severityRank(b);
         if (rankDiff !== 0) return rankDiff;
         return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
       });
-  }, [accounts, search, benchmarks, masterRates, readingSummaries]);
+  }, [accounts, search, filterFuel, filterStatus, filterRenewal, benchmarks, masterRates, readingSummaries]);
 
   const summaryStats = useMemo(() => {
     const needAttention = enriched.filter((a) => {
@@ -1341,9 +1348,51 @@ export default function AccountsBoard({ companyId }) {
         </div>
       </div>
 
-      <div style={{ position: "relative", marginBottom: 18, maxWidth: 320 }}>
-        <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: 10 }} />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search site or provider…" style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }} />
+      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ position: "relative", maxWidth: 320, flex: 1, minWidth: 200 }}>
+          <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: 10 }} />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search site or provider…" style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }} />
+        </div>
+
+        <select value={filterFuel} onChange={(e) => setFilterFuel(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+          <option value="all">All fuel types</option>
+          <option value="electricity">Electricity</option>
+          <option value="gas">Gas</option>
+        </select>
+
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+          <option value="all">All statuses</option>
+          <option value="Action needed">Action needed</option>
+          <option value="Missing bill">Missing bill</option>
+          <option value="Rate jumped">Rate jumped</option>
+          <option value="Renewing soon">Renewing soon</option>
+          <option value="Needs review">Needs review</option>
+          <option value="Quote requested">Quote requested</option>
+          <option value="Switching">Switching</option>
+          <option value="On track">On track</option>
+        </select>
+
+        <select value={filterRenewal} onChange={(e) => setFilterRenewal(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+          <option value="all">All renewal stages</option>
+          <option value="not_started">Not started</option>
+          <option value="quote_requested">Quote requested</option>
+          <option value="switching">Switching</option>
+          <option value="renewed">Renewed</option>
+        </select>
+
+        {(filterFuel !== "all" || filterStatus !== "all" || filterRenewal !== "all" || search) && (
+          <button
+            onClick={() => {
+              setFilterFuel("all");
+              setFilterStatus("all");
+              setFilterRenewal("all");
+              setSearch("");
+            }}
+            style={{ background: "none", border: "none", color: "var(--teal)", cursor: "pointer", fontSize: 12.5 }}
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {error && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
@@ -1352,7 +1401,7 @@ export default function AccountsBoard({ companyId }) {
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--muted)", border: "1px dashed var(--border)", borderRadius: 12 }}>
           <Flame size={28} color="var(--teal-dim)" style={{ marginBottom: 10 }} />
           <div style={{ fontSize: 14 }}>
-            {accounts.length === 0 ? "No accounts yet. Add your first energy account to start tracking renewals." : "No accounts match that search."}
+            {accounts.length === 0 ? "No accounts yet. Add your first energy account to start tracking renewals." : "No accounts match that search or filter."}
           </div>
         </div>
       ) : (
