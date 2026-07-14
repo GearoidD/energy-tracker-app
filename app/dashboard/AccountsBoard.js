@@ -381,7 +381,7 @@ const inputStyle = {
   outline: "none",
 };
 
-function Field({ label, required, children }) {
+function Field({ label, required, hint, children }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "var(--muted)" }}>
       <span>
@@ -389,6 +389,7 @@ function Field({ label, required, children }) {
         {required ? <span style={{ color: "var(--red)" }}> *</span> : <span style={{ color: "var(--muted)", opacity: 0.7 }}> (optional)</span>}
       </span>
       {children}
+      {hint && <span style={{ fontSize: 11, color: "var(--muted)", opacity: 0.8, marginTop: -2 }}>{hint}</span>}
     </label>
   );
 }
@@ -434,8 +435,8 @@ function AccountForm({ initial, onSave, onCancel }) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Field label="Site / account name" required>
-            <input style={inputStyle} value={form.name} onChange={set("name")} placeholder="e.g. Warehouse 2 — Cork" />
+          <Field label="Site / account name" required hint="Use the same format for every site — makes search and sorting easier later.">
+            <input style={inputStyle} value={form.name} onChange={set("name")} placeholder="e.g. 12 Main Street, Unit 3" />
           </Field>
           <Field label="Fuel type" required>
             <select style={inputStyle} value={form.fuel_type} onChange={set("fuel_type")}>
