@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
@@ -727,6 +728,7 @@ function quoteRequestMailto(acc, supplierEmail) {
 
 export default function AccountsBoard({ companyId }) {
   const supabase = createClient();
+  const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -745,6 +747,8 @@ export default function AccountsBoard({ companyId }) {
   const [masterRates, setMasterRates] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [quotePickerFor, setQuotePickerFor] = useState(null);
+  const [quickRenewFor, setQuickRenewFor] = useState(null);
+  const [quickRenewForm, setQuickRenewForm] = useState({ rate: "", provider: "", contract_end: "" });
   const [showBenchmarks, setShowBenchmarks] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -857,6 +861,42 @@ export default function AccountsBoard({ companyId }) {
         .order("reading_date", { ascending: false });
       setReadingsByAccount((prev) => ({ ...prev, [accountId]: data || [] }));
     }
+  };
+
+  const openQuickRenew = (account) => {
+    setQuickRenewFor(account.id);
+    setQuickRenewForm({ rate: account.rate || "", provider: account.provider || "", contract_end: "" });
+  };
+
+  useEffect(() => {
+    const renewId = searchParams.get("renew");
+    if (renewId && accounts.length > 0) {
+      const match = accounts.find((a) => a.id === renewId);
+      if (match) openQuickRenew(match);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, searchParams]);
+
+  const saveQuickRenew = async (accountId) => {
+    if (!quickRenewForm.contract_end) {
+      alert("New contract end date is required.");
+      return;
+    }
+    const { error } = await supabase
+      .from("accounts")
+      .update({
+        rate: quickRenewForm.rate || null,
+        provider: quickRenewForm.provider || null,
+        contract_end: quickRenewForm.contract_end,
+        renewal_status: "not_started",
+      })
+      .eq("id", accountId);
+    if (error) {
+      alert("Couldn't save: " + error.message);
+      return;
+    }
+    setQuickRenewFor(null);
+    loadAccounts();
   };
 
   const loadNotes = async (accountId) => {
@@ -1345,7 +1385,13 @@ export default function AccountsBoard({ companyId }) {
                       <MoreHorizontal size={18} />
                     </button>
                     {menuForId === a.id && (
-                      <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 8, minWidth: 140, zIndex: 20, overflow: "hidden" }}>
+                      <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 8, minWidth: 160, zIndex: 20, overflow: "hidden" }}>
+                        <button
+                          onClick={() => { setMenuForId(null); openQuickRenew(a); }}
+                          style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "9px 12px", color: "var(--teal)", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                        >
+                          Just renewed?
+                        </button>
                         <button
                           onClick={() => { setMenuForId(null); setUploadingFor(a.id); }}
                           style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "9px 12px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}
@@ -1818,6 +1864,66 @@ export default function AccountsBoard({ companyId }) {
             loadAccounts();
           }}
         />
+      )}
+
+      {quickRenewFor && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(6,12,14,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 65, padding: 20 }}
+          onClick={() => setQuickRenewFor(null)}
+        >
+          <div
+            style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 380, maxWidth: "100%", padding: 24 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>Just renewed?</h2>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>
+              Three quick fields — full details can wait for the next bill.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 18 }}>
+              <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
+                New contract end date *
+                <input
+                  type="date"
+                  style={inputStyle}
+                  value={quickRenewForm.contract_end}
+                  onChange={(e) => setQuickRenewForm((f) => ({ ...f, contract_end: e.target.value }))}
+                />
+              </label>
+              <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
+                New rate (c/kWh)
+                <input
+                  type="number"
+                  step="0.01"
+                  style={inputStyle}
+                  value={quickRenewForm.rate}
+                  onChange={(e) => setQuickRenewForm((f) => ({ ...f, rate: e.target.value }))}
+                />
+              </label>
+              <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
+                Provider
+                <input
+                  style={inputStyle}
+                  value={quickRenewForm.provider}
+                  onChange={(e) => setQuickRenewForm((f) => ({ ...f, provider: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                onClick={() => setQuickRenewFor(null)}
+                style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)", padding: "9px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => saveQuickRenew(quickRenewFor)}
+                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

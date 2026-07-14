@@ -18,6 +18,7 @@ function urgencyLine(daysLeft) {
 }
 
 export async function GET(request) {
+  // Only Vercel's Cron scheduler (or you, manually, with the secret) can trigger this.
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,6 +36,8 @@ export async function GET(request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Only accounts that hit an exact reminder milestone today, or are overdue
+  // (overdue accounts get a reminder every day, since that's the whole point).
   const dueAccounts = (accounts || [])
     .map((a) => ({ ...a, daysLeft: daysUntil(a.contract_end) }))
     .filter((a) => a.daysLeft < 0 || REMINDER_DAYS.includes(a.daysLeft));
@@ -43,6 +46,7 @@ export async function GET(request) {
     return NextResponse.json({ sent: 0, message: "Nothing due today" });
   }
 
+  // Group by company so each team gets one email, not one per account
   const byCompany = {};
   for (const a of dueAccounts) {
     if (!byCompany[a.company_id]) byCompany[a.company_id] = [];
@@ -64,7 +68,7 @@ export async function GET(request) {
     const listHtml = accountsForCompany
       .map(
         (a) =>
-          `<li><strong>${a.name}</strong>${a.provider ? ` (${a.provider})` : ""} — ${urgencyLine(a.daysLeft)}</li>`
+          `<li><strong>${a.name}</strong>${a.provider ? ` (${a.provider})` : ""} — ${urgencyLine(a.daysLeft)} — <a href="https://wattpryce.com/dashboard?renew=${a.id}">Just renewed? Update it here</a></li>`
       )
       .join("");
 
@@ -76,7 +80,7 @@ export async function GET(request) {
         html: `
           <p>Here's what's coming up on your energy accounts:</p>
           <ul>${listHtml}</ul>
-          <p>Log in to Wattpryce to review or update these.</p>
+          <p>Or <a href="https://wattpryce.com/dashboard">log in to Wattpryce</a> to review everything.</p>
         `,
       });
       emailsSent++;
