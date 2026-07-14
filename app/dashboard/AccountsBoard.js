@@ -1103,6 +1103,8 @@ export default function AccountsBoard({ companyId }) {
 
     const potentialSavings = enriched.reduce((sum, a) => (a.saving && a.saving > 20 ? sum + a.saving : sum), 0);
     const totalSpend = enriched.reduce((sum, a) => (a.cost ? sum + a.cost : sum), 0);
+    const hasAnyComparison = enriched.some((a) => a.comparison);
+    const hasAnyCost = enriched.some((a) => a.cost !== null && a.cost !== undefined);
 
     return {
       total: enriched.length,
@@ -1110,6 +1112,8 @@ export default function AccountsBoard({ companyId }) {
       renewingSoon90,
       potentialSavings,
       totalSpend,
+      hasAnyComparison,
+      hasAnyCost,
     };
   }, [enriched]);
 
@@ -1319,12 +1323,20 @@ export default function AccountsBoard({ companyId }) {
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Renewing within 90 days</div>
         </div>
         <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>{fmtMoney(summaryStats.potentialSavings)}</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Potential savings/yr</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: !summaryStats.hasAnyComparison ? "var(--muted)" : summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>
+            {summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+            {summaryStats.hasAnyComparison ? "Potential savings/yr" : "No market comparison yet"}
+          </div>
         </div>
         <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</div>
-          <div title="Extrapolated from the bills you've entered — the more history an account has, the more accurate this is" style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, cursor: "help", textDecoration: "underline dotted" }}>Est. annual spend</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: summaryStats.hasAnyCost ? "var(--text)" : "var(--muted)" }}>
+            {summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "—"}
+          </div>
+          <div title="Extrapolated from the bills you've entered — the more history an account has, the more accurate this is" style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, cursor: "help", textDecoration: "underline dotted" }}>
+            {summaryStats.hasAnyCost ? "Est. annual spend" : "No bill data yet"}
+          </div>
         </div>
       </div>
 
@@ -1374,8 +1386,8 @@ export default function AccountsBoard({ companyId }) {
                     {overall.label !== "On track" && <AlertTriangle size={11} />}
                     {overall.label}
                   </span>
-                  <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                    {a.daysLeft === null ? "–" : a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d over` : `${a.daysLeft}d`}
+                  <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} title="Days until contract end date">
+                    {a.daysLeft === null ? "–" : a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d overdue` : `${a.daysLeft}d to renew`}
                   </span>
                   <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                     <button
