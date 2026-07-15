@@ -16,12 +16,12 @@ const inputStyle = {
 };
 
 const GAS_TIERS = ["SBU", "MBU", "FVT"];
-const ELEC_TIERS = ["standard", "MIC"];
+const ELEC_TIERS = ["DG1", "DG2", "DG3", "DG4", "DG5", "DG6", "DG7", "DG8", "DG9", "DG10"];
 
 function emptyForm() {
   return {
     fuel_type: "electricity",
-    tariff_tier: "standard",
+    tariff_tier: "DG5",
     min_usage: "",
     max_usage: "",
     rate: "",
@@ -138,15 +138,16 @@ export default function MasterRatesBoard() {
         <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "14px 16px", marginBottom: 24, fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6 }}>
           <strong style={{ color: "var(--text)" }}>How matching actually works:</strong> every customer's account is
           automatically classified — gas accounts by usage and SPC into <strong style={{ color: "var(--text)" }}>SBU / MBU / FVT</strong>,
-          electricity accounts by whether they have a MIC set (<strong style={{ color: "var(--text)" }}>MIC</strong> vs{" "}
-          <strong style={{ color: "var(--text)" }}>standard</strong>). Set a <strong style={{ color: "var(--text)" }}>Tariff tier</strong> below
-          and this rate applies to every matching account automatically — no manual linking needed. Only use{" "}
-          <strong style={{ color: "var(--text)" }}>Min/Max usage</strong> instead if you want a plain usage-band fallback with no tier
-          logic. A tier match always takes priority over a usage-band match.
+          electricity accounts by their real <strong style={{ color: "var(--text)" }}>DG Group</strong> (DG1–DG10, read straight off
+          the bill — most SMEs are DG5 or DG6). DG Group is what actually determines which rate structure applies, not MIC — MIC
+          is just the number used to calculate the capacity charge within whichever DG plan an account is on. Set a{" "}
+          <strong style={{ color: "var(--text)" }}>Tariff tier</strong> below and this rate applies to every matching account
+          automatically — no manual linking needed. Only use <strong style={{ color: "var(--text)" }}>Min/Max usage</strong> instead
+          if you want a plain usage-band fallback with no tier logic. A tier match always takes priority over a usage-band match.
           <br />
           <br />
-          Example: adding a <strong style={{ color: "var(--text)" }}>Gas / MBU</strong> rate instantly applies to every gas account
-          across every customer that's currently classified as MBU — you don't pick which ones.
+          Example: adding a <strong style={{ color: "var(--text)" }}>Electricity / DG6</strong> rate instantly applies to every
+          electricity account across every customer currently classified as DG6 — you don't pick which ones.
         </div>
 
         {error && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
@@ -159,7 +160,7 @@ export default function MasterRatesBoard() {
               <select
                 style={inputStyle}
                 value={form.fuel_type}
-                onChange={(e) => setForm((f) => ({ ...f, fuel_type: e.target.value, tariff_tier: e.target.value === "gas" ? "SBU" : "standard" }))}
+                onChange={(e) => setForm((f) => ({ ...f, fuel_type: e.target.value, tariff_tier: e.target.value === "gas" ? "SBU" : "DG5" }))}
               >
                 <option value="electricity">Electricity</option>
                 <option value="gas">Gas</option>

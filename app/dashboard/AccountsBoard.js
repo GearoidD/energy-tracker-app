@@ -216,8 +216,8 @@ function masterRateFor(acc, masterRates) {
   const candidates = masterRates.filter((r) => r.fuel_type === fuel);
   if (candidates.length === 0) return null;
 
-  const tier = fuel === "gas" ? gasTariffFor(acc) : acc.mic_kva ? "MIC" : "standard";
-  const tierMatch = candidates.find((r) => r.tariff_tier === tier);
+  const tier = fuel === "gas" ? gasTariffFor(acc) : acc.dg_group || null;
+  const tierMatch = tier ? candidates.find((r) => r.tariff_tier === tier) : null;
   if (tierMatch) return tierMatch;
 
   const usage = parseFloat(acc.usage);
@@ -243,12 +243,17 @@ function marketComparisonFor(acc, benchmarks, masterRates = []) {
   // A rate you've manually verified beats a company-specific benchmark or an AI estimate
   const master = masterRateFor(acc, masterRates);
   if (master) {
+    const micVal = parseFloat(acc.mic_kva);
+    const estCapacityCost =
+      master.capacity_charge && !isNaN(micVal) ? parseFloat(master.capacity_charge) * micVal : null;
     return {
       rate: parseFloat(master.rate),
       source: "verified",
       note: master.note,
       supplierName: master.suppliers?.name,
       updatedAt: master.updated_at,
+      dgGroup: master.tariff_tier,
+      estCapacityCost,
     };
   }
 
@@ -1877,12 +1882,22 @@ export default function AccountsBoard({ companyId }) {
                       </div>
                     )}
                     {a.comparison?.source === "verified" && (a.comparison.supplierName || a.comparison.note) && (
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>
                         {a.comparison.supplierName ? `${a.comparison.supplierName}` : ""}
                         {a.comparison.supplierName && a.comparison.note ? " · " : ""}
                         {a.comparison.note || ""}
                         {" · updated "}
                         {new Date(a.comparison.updatedAt).toLocaleDateString("en-IE")}
+                      </div>
+                    )}
+                    {a.comparison?.source === "verified" && a.comparison.dgGroup && (
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: a.comparison.estCapacityCost ? 4 : 10 }}>
+                        Matched on {a.comparison.dgGroup}
+                      </div>
+                    )}
+                    {a.comparison?.source === "verified" && a.comparison.estCapacityCost && (
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10 }}>
+                        Est. capacity charge at this rate: {fmtMoney(a.comparison.estCapacityCost)}/yr (based on {a.mic_kva} kVA MIC)
                       </div>
                     )}
 
