@@ -1077,11 +1077,17 @@ export default function AccountsBoard({ companyId, companyName }) {
         const fuel = acc.fuel_type || "electricity";
         const tier = fuel === "gas" ? gasTariffFor(acc) : acc.dg_group || null;
         if (tier) {
+          const matchedSupplier = quickRenewForm.provider
+            ? suppliers.find((s) => s.name.toLowerCase() === quickRenewForm.provider.toLowerCase())
+            : null;
           await supabase.from("rate_scan_queue").insert({
             fuel_type: fuel,
             tariff_tier: tier,
             rate: quickRenewForm.rate,
-            source_note: "Submitted by a customer after renewing — their actual new contracted rate, not just a quote.",
+            supplier_id: matchedSupplier?.id || null,
+            source_note: matchedSupplier
+              ? "Submitted by a customer after renewing — their actual new contracted rate, not just a quote."
+              : `Submitted by a customer after renewing with ${quickRenewForm.provider || "an unlisted supplier"} — add this supplier if you want it linked properly.`,
             status: "pending",
           });
         } else {

@@ -25,11 +25,20 @@ export default function RateReviewQueue() {
 
   const load = useCallback(async () => {
     const [queueRes, suppliersRes] = await Promise.all([
-      supabase.from("rate_scan_queue").select("*").eq("status", "pending").order("scanned_at", { ascending: false }),
+      supabase.from("rate_scan_queue").select("*, suppliers(name)").eq("status", "pending").order("scanned_at", { ascending: false }),
       supabase.from("suppliers").select("*").order("name"),
     ]);
-    setItems(queueRes.data || []);
+    const loadedItems = queueRes.data || [];
+    setItems(loadedItems);
     setSuppliers(suppliersRes.data || []);
+    // Pre-select any supplier already known from the original submission
+    setSelectedSupplier((prev) => {
+      const next = { ...prev };
+      loadedItems.forEach((item) => {
+        if (item.supplier_id && next[item.id] === undefined) next[item.id] = item.supplier_id;
+      });
+      return next;
+    });
     setLoading(false);
   }, []);
 
@@ -56,7 +65,9 @@ export default function RateReviewQueue() {
       rate: finalRate,
       capacity_charge: item.capacity_charge,
       supplier_id: supplierId,
-      note: `AI-scanned, confirmed by admin — ${item.source_note || ""}`.trim(),
+      note: item.source_note?.includes("Submitted by a customer")
+        ? `Confirmed by admin — ${item.source_note}`
+        : `AI-scanned, confirmed by admin — ${item.source_note || ""}`.trim(),
       updated_at: new Date().toISOString(),
     };
 
@@ -97,9 +108,11 @@ export default function RateReviewQueue() {
               <div>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>
                   {item.fuel_type === "gas" ? "Gas" : "Electricity"} · {item.tariff_tier}
+                  {item.suppliers?.name && <span style={{ color: "var(--teal)" }}> · {item.suppliers.name}</span>}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
-                  Scanned {new Date(item.scanned_at).toLocaleDateString("en-IE")}
+                  {item.source_note?.includes("Submitted by a customer") ? "Customer submission" : "AI-scanned"} ·{" "}
+                  {new Date(item.scanned_at).toLocaleDateString("en-IE")}
                   {item.capacity_charge ? ` · capacity charge €${item.capacity_charge}/kVA/yr` : ""}
                 </div>
               </div>
