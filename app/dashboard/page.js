@@ -57,7 +57,7 @@ export default async function DashboardPage() {
     <div style={{ minHeight: "100vh" }}>
       <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
       <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
-        <AccountsBoard companyId={activeCompanyId} />
+        <AccountsBoard companyId={activeCompanyId} companyName={companies.find((c) => c.id === activeCompanyId)?.name || ""} />
       </div>
     </div>
   );

@@ -730,7 +730,7 @@ function recommendationFor(a) {
   };
 }
 
-function providerNegotiationMailto(acc, providerEmail, comparison) {
+function providerNegotiationMailto(acc, providerEmail, comparison, companyName) {
   const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
   const subject = `Renewal check-in — ${acc.name}${acc.account_number ? ` (${acc.account_number})` : ""}`;
 
@@ -739,9 +739,12 @@ function providerNegotiationMailto(acc, providerEmail, comparison) {
     "",
     `Ahead of my ${fuel} contract renewal, I wanted to check in on the account below:`,
     "",
+    companyName ? `Business: ${companyName}` : null,
     `Site: ${acc.name}`,
     acc.account_number ? `${fuel === "gas" ? "GPRN" : "MPRN"}: ${acc.account_number}` : null,
     acc.rate ? `Current rate: ${acc.rate}c/kWh` : null,
+    acc.standing_charge ? `Current standing charge: ${acc.standing_charge}c/day` : null,
+    fuel !== "gas" && acc.dg_group ? `DG Group: ${acc.dg_group}` : null,
     acc.contract_end ? `Contract end date: ${acc.contract_end}` : null,
     "",
     comparison && comparison.rate < acc.rate
@@ -754,15 +757,16 @@ function providerNegotiationMailto(acc, providerEmail, comparison) {
   return `mailto:${providerEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
 }
 
-function buildBulkQuoteRequestContent(accs) {
+function buildBulkQuoteRequestContent(accs, companyName) {
   const subject = `Rate quote request — ${accs.length} account${accs.length === 1 ? "" : "s"}`;
 
   const lines = [
     "Hi,",
     "",
+    companyName ? `Business: ${companyName}` : null,
     `I'd like current business rate quotes for the following ${accs.length} account${accs.length === 1 ? "" : "s"}:`,
     "",
-  ];
+  ].filter(Boolean);
 
   accs.forEach((acc, i) => {
     const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
@@ -771,10 +775,12 @@ function buildBulkQuoteRequestContent(accs) {
     if (acc.account_number) lines.push(`   ${fuel === "gas" ? "GPRN" : "MPRN"}: ${acc.account_number}`);
     if (acc.provider) lines.push(`   Current supplier: ${acc.provider}`);
     if (acc.rate) lines.push(`   Current rate: ${acc.rate}c/kWh`);
+    if (acc.standing_charge) lines.push(`   Current standing charge: ${acc.standing_charge}c/day`);
     if (acc.usage) lines.push(`   Annual usage: ${acc.usage} kWh`);
     if (fuel === "gas" && tariff) lines.push(`   Tariff tier: ${tariff}`);
     if (fuel === "gas" && acc.spc_kwh) lines.push(`   Supply Point Capacity: ${acc.spc_kwh} kWh`);
     if (fuel !== "gas" && acc.mic_kva) lines.push(`   MIC: ${acc.mic_kva} kVA`);
+    if (fuel !== "gas" && acc.dg_group) lines.push(`   DG Group: ${acc.dg_group}`);
     if (acc.contract_end) lines.push(`   Contract end date: ${acc.contract_end}`);
     lines.push("");
   });
@@ -784,17 +790,17 @@ function buildBulkQuoteRequestContent(accs) {
   return { subject, body: lines.join("\n") };
 }
 
-function bulkQuoteRequestMailto(accs, supplierEmail) {
-  const { subject, body } = buildBulkQuoteRequestContent(accs);
+function bulkQuoteRequestMailto(accs, supplierEmail, companyName) {
+  const { subject, body } = buildBulkQuoteRequestContent(accs, companyName);
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function bulkQuoteRequestMailtoBCC(accs, supplierEmails) {
-  const { subject, body } = buildBulkQuoteRequestContent(accs);
+function bulkQuoteRequestMailtoBCC(accs, supplierEmails, companyName) {
+  const { subject, body } = buildBulkQuoteRequestContent(accs, companyName);
   return `mailto:?bcc=${encodeURIComponent(supplierEmails.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function buildQuoteRequestContent(acc) {
+function buildQuoteRequestContent(acc, companyName) {
   const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
   const tariff = gasTariffFor(acc);
 
@@ -805,14 +811,17 @@ function buildQuoteRequestContent(acc) {
     "",
     `I'd like a current business ${fuel} rate quote for the following account:`,
     "",
+    companyName ? `Business: ${companyName}` : null,
     `Site: ${acc.name}`,
     acc.account_number ? `${fuel === "gas" ? "GPRN" : "MPRN"}: ${acc.account_number}` : null,
     acc.provider ? `Current supplier: ${acc.provider}` : null,
     acc.rate ? `Current rate: ${acc.rate}c/kWh` : null,
+    acc.standing_charge ? `Current standing charge: ${acc.standing_charge}c/day` : null,
     acc.usage ? `Annual usage: ${acc.usage} kWh` : null,
     fuel === "gas" && tariff ? `Tariff tier: ${tariff}` : null,
     fuel === "gas" && acc.spc_kwh ? `Supply Point Capacity: ${acc.spc_kwh} kWh` : null,
     fuel !== "gas" && acc.mic_kva ? `MIC: ${acc.mic_kva} kVA` : null,
+    fuel !== "gas" && acc.dg_group ? `DG Group: ${acc.dg_group}` : null,
     acc.contract_end ? `Current contract end date: ${acc.contract_end}` : null,
     "",
     "Could you send over your best current rate for this account?",
@@ -823,17 +832,17 @@ function buildQuoteRequestContent(acc) {
   return { subject, body: lines.join("\n") };
 }
 
-function quoteRequestMailtoBCC(acc, supplierEmails) {
-  const { subject, body } = buildQuoteRequestContent(acc);
+function quoteRequestMailtoBCC(acc, supplierEmails, companyName) {
+  const { subject, body } = buildQuoteRequestContent(acc, companyName);
   return `mailto:?bcc=${encodeURIComponent(supplierEmails.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function quoteRequestMailto(acc, supplierEmail) {
-  const { subject, body } = buildQuoteRequestContent(acc);
+function quoteRequestMailto(acc, supplierEmail, companyName) {
+  const { subject, body } = buildQuoteRequestContent(acc, companyName);
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-export default function AccountsBoard({ companyId }) {
+export default function AccountsBoard({ companyId, companyName }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState([]);
@@ -1659,7 +1668,7 @@ export default function AccountsBoard({ companyId }) {
                 <>
                   {chosenSuppliers.length > 1 && emailableChosen.length === chosenSuppliers.length && (
                     <a
-                      href={bulkQuoteRequestMailtoBCC(selectedAccounts, emailableChosen.map((s) => s.contact_email))}
+                      href={bulkQuoteRequestMailtoBCC(selectedAccounts, emailableChosen.map((s) => s.contact_email), companyName)}
                       onClick={() => setBulkQuotePickerOpen(false)}
                       style={{
                         display: "flex",
@@ -1687,7 +1696,7 @@ export default function AccountsBoard({ companyId }) {
                         </label>
                         {s.accepts_email_quotes && s.contact_email ? (
                           <a
-                            href={bulkQuoteRequestMailto(selectedAccounts, s.contact_email)}
+                            href={bulkQuoteRequestMailto(selectedAccounts, s.contact_email, companyName)}
                             onClick={() => setBulkQuotePickerOpen(false)}
                             style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}
                           >
@@ -2053,7 +2062,8 @@ export default function AccountsBoard({ companyId }) {
                           href={providerNegotiationMailto(
                             a,
                             suppliers.find((s) => s.name.toLowerCase() === a.provider.toLowerCase())?.contact_email,
-                            a.comparison
+                            a.comparison,
+                            companyName
                           )}
                           style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", color: "var(--muted)", cursor: "pointer", fontSize: 12, textDecoration: "none" }}
                         >
@@ -2092,7 +2102,7 @@ export default function AccountsBoard({ companyId }) {
                                     if (emailable.length === selectedSuppliers.length) {
                                       return (
                                         <a
-                                          href={quoteRequestMailtoBCC(a, emailable.map((s) => s.contact_email))}
+                                          href={quoteRequestMailtoBCC(a, emailable.map((s) => s.contact_email), companyName)}
                                           style={{
                                             display: "flex",
                                             alignItems: "center",
@@ -2124,7 +2134,7 @@ export default function AccountsBoard({ companyId }) {
                                         <span style={{ color: "var(--text)" }}>{s.name}</span>
                                         {s.accepts_email_quotes && s.contact_email ? (
                                           <a
-                                            href={quoteRequestMailto(a, s.contact_email)}
+                                            href={quoteRequestMailto(a, s.contact_email, companyName)}
                                             style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
                                           >
                                             <Mail size={11} /> Email
@@ -2146,7 +2156,7 @@ export default function AccountsBoard({ companyId }) {
                                     </label>
                                     {s.accepts_email_quotes && s.contact_email ? (
                                       <a
-                                        href={quoteRequestMailto(a, s.contact_email)}
+                                        href={quoteRequestMailto(a, s.contact_email, companyName)}
                                         style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
                                       >
                                         <Mail size={11} /> Email
