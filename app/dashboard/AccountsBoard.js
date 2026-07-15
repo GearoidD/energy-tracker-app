@@ -769,7 +769,7 @@ function bulkQuoteRequestMailto(accs, supplierEmail) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
 }
 
-function quoteRequestMailto(acc, supplierEmail) {
+function buildQuoteRequestContent(acc) {
   const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
   const tariff = gasTariffFor(acc);
 
@@ -795,7 +795,17 @@ function quoteRequestMailto(acc, supplierEmail) {
     "Thanks,",
   ].filter(Boolean);
 
-  return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
+  return { subject, body: lines.join("\n") };
+}
+
+function quoteRequestMailtoBCC(acc, supplierEmails) {
+  const { subject, body } = buildQuoteRequestContent(acc);
+  return `mailto:?bcc=${encodeURIComponent(supplierEmails.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function quoteRequestMailto(acc, supplierEmail) {
+  const { subject, body } = buildQuoteRequestContent(acc);
+  return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 export default function AccountsBoard({ companyId }) {
@@ -1995,6 +2005,37 @@ export default function AccountsBoard({ companyId }) {
                                   <div style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)", letterSpacing: 0.5, marginBottom: 6 }}>
                                     SELECTED — CLICK EACH TO SEND
                                   </div>
+                                  {(() => {
+                                    const emailable = selectedSuppliers.filter((s) => s.accepts_email_quotes && s.contact_email);
+                                    if (emailable.length === selectedSuppliers.length) {
+                                      return (
+                                        <a
+                                          href={quoteRequestMailtoBCC(a, emailable.map((s) => s.contact_email))}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 6,
+                                            background: "var(--teal)",
+                                            color: "#06201d",
+                                            textDecoration: "none",
+                                            borderRadius: 6,
+                                            padding: "6px 10px",
+                                            fontSize: 12.5,
+                                            fontWeight: 600,
+                                            marginBottom: 8,
+                                            width: "fit-content",
+                                          }}
+                                        >
+                                          <Mail size={12} /> Email all {emailable.length} at once (BCC — they won't see each other)
+                                        </a>
+                                      );
+                                    }
+                                    return (
+                                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>
+                                        One-at-a-time only — not every selected supplier accepts email.
+                                      </div>
+                                    );
+                                  })()}
                                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                     {selectedSuppliers.map((s) => (
                                       <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
