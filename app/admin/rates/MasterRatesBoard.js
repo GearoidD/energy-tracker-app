@@ -253,7 +253,15 @@ export default function MasterRatesBoard() {
             {rates.map((r) => (
               <div
                 key={r.id}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px" }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: "var(--panel)",
+                  border: `1px solid ${(Date.now() - new Date(r.updated_at).getTime()) / 86400000 > 60 ? "var(--amber)" : "var(--border)"}`,
+                  borderRadius: 8,
+                  padding: "12px 16px",
+                }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {r.fuel_type === "gas" ? <Flame size={14} color="var(--amber)" /> : <Zap size={14} color="var(--teal)" />}
@@ -264,10 +272,11 @@ export default function MasterRatesBoard() {
                       {r.capacity_charge ? ` · ${r.capacity_charge}/kVA` : ""}
                       {!r.tariff_tier && (r.min_usage || r.max_usage) ? ` · ${r.min_usage || 0}–${r.max_usage || "∞"} kWh` : ""}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    <div style={{ fontSize: 11, color: (Date.now() - new Date(r.updated_at).getTime()) / 86400000 > 60 ? "var(--amber)" : "var(--muted)" }}>
                       {r.suppliers?.name ? `${r.suppliers.name} · ` : ""}
                       {r.note ? `${r.note} · ` : ""}
                       Updated {new Date(r.updated_at).toLocaleDateString("en-IE")}
+                      {(Date.now() - new Date(r.updated_at).getTime()) / 86400000 > 60 ? " · getting stale, worth rechecking" : ""}
                     </div>
                   </div>
                 </div>

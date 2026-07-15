@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/send-reminders",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/scan-rates",
+      "schedule": "0 6 * * 1"
     }
   ]
 }

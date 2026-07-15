@@ -13,7 +13,7 @@ const code = { background: "var(--panel)", border: "1px solid var(--border)", bo
 export default function HelpPage() {
   return (
     <div style={wrap}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`}</style>
+      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');` }} />
       <div style={inner}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 28 }}>
           <Zap size={20} color="var(--teal)" />

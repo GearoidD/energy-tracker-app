@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Zap, Building2, Users, Zap as ZapIcon } from "lucide-react";
+import DeleteCompanyButton from "./DeleteCompanyButton";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,7 @@ export default async function AdminOverviewPage() {
                     >
                       {last ? (isActive ? "Active" : "Quiet") : "No activity yet"}
                     </span>
+                    <DeleteCompanyButton companyId={c.id} companyName={c.name} />
                   </div>
                 </div>
               );

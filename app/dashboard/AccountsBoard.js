@@ -211,22 +211,28 @@ function severityRank(a) {
   return 5; // being-handled: Quote requested / Switching
 }
 
-function masterRateFor(acc, masterRates) {
+function allMasterRatesFor(acc, masterRates) {
   const fuel = acc.fuel_type || "electricity";
   const candidates = masterRates.filter((r) => r.fuel_type === fuel);
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) return [];
 
   const tier = fuel === "gas" ? gasTariffFor(acc) : acc.dg_group || null;
-  const tierMatch = tier ? candidates.find((r) => r.tariff_tier === tier) : null;
-  if (tierMatch) return tierMatch;
+  const tierMatches = tier ? candidates.filter((r) => r.tariff_tier === tier) : [];
+  if (tierMatches.length > 0) {
+    return [...tierMatches].sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate));
+  }
 
   const usage = parseFloat(acc.usage);
-  if (isNaN(usage)) return null;
-  return (
-    candidates.find(
-      (r) => !r.tariff_tier && usage >= (r.min_usage || 0) && (r.max_usage === null || r.max_usage === undefined || usage <= r.max_usage)
-    ) || null
+  if (isNaN(usage)) return [];
+  const usageMatches = candidates.filter(
+    (r) => !r.tariff_tier && usage >= (r.min_usage || 0) && (r.max_usage === null || r.max_usage === undefined || usage <= r.max_usage)
   );
+  return [...usageMatches].sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate));
+}
+
+function masterRateFor(acc, masterRates) {
+  const all = allMasterRatesFor(acc, masterRates);
+  return all.length > 0 ? all[0] : null;
 }
 
 function marketComparisonFor(acc, benchmarks, masterRates = []) {
@@ -1900,6 +1906,38 @@ export default function AccountsBoard({ companyId }) {
                         Est. capacity charge at this rate: {fmtMoney(a.comparison.estCapacityCost)}/yr (based on {a.mic_kva} kVA MIC)
                       </div>
                     )}
+
+                    {(() => {
+                      const allRates = allMasterRatesFor(a, masterRates);
+                      if (allRates.length < 2) return null;
+                      return (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 6 }}>
+                            ALL SUPPLIERS FOR THIS TIER
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                            {allRates.map((r, i) => (
+                              <div
+                                key={r.id}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  fontSize: 12.5,
+                                  background: i === 0 ? "var(--bg)" : "none",
+                                  padding: i === 0 ? "6px 10px" : "0 10px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                <span style={{ color: i === 0 ? "var(--teal)" : "var(--muted)", fontWeight: i === 0 ? 600 : 400 }}>
+                                  {r.suppliers?.name || "Unspecified supplier"} {i === 0 ? "· cheapest" : ""}
+                                </span>
+                                <span style={{ color: "var(--text)" }}>{r.rate}c/kWh</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
