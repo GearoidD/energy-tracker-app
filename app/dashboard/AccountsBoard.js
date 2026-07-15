@@ -394,7 +394,7 @@ function Field({ label, required, hint, children }) {
   );
 }
 
-function AccountForm({ initial, onSave, onCancel }) {
+function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
   const [form, setForm] = useState(
     initial
       ? { ...initial }
@@ -437,6 +437,14 @@ function AccountForm({ initial, onSave, onCancel }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <Field label="Site / account name" required hint="Use the same format for every site — makes search and sorting easier later.">
             <input style={inputStyle} value={form.name} onChange={set("name")} placeholder="e.g. 12 Main Street, Unit 3" />
+          </Field>
+          <Field label="Location" hint="If this building has both gas and electricity, use the same location name for both.">
+            <input style={inputStyle} value={form.location || ""} onChange={set("location")} placeholder="e.g. Palm Grove" list="location-suggestions" />
+            <datalist id="location-suggestions">
+              {existingLocations.map((loc) => (
+                <option key={loc} value={loc} />
+              ))}
+            </datalist>
           </Field>
           <Field label="Fuel type" required>
             <select style={inputStyle} value={form.fuel_type} onChange={set("fuel_type")}>
@@ -769,6 +777,7 @@ export default function AccountsBoard({ companyId }) {
   const [filterFuel, setFilterFuel] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRenewal, setFilterRenewal] = useState("all");
+  const [filterLocation, setFilterLocation] = useState("all");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
   const [uploadingFor, setUploadingFor] = useState(null);
@@ -1043,6 +1052,7 @@ export default function AccountsBoard({ companyId }) {
 
     const payload = {
       name: form.name,
+      location: form.location || null,
       provider: form.provider || null,
       account_number: form.account_number || null,
       fuel_type: form.fuel_type || "electricity",
@@ -1124,14 +1134,15 @@ export default function AccountsBoard({ companyId }) {
         const matchesFuel = filterFuel === "all" || (a.fuel_type || "electricity") === filterFuel;
         const matchesStatus = filterStatus === "all" || overallStatusFor(a).label === filterStatus;
         const matchesRenewal = filterRenewal === "all" || (a.renewal_status || "not_started") === filterRenewal;
-        return matchesSearch && matchesFuel && matchesStatus && matchesRenewal;
+        const matchesLocation = filterLocation === "all" || (a.location || "") === filterLocation;
+        return matchesSearch && matchesFuel && matchesStatus && matchesRenewal && matchesLocation;
       })
       .sort((a, b) => {
         const rankDiff = severityRank(a) - severityRank(b);
         if (rankDiff !== 0) return rankDiff;
         return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
       });
-  }, [accounts, search, filterFuel, filterStatus, filterRenewal, benchmarks, masterRates, readingSummaries]);
+  }, [accounts, search, filterFuel, filterStatus, filterRenewal, filterLocation, benchmarks, masterRates, readingSummaries]);
 
   const summaryStats = useMemo(() => {
     const needAttention = enriched.filter((a) => {
@@ -1412,12 +1423,24 @@ export default function AccountsBoard({ companyId }) {
           <option value="renewed">Renewed</option>
         </select>
 
-        {(filterFuel !== "all" || filterStatus !== "all" || filterRenewal !== "all" || search) && (
+        {[...new Set(accounts.map((a) => a.location).filter(Boolean))].length > 0 && (
+          <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+            <option value="all">All locations</option>
+            {[...new Set(accounts.map((a) => a.location).filter(Boolean))].sort().map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {(filterFuel !== "all" || filterStatus !== "all" || filterRenewal !== "all" || filterLocation !== "all" || search) && (
           <button
             onClick={() => {
               setFilterFuel("all");
               setFilterStatus("all");
               setFilterRenewal("all");
+              setFilterLocation("all");
               setSearch("");
             }}
             style={{ background: "none", border: "none", color: "var(--teal)", cursor: "pointer", fontSize: 12.5 }}
@@ -1426,6 +1449,21 @@ export default function AccountsBoard({ companyId }) {
           </button>
         )}
       </div>
+
+      {filterLocation !== "all" && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 16px", marginBottom: 14, display: "flex", gap: 20, fontSize: 12.5, color: "var(--muted)" }}>
+          <span>
+            <strong style={{ color: "var(--text)" }}>{enriched.length}</strong> account{enriched.length === 1 ? "" : "s"} at {filterLocation}
+          </span>
+          <span>
+            Combined spend: <strong style={{ color: "var(--text)" }}>{fmtMoney(enriched.reduce((s, a) => (a.cost ? s + a.cost : s), 0))}</strong>
+          </span>
+          <span>
+            Combined potential savings:{" "}
+            <strong style={{ color: "var(--green)" }}>{fmtMoney(enriched.reduce((s, a) => (a.saving && a.saving > 20 ? s + a.saving : s), 0))}</strong>
+          </span>
+        </div>
+      )}
 
       {error && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
@@ -1532,8 +1570,13 @@ export default function AccountsBoard({ companyId }) {
                     style={{ flexShrink: 0, cursor: "pointer", width: 15, height: 15 }}
                   />
                   <RateSparkline readings={readingSummaries[a.id]} />
-                  <span style={{ flex: 1, minWidth: 0, fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {a.name}
+                  <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 8, overflow: "hidden" }}>
+                    <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {a.name}
+                    </span>
+                    {a.location && (
+                      <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>📍 {a.location}</span>
+                    )}
                   </span>
                   <span
                     style={{
@@ -1983,6 +2026,7 @@ export default function AccountsBoard({ companyId }) {
       {showForm && (
         <AccountForm
           initial={editing}
+          existingLocations={[...new Set(accounts.map((a) => a.location).filter(Boolean))]}
           onSave={saveAccount}
           onCancel={() => {
             setShowForm(false);
