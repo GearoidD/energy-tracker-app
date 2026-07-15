@@ -2043,7 +2043,7 @@ export default function AccountsBoard({ companyId, companyName }) {
 
                     <div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {ratePullFor !== a.id && (
+                      {ratePullFor !== a.id && (!a.comparison || a.comparison.source === "estimated") && (
                         <button
                           onClick={() => pullMarketRate(a)}
                           style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", color: "var(--teal)", cursor: "pointer", fontSize: 12 }}
