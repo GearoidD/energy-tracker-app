@@ -873,7 +873,7 @@ export default function AccountsBoard({ companyId, companyName }) {
   const [quotePickerFor, setQuotePickerFor] = useState(null);
   const [quoteSupplierSelection, setQuoteSupplierSelection] = useState({});
   const [quickRenewFor, setQuickRenewFor] = useState(null);
-  const [quickRenewForm, setQuickRenewForm] = useState({ rate: "", provider: "", contract_end: "" });
+  const [quickRenewForm, setQuickRenewForm] = useState({ rate: "", provider: "", contract_end: "", share_rate_with_wattpryce: false });
   const [showBenchmarks, setShowBenchmarks] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -1040,7 +1040,7 @@ export default function AccountsBoard({ companyId, companyName }) {
 
   const openQuickRenew = (account) => {
     setQuickRenewFor(account.id);
-    setQuickRenewForm({ rate: account.rate || "", provider: account.provider || "", contract_end: "" });
+    setQuickRenewForm({ rate: account.rate || "", provider: account.provider || "", contract_end: "", share_rate_with_wattpryce: false });
   };
 
   useEffect(() => {
@@ -1070,6 +1070,24 @@ export default function AccountsBoard({ companyId, companyName }) {
       alert("Couldn't save: " + error.message);
       return;
     }
+
+    if (quickRenewForm.share_rate_with_wattpryce && quickRenewForm.rate) {
+      const acc = accounts.find((a) => a.id === accountId);
+      if (acc) {
+        const fuel = acc.fuel_type || "electricity";
+        const tier = fuel === "gas" ? gasTariffFor(acc) : acc.dg_group || null;
+        if (tier) {
+          await supabase.from("rate_scan_queue").insert({
+            fuel_type: fuel,
+            tariff_tier: tier,
+            rate: quickRenewForm.rate,
+            source_note: "Submitted by a customer after renewing — their actual new contracted rate, not just a quote.",
+            status: "pending",
+          });
+        }
+      }
+    }
+
     setQuickRenewFor(null);
     loadAccounts();
   };
@@ -2449,6 +2467,16 @@ export default function AccountsBoard({ companyId, companyName }) {
                   onChange={(e) => setQuickRenewForm((f) => ({ ...f, provider: e.target.value }))}
                 />
               </label>
+              {quickRenewForm.rate && (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--muted)", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={quickRenewForm.share_rate_with_wattpryce || false}
+                    onChange={(e) => setQuickRenewForm((f) => ({ ...f, share_rate_with_wattpryce: e.target.checked }))}
+                  />
+                  Share this rate with Wattpryce to help other customers (reviewed before it's ever shown to anyone)
+                </label>
+              )}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
