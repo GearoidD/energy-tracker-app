@@ -53,7 +53,7 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
       const rate = Number(r.rate) || 0;
       const standing = Number(r.standing_charge) || 0;
       map[key].usage += usage;
-      map[key].cost += (rate / 100) * usage + (standing / 100) * 30;
+      map[key].cost += r.total_cost !== null && r.total_cost !== undefined ? Number(r.total_cost) : (rate / 100) * usage + (standing / 100) * 30;
     });
     return Object.values(map)
       .sort((a, b) => a.key.localeCompare(b.key))

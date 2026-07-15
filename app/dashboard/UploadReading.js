@@ -39,6 +39,9 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
   const [syncCapacity, setSyncCapacity] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const [fuelTypeUncertain, setFuelTypeUncertain] = useState(false);
+  const [rateCarriedOver, setRateCarriedOver] = useState(false);
+  const [dgGroupValue, setDgGroupValue] = useState("");
+  const [syncDgGroup, setSyncDgGroup] = useState(true);
 
   // Batch upload state — lets someone pick or drop several bills at once
   const [fileQueue, setFileQueue] = useState([]);
@@ -61,6 +64,8 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
     setSyncCapacity(true);
     setError(null);
     setFuelTypeUncertain(false);
+    setRateCarriedOver(false);
+    setDgGroupValue("");
   };
 
   const handleFile = async (file) => {
@@ -76,27 +81,52 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Extraction failed");
-      setExtracted(data.extracted);
-      setContractEndValue(data.extracted.contract_end || "");
-      setCapacityValue(data.extracted.fuel_type === "gas" ? data.extracted.spc_kwh || "" : data.extracted.mic_kva || "");
-      const uncertainFuel = data.extracted.fuel_type !== "gas" && data.extracted.fuel_type !== "electricity";
+
+      const extractedData = { ...data.extracted };
+      const uncertainFuel = extractedData.fuel_type !== "gas" && extractedData.fuel_type !== "electricity";
       setFuelTypeUncertain(uncertainFuel);
 
+      let targetAccountId = accountId || null;
+
       if (!accountId) {
-        const matched = data.extracted.account_number
-          ? accounts.find((a) => a.account_number && a.account_number === data.extracted.account_number)
+        const matched = extractedData.account_number
+          ? accounts.find((a) => a.account_number && a.account_number === extractedData.account_number)
           : null;
 
         if (matched) {
           setTargetMode("existing");
           setSelectedAccountId(matched.id);
+          targetAccountId = matched.id;
         } else {
           setTargetMode("new");
-          setNewSiteName(data.extracted.provider ? `${data.extracted.provider} account` : "");
-          setNewSiteAccountNumber(data.extracted.account_number || "");
-          setNewSiteFuelType(data.extracted.fuel_type === "gas" ? "gas" : "electricity");
+          setNewSiteName(extractedData.supply_address || (extractedData.provider ? `${extractedData.provider} account` : ""));
+          setNewSiteAccountNumber(extractedData.account_number || "");
+          setNewSiteFuelType(extractedData.fuel_type === "gas" ? "gas" : "electricity");
         }
       }
+
+      // If the bill didn't show a rate but this account has prior bill history,
+      // assume the rate hasn't changed rather than leaving it blank.
+      let carriedOverRate = false;
+      if ((extractedData.rate === null || extractedData.rate === undefined) && targetAccountId) {
+        const supabaseCheck = createClient();
+        const { data: prevReadings } = await supabaseCheck
+          .from("readings")
+          .select("rate, reading_date")
+          .eq("account_id", targetAccountId)
+          .not("rate", "is", null)
+          .order("reading_date", { ascending: false })
+          .limit(1);
+        if (prevReadings && prevReadings.length > 0) {
+          extractedData.rate = prevReadings[0].rate;
+          carriedOverRate = true;
+        }
+      }
+      setRateCarriedOver(carriedOverRate);
+      setExtracted(extractedData);
+      setContractEndValue(extractedData.contract_end || "");
+      setCapacityValue(extractedData.fuel_type === "gas" ? extractedData.spc_kwh || "" : extractedData.mic_kva || "");
+      setDgGroupValue(extractedData.dg_group || "");
       setStage("confirm");
     } catch (e) {
       setError(e.message);
@@ -156,6 +186,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
           contract_end: syncContractEnd && contractEndValue ? contractEndValue : null,
           mic_kva: newSiteFuelType !== "gas" && capacityValue ? capacityValue : null,
           spc_kwh: newSiteFuelType === "gas" && capacityValue ? capacityValue : null,
+          dg_group: newSiteFuelType !== "gas" && dgGroupValue ? dgGroupValue : null,
         })
         .select()
         .single();
@@ -184,6 +215,9 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
         const field = matchedAccount?.fuel_type === "gas" ? "spc_kwh" : "mic_kva";
         await supabase.from("accounts").update({ [field]: capacityValue }).eq("id", finalAccountId);
       }
+      if (syncDgGroup && dgGroupValue) {
+        await supabase.from("accounts").update({ dg_group: dgGroupValue }).eq("id", finalAccountId);
+      }
     }
 
     const { error: readingError } = await supabase.from("readings").insert({
@@ -193,6 +227,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       usage: extracted.usage || null,
       rate: extracted.rate || null,
       standing_charge: extracted.standing_charge || null,
+      total_cost: extracted.total_cost || null,
       source: "upload",
       confidence: extracted.confidence || null,
     });
@@ -308,6 +343,12 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
               <div style={{ display: "flex", gap: 6, alignItems: "flex-start", color: "var(--amber)", fontSize: 12.5, marginBottom: 14, background: "var(--bg)", padding: "8px 10px", borderRadius: 6 }}>
                 <AlertTriangle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
                 Some of this was hard to read clearly — double-check the numbers below before saving.
+              </div>
+            )}
+            {rateCarriedOver && (
+              <div style={{ display: "flex", gap: 6, alignItems: "flex-start", color: "var(--teal)", fontSize: 12.5, marginBottom: 14, background: "var(--bg)", padding: "8px 10px", borderRadius: 6 }}>
+                <AlertTriangle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+                This bill didn't show a rate — carried over from the previous bill. Adjust it if it's actually changed.
               </div>
             )}
             {extracted.rate_note && (
@@ -440,6 +481,21 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
                   value={capacityValue}
                   onChange={(e) => setCapacityValue(e.target.value)}
                   disabled={!syncCapacity}
+                />
+              </div>
+            )}
+
+            {extracted.dg_group && extracted.fuel_type !== "gas" && (
+              <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", marginBottom: 16 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text)", marginBottom: 8 }}>
+                  <input type="checkbox" checked={syncDgGroup} onChange={(e) => setSyncDgGroup(e.target.checked)} />
+                  This bill shows a Distribution Group — update the account to:
+                </label>
+                <input
+                  style={{ ...inputStyle, opacity: syncDgGroup ? 1 : 0.5 }}
+                  value={dgGroupValue}
+                  onChange={(e) => setDgGroupValue(e.target.value)}
+                  disabled={!syncDgGroup}
                 />
               </div>
             )}

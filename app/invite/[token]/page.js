@@ -43,12 +43,23 @@ export default async function InvitePage({ params }) {
     );
   }
 
-  // Add them to the company (ignore a duplicate — they might already be a member)
-  await admin.from("company_members").insert({
+  // Add them to the company (ignore only a genuine duplicate — they might already be a member)
+  const { error: memberError } = await admin.from("company_members").insert({
     user_id: user.id,
     company_id: invite.company_id,
     role: invite.role || "member",
   });
+
+  const isDuplicate = memberError?.code === "23505";
+
+  if (memberError && !isDuplicate) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)", padding: 20, textAlign: "center" }}>
+        Something went wrong adding you to this company ({memberError.message}). Nothing was consumed — ask an admin to
+        try sending the invite again, or contact support if this keeps happening.
+      </div>
+    );
+  }
 
   await admin.from("invites").update({ used_at: new Date().toISOString(), used_by: user.id }).eq("id", invite.id);
 

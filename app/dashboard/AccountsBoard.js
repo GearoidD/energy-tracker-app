@@ -280,10 +280,18 @@ function estimatedAnnualSpend(acc, readings) {
   const first = new Date(sorted[0].reading_date);
   const last = new Date(sorted[sorted.length - 1].reading_date);
   const daySpan = Math.max((last - first) / 86400000, 30);
-
-  const totalEnergyCost = sorted.reduce((sum, r) => sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage), 0);
   const scaleFactor = 365 / daySpan;
 
+  const allHaveTotalCost = sorted.every((r) => r.total_cost !== null && r.total_cost !== undefined);
+
+  if (allHaveTotalCost) {
+    // The bill's real total already includes standing charges, taxes, everything —
+    // more accurate than reconstructing it from rate × usage.
+    const totalActualCost = sorted.reduce((sum, r) => sum + parseFloat(r.total_cost), 0);
+    return totalActualCost * scaleFactor;
+  }
+
+  const totalEnergyCost = sorted.reduce((sum, r) => sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage), 0);
   const standing = parseFloat(acc.standing_charge) || 0;
   const annualStanding = (standing / 100) * 365;
 
