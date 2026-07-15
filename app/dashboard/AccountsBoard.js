@@ -826,6 +826,7 @@ export default function AccountsBoard({ companyId }) {
   const [masterRates, setMasterRates] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [quotePickerFor, setQuotePickerFor] = useState(null);
+  const [quoteSupplierSelection, setQuoteSupplierSelection] = useState({});
   const [quickRenewFor, setQuickRenewFor] = useState(null);
   const [quickRenewForm, setQuickRenewForm] = useState({ rate: "", provider: "", contract_end: "" });
   const [showBenchmarks, setShowBenchmarks] = useState(false);
@@ -1977,26 +1978,65 @@ export default function AccountsBoard({ companyId }) {
                           if (matching.length === 0) {
                             return <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No suppliers saved yet for {fuel}. Add some in the admin rates page.</div>;
                           }
+                          const selected = quoteSupplierSelection[a.id] || new Set();
+                          const toggle = (id) => {
+                            setQuoteSupplierSelection((prev) => {
+                              const next = new Set(prev[a.id] || []);
+                              if (next.has(id)) next.delete(id);
+                              else next.add(id);
+                              return { ...prev, [a.id]: next };
+                            });
+                          };
+                          const selectedSuppliers = matching.filter((s) => selected.has(s.id));
                           return (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              {matching.map((s) => (
-                                <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
-                                  <span style={{ color: "var(--text)" }}>{s.name}</span>
-                                  {s.accepts_email_quotes && s.contact_email ? (
-                                    <a
-                                      href={quoteRequestMailto(a, s.contact_email)}
-                                      style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
-                                    >
-                                      <Mail size={11} /> Email
-                                    </a>
-                                  ) : (
-                                    <span style={{ color: "var(--muted)", fontSize: 11.5 }}>
-                                      Call {s.contact_phone || "— no number saved"}
-                                    </span>
-                                  )}
+                            <>
+                              {selectedSuppliers.length > 1 && (
+                                <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid var(--border)" }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)", letterSpacing: 0.5, marginBottom: 6 }}>
+                                    SELECTED — CLICK EACH TO SEND
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                    {selectedSuppliers.map((s) => (
+                                      <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
+                                        <span style={{ color: "var(--text)" }}>{s.name}</span>
+                                        {s.accepts_email_quotes && s.contact_email ? (
+                                          <a
+                                            href={quoteRequestMailto(a, s.contact_email)}
+                                            style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+                                          >
+                                            <Mail size={11} /> Email
+                                          </a>
+                                        ) : (
+                                          <span style={{ color: "var(--muted)", fontSize: 11.5 }}>Call {s.contact_phone || "— no number saved"}</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              ))}
-                            </div>
+                              )}
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {matching.map((s) => (
+                                  <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)", cursor: "pointer" }}>
+                                      <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
+                                      {s.name}
+                                    </label>
+                                    {s.accepts_email_quotes && s.contact_email ? (
+                                      <a
+                                        href={quoteRequestMailto(a, s.contact_email)}
+                                        style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+                                      >
+                                        <Mail size={11} /> Email
+                                      </a>
+                                    ) : (
+                                      <span style={{ color: "var(--muted)", fontSize: 11.5 }}>
+                                        Call {s.contact_phone || "— no number saved"}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </>
                           );
                         })()}
                       </div>
