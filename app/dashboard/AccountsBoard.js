@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
@@ -2100,6 +2101,13 @@ export default function AccountsBoard({ companyId }) {
           </div>
         </div>
       )}
+
+      <div style={{ marginTop: 48, paddingTop: 18, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "center", gap: 18 }}>
+        <span style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.7 }}>Wattpryce</span>
+        <Link href="/help" style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.7, textDecoration: "none" }}>Help</Link>
+        <Link href="/legal/terms" style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.7, textDecoration: "none" }}>Terms</Link>
+        <Link href="/legal/privacy-policy" style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.7, textDecoration: "none" }}>Privacy</Link>
+      </div>
 
       {showForm && (
         <AccountForm
