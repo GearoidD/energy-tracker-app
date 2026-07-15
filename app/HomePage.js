@@ -226,6 +226,9 @@ export default function HomePage() {
           </div>
           <span style={{ fontSize: 12, color: "#8FA6A3" }}>Know before your contract renews.</span>
           <div style={{ display: "flex", gap: 16 }}>
+            <Link href="/help" style={{ fontSize: 12, color: "#8FA6A3", textDecoration: "none" }}>
+              Help
+            </Link>
             <Link href="/legal/terms" style={{ fontSize: 12, color: "#8FA6A3", textDecoration: "none" }}>
               Terms
             </Link>
