@@ -1084,6 +1084,12 @@ export default function AccountsBoard({ companyId, companyName }) {
             source_note: "Submitted by a customer after renewing — their actual new contracted rate, not just a quote.",
             status: "pending",
           });
+        } else {
+          alert(
+            fuel === "gas"
+              ? "Saved the renewal, but couldn't share the rate — this account needs its usage and SPC set first so it can be classified (SBU/MBU/FVT)."
+              : "Saved the renewal, but couldn't share the rate — this account needs a DG Group set first (edit the account and add it from the bill)."
+          );
         }
       }
     }
@@ -1245,6 +1251,12 @@ export default function AccountsBoard({ companyId, companyName }) {
           source_note: "Submitted by a customer via their own account — not independently verified yet.",
           status: "pending",
         });
+      } else {
+        alert(
+          fuel === "gas"
+            ? "Saved the account, but couldn't share the rate — set this account's usage and SPC first so it can be classified (SBU/MBU/FVT)."
+            : "Saved the account, but couldn't share the rate — set this account's DG Group first (found on the bill)."
+        );
       }
     }
 
