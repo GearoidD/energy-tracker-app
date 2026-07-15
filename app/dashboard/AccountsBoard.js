@@ -698,6 +698,36 @@ function providerNegotiationMailto(acc, providerEmail, comparison) {
   return `mailto:${providerEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
 }
 
+function bulkQuoteRequestMailto(accs, supplierEmail) {
+  const subject = `Rate quote request — ${accs.length} account${accs.length === 1 ? "" : "s"}`;
+
+  const lines = [
+    "Hi,",
+    "",
+    `I'd like current business rate quotes for the following ${accs.length} account${accs.length === 1 ? "" : "s"}:`,
+    "",
+  ];
+
+  accs.forEach((acc, i) => {
+    const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
+    const tariff = gasTariffFor(acc);
+    lines.push(`${i + 1}. ${acc.name}`);
+    if (acc.account_number) lines.push(`   ${fuel === "gas" ? "GPRN" : "MPRN"}: ${acc.account_number}`);
+    if (acc.provider) lines.push(`   Current supplier: ${acc.provider}`);
+    if (acc.rate) lines.push(`   Current rate: ${acc.rate}c/kWh`);
+    if (acc.usage) lines.push(`   Annual usage: ${acc.usage} kWh`);
+    if (fuel === "gas" && tariff) lines.push(`   Tariff tier: ${tariff}`);
+    if (fuel === "gas" && acc.spc_kwh) lines.push(`   Supply Point Capacity: ${acc.spc_kwh} kWh`);
+    if (fuel !== "gas" && acc.mic_kva) lines.push(`   MIC: ${acc.mic_kva} kVA`);
+    if (acc.contract_end) lines.push(`   Contract end date: ${acc.contract_end}`);
+    lines.push("");
+  });
+
+  lines.push("Could you send over your best current rates for these accounts?", "", "Thanks,");
+
+  return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
+}
+
 function quoteRequestMailto(acc, supplierEmail) {
   const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
   const tariff = gasTariffFor(acc);
@@ -739,6 +769,8 @@ export default function AccountsBoard({ companyId }) {
   const [filterFuel, setFilterFuel] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRenewal, setFilterRenewal] = useState("all");
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
   const [uploadingFor, setUploadingFor] = useState(null);
   const [addingReadingFor, setAddingReadingFor] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -1397,6 +1429,76 @@ export default function AccountsBoard({ companyId }) {
 
       {error && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
+      {selectedIds.size > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{selectedIds.size} selected</span>
+          <button
+            onClick={() => setBulkQuotePickerOpen(true)}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 12px", color: "var(--teal)", cursor: "pointer", fontSize: 12.5 }}
+          >
+            <Mail size={13} /> Email selected accounts
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 12.5 }}
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
+      {bulkQuotePickerOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(6,12,14,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 65, padding: 20 }}
+          onClick={() => setBulkQuotePickerOpen(false)}
+        >
+          <div
+            style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 420, maxWidth: "100%", padding: 24 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>
+              Email {selectedIds.size} account{selectedIds.size === 1 ? "" : "s"}
+            </h2>
+            {(() => {
+              const selectedAccounts = enriched.filter((a) => selectedIds.has(a.id));
+              const fuelsPresent = new Set(selectedAccounts.map((a) => a.fuel_type || "electricity"));
+              const matching = suppliers.filter((s) => s.fuel_types.some((f) => fuelsPresent.has(f)));
+              if (matching.length === 0) {
+                return <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No saved suppliers match these accounts yet. Add some in the admin rates page.</div>;
+              }
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {matching.map((s) => (
+                    <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px" }}>
+                      <span style={{ fontSize: 13, color: "var(--text)" }}>{s.name}</span>
+                      {s.accepts_email_quotes && s.contact_email ? (
+                        <a
+                          href={bulkQuoteRequestMailto(selectedAccounts, s.contact_email)}
+                          onClick={() => setBulkQuotePickerOpen(false)}
+                          style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}
+                        >
+                          <Mail size={12} /> Email
+                        </a>
+                      ) : (
+                        <span style={{ color: "var(--muted)", fontSize: 11.5 }}>Call {s.contact_phone || "— no number saved"}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <button
+                onClick={() => setBulkQuotePickerOpen(false)}
+                style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)", padding: "8px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {enriched.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--muted)", border: "1px dashed var(--border)", borderRadius: 12 }}>
           <Flame size={28} color="var(--teal-dim)" style={{ marginBottom: 10 }} />
@@ -1415,6 +1517,20 @@ export default function AccountsBoard({ companyId }) {
                   onClick={() => toggleReadings(a.id)}
                   style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer" }}
                 >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(a.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(a.id)) next.delete(a.id);
+                        else next.add(a.id);
+                        return next;
+                      });
+                    }}
+                    style={{ flexShrink: 0, cursor: "pointer", width: 15, height: 15 }}
+                  />
                   <RateSparkline readings={readingSummaries[a.id]} />
                   <span style={{ flex: 1, minWidth: 0, fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {a.name}
