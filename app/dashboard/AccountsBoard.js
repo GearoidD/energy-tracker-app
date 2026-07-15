@@ -48,6 +48,19 @@ function fmtMoney(n) {
   return "€" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-IE");
+}
+
 function exportAccountsCSV(accounts) {
   const headers = [
     "Site name",
@@ -779,6 +792,7 @@ export default function AccountsBoard({ companyId }) {
   const [filterRenewal, setFilterRenewal] = useState("all");
   const [filterLocation, setFilterLocation] = useState("all");
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [activityItems, setActivityItems] = useState(null);
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
   const [uploadingFor, setUploadingFor] = useState(null);
   const [addingReadingFor, setAddingReadingFor] = useState(null);
@@ -885,11 +899,61 @@ export default function AccountsBoard({ companyId }) {
     setSuppliers(data || []);
   }, []);
 
+  const loadActivity = useCallback(async () => {
+    const [notesRes, readingsRes, accountsRes] = await Promise.all([
+      supabase
+        .from("account_notes")
+        .select("id, body, created_at, accounts(name), profiles(email)")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("readings")
+        .select("id, created_at, source, accounts(name)")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("accounts")
+        .select("id, name, created_at")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+
+    const items = [];
+    (notesRes.data || []).forEach((n) =>
+      items.push({
+        id: `note-${n.id}`,
+        timestamp: n.created_at,
+        text: `${n.profiles?.email || "Someone"} added a note on ${n.accounts?.name || "an account"}`,
+      })
+    );
+    (readingsRes.data || []).forEach((r) =>
+      items.push({
+        id: `reading-${r.id}`,
+        timestamp: r.created_at,
+        text: `Bill ${r.source === "upload" ? "uploaded" : "added"} for ${r.accounts?.name || "an account"}`,
+      })
+    );
+    (accountsRes.data || []).forEach((a) =>
+      items.push({
+        id: `account-${a.id}`,
+        timestamp: a.created_at,
+        text: `Account created: ${a.name}`,
+      })
+    );
+
+    items.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    setActivityItems(items.slice(0, 10));
+  }, [companyId]);
+
   useEffect(() => {
     loadBenchmarks();
     loadMasterRates();
     loadSuppliers();
-  }, [loadBenchmarks, loadMasterRates, loadSuppliers]);
+    loadActivity();
+  }, [loadBenchmarks, loadMasterRates, loadSuppliers, loadActivity]);
 
   const toggleReadings = async (accountId) => {
     if (expandedId === accountId) {
@@ -2020,6 +2084,20 @@ export default function AccountsBoard({ companyId }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {activityItems && activityItems.length > 0 && (
+        <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 14 }}>RECENT ACTIVITY</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {activityItems.map((item) => (
+              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--muted)" }}>
+                <span>{item.text}</span>
+                <span style={{ flexShrink: 0, marginLeft: 12 }}>{timeAgo(item.timestamp)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
