@@ -520,6 +520,11 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
               />
             </Field>
           )}
+          {form.fuel_type !== "gas" && (
+            <Field label="DG Group" hint="Printed near the MPRN on your bill — determines your actual rate structure.">
+              <input style={inputStyle} value={form.dg_group || ""} onChange={set("dg_group")} placeholder="e.g. DG5, DG6" />
+            </Field>
+          )}
           {form.fuel_type === "gas" && (
             <Field label="SPC (Supply Point Capacity, kWh)">
               <input
@@ -533,6 +538,16 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
           )}
           <Field label="Best market rate found (c/kWh)">
             <input type="number" step="0.01" style={inputStyle} value={form.market_rate || ""} onChange={set("market_rate")} placeholder="Optional" />
+            {form.market_rate && (
+              <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 11.5, color: "var(--muted)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={form.share_rate_with_wattpryce || false}
+                  onChange={(e) => setForm((f) => ({ ...f, share_rate_with_wattpryce: e.target.checked }))}
+                />
+                Share this rate with Wattpryce to help other customers (reviewed before it's ever shown to anyone)
+              </label>
+            )}
           </Field>
           <div />
           <div style={{ gridColumn: "1 / -1" }}>
@@ -739,7 +754,7 @@ function providerNegotiationMailto(acc, providerEmail, comparison) {
   return `mailto:${providerEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
 }
 
-function bulkQuoteRequestMailto(accs, supplierEmail) {
+function buildBulkQuoteRequestContent(accs) {
   const subject = `Rate quote request — ${accs.length} account${accs.length === 1 ? "" : "s"}`;
 
   const lines = [
@@ -766,7 +781,17 @@ function bulkQuoteRequestMailto(accs, supplierEmail) {
 
   lines.push("Could you send over your best current rates for these accounts?", "", "Thanks,");
 
-  return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
+  return { subject, body: lines.join("\n") };
+}
+
+function bulkQuoteRequestMailto(accs, supplierEmail) {
+  const { subject, body } = buildBulkQuoteRequestContent(accs);
+  return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function bulkQuoteRequestMailtoBCC(accs, supplierEmails) {
+  const { subject, body } = buildBulkQuoteRequestContent(accs);
+  return `mailto:?bcc=${encodeURIComponent(supplierEmails.join(","))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function buildQuoteRequestContent(acc) {
@@ -824,6 +849,7 @@ export default function AccountsBoard({ companyId }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [activityItems, setActivityItems] = useState(null);
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
+  const [bulkQuoteSupplierSelection, setBulkQuoteSupplierSelection] = useState(new Set());
   const [uploadingFor, setUploadingFor] = useState(null);
   const [addingReadingFor, setAddingReadingFor] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -1158,6 +1184,7 @@ export default function AccountsBoard({ companyId }) {
       market_rate: form.market_rate || null,
       notes: form.notes || null,
       mic_kva: form.mic_kva || null,
+      dg_group: form.dg_group || null,
       spc_kwh: form.spc_kwh || null,
       company_id: companyId,
       updated_at: new Date().toISOString(),
@@ -1180,6 +1207,20 @@ export default function AccountsBoard({ companyId }) {
       }
       return;
     }
+    if (form.share_rate_with_wattpryce && form.market_rate) {
+      const fuel = form.fuel_type || "electricity";
+      const tier = fuel === "gas" ? gasTariffFor(form) : form.dg_group || null;
+      if (tier) {
+        await supabase.from("rate_scan_queue").insert({
+          fuel_type: fuel,
+          tariff_tier: tier,
+          rate: form.market_rate,
+          source_note: "Submitted by a customer via their own account — not independently verified yet.",
+          status: "pending",
+        });
+      }
+    }
+
     setShowForm(false);
     setEditing(null);
     loadAccounts();
@@ -1566,7 +1607,10 @@ export default function AccountsBoard({ companyId }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{selectedIds.size} selected</span>
           <button
-            onClick={() => setBulkQuotePickerOpen(true)}
+            onClick={() => {
+              setBulkQuoteSupplierSelection(new Set());
+              setBulkQuotePickerOpen(true);
+            }}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 12px", color: "var(--teal)", cursor: "pointer", fontSize: 12.5 }}
           >
             <Mail size={13} /> Email selected accounts
@@ -1599,25 +1643,63 @@ export default function AccountsBoard({ companyId }) {
               if (matching.length === 0) {
                 return <div style={{ fontSize: 12.5, color: "var(--muted)" }}>No saved suppliers match these accounts yet. Add some in the admin rates page.</div>;
               }
+              const selectedSupplierIds = bulkQuoteSupplierSelection;
+              const toggleSupplier = (id) => {
+                setBulkQuoteSupplierSelection((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                });
+              };
+              const chosenSuppliers = matching.filter((s) => selectedSupplierIds.has(s.id));
+              const emailableChosen = chosenSuppliers.filter((s) => s.accepts_email_quotes && s.contact_email);
+
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {matching.map((s) => (
-                    <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px" }}>
-                      <span style={{ fontSize: 13, color: "var(--text)" }}>{s.name}</span>
-                      {s.accepts_email_quotes && s.contact_email ? (
-                        <a
-                          href={bulkQuoteRequestMailto(selectedAccounts, s.contact_email)}
-                          onClick={() => setBulkQuotePickerOpen(false)}
-                          style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}
-                        >
-                          <Mail size={12} /> Email
-                        </a>
-                      ) : (
-                        <span style={{ color: "var(--muted)", fontSize: 11.5 }}>Call {s.contact_phone || "— no number saved"}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  {chosenSuppliers.length > 1 && emailableChosen.length === chosenSuppliers.length && (
+                    <a
+                      href={bulkQuoteRequestMailtoBCC(selectedAccounts, emailableChosen.map((s) => s.contact_email))}
+                      onClick={() => setBulkQuotePickerOpen(false)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background: "var(--teal)",
+                        color: "#06201d",
+                        textDecoration: "none",
+                        borderRadius: 6,
+                        padding: "8px 12px",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Mail size={12} /> Email all {emailableChosen.length} selected at once (BCC — they won't see each other)
+                    </a>
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {matching.map((s) => (
+                      <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text)", cursor: "pointer" }}>
+                          <input type="checkbox" checked={selectedSupplierIds.has(s.id)} onChange={() => toggleSupplier(s.id)} />
+                          {s.name}
+                        </label>
+                        {s.accepts_email_quotes && s.contact_email ? (
+                          <a
+                            href={bulkQuoteRequestMailto(selectedAccounts, s.contact_email)}
+                            onClick={() => setBulkQuotePickerOpen(false)}
+                            style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}
+                          >
+                            <Mail size={12} /> Email
+                          </a>
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: 11.5 }}>Call {s.contact_phone || "— no number saved"}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
               );
             })()}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
