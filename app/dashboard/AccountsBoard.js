@@ -1326,6 +1326,39 @@ export default function AccountsBoard({ companyId, companyName }) {
       });
   }, [accounts, search, filterFuel, filterStatus, filterRenewal, filterLocation, benchmarks, masterRates, readingSummaries]);
 
+  const displayItems = useMemo(() => {
+    if (!groupByLocation) {
+      return enriched.map((a) => ({ type: "account", account: a }));
+    }
+    const groups = {};
+    const standalone = [];
+    enriched.forEach((a) => {
+      if (a.location) {
+        if (!groups[a.location]) groups[a.location] = [];
+        groups[a.location].push(a);
+      } else {
+        standalone.push(a);
+      }
+    });
+    const groupList = Object.entries(groups)
+      .map(([location, accts]) => ({
+        location,
+        accounts: accts,
+        worstRank: Math.min(...accts.map((a) => severityRank(a))),
+      }))
+      .sort((a, b) => a.worstRank - b.worstRank);
+
+    const items = [];
+    groupList.forEach((g) => {
+      items.push({ type: "location-header", location: g.location, accounts: g.accounts });
+      if (expandedLocationGroups.has(g.location)) {
+        g.accounts.forEach((a) => items.push({ type: "account", account: a }));
+      }
+    });
+    standalone.forEach((a) => items.push({ type: "account", account: a }));
+    return items;
+  }, [enriched, groupByLocation, expandedLocationGroups]);
+
   const summaryStats = useMemo(() => {
     const needAttention = enriched.filter((a) => {
       const c = overallStatusFor(a).color;
@@ -1358,9 +1391,23 @@ export default function AccountsBoard({ companyId, companyName }) {
       const statusSuffix = beingHandled ? ` — ${RENEWAL_STATUS_META[status].label}` : "";
 
       if (a.status === "overdue") {
-        items.push({ id: `${a.id}-overdue`, account: a, severity: beingHandled ? 1.5 : 0, color: beingHandled ? "var(--teal)" : "var(--red)", message: `${a.name}: out of contract — likely on penalty rates${statusSuffix}` });
+        items.push({
+          id: `${a.id}-overdue`,
+          account: a,
+          severity: beingHandled ? 1.5 : 0,
+          color: beingHandled ? "var(--teal)" : "var(--red)",
+          groupLabel: beingHandled ? "Overdue, being handled" : "Out of contract — likely on penalty rates",
+          detail: statusSuffix ? statusSuffix.replace(" — ", "") : null,
+        });
       } else if (a.status === "urgent") {
-        items.push({ id: `${a.id}-urgent`, account: a, severity: beingHandled ? 1.5 : 1, color: beingHandled ? "var(--teal)" : "var(--red)", message: `${a.name}: renews in ${a.daysLeft} day(s)${statusSuffix}` });
+        items.push({
+          id: `${a.id}-urgent`,
+          account: a,
+          severity: beingHandled ? 1.5 : 1,
+          color: beingHandled ? "var(--teal)" : "var(--red)",
+          groupLabel: beingHandled ? "Renewing soon, being handled" : "Renewing soon",
+          detail: `${a.daysLeft} day(s) left${statusSuffix ? statusSuffix.replace(" — ", ", ") : ""}`,
+        });
       }
       if (a.confidence.missingBill) {
         items.push({
@@ -1368,12 +1415,13 @@ export default function AccountsBoard({ companyId, companyName }) {
           account: a,
           severity: 2,
           color: "var(--amber)",
-          message: `${a.name}: ${a.confidence.daysSinceLastReading ? `no bill added in ${a.confidence.daysSinceLastReading} days` : "no bills added yet"}`,
+          groupLabel: "No bill uploaded recently",
+          detail: a.confidence.daysSinceLastReading ? `${a.confidence.daysSinceLastReading} days since last bill` : "no bills added yet",
         });
       }
       const latest = readingSummaries[a.id]?.[0];
       if (latest?.confidence === "low") {
-        items.push({ id: `${a.id}-lowconf`, account: a, severity: 3, color: "var(--amber)", message: `${a.name}: last upload was low-confidence — worth checking` });
+        items.push({ id: `${a.id}-lowconf`, account: a, severity: 3, color: "var(--amber)", groupLabel: "Low-confidence bill upload — worth checking", detail: null });
       }
       if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) {
         items.push({
@@ -1381,12 +1429,27 @@ export default function AccountsBoard({ companyId, companyName }) {
           account: a,
           severity: 1.8,
           color: "var(--amber)",
-          message: `${a.name}: rate jumped ${a.rateChange.pct.toFixed(1)}% since last bill (${a.rateChange.from}c → ${a.rateChange.to}c)`,
+          groupLabel: "Unexpected rate jump",
+          detail: `${a.rateChange.pct.toFixed(1)}% (${a.rateChange.from}c → ${a.rateChange.to}c)`,
         });
       }
     });
     return items.sort((x, y) => x.severity - y.severity);
   }, [enriched, readingSummaries]);
+
+  const attentionGroups = useMemo(() => {
+    const map = {};
+    attentionItems.forEach((item) => {
+      const key = `${item.color}::${item.groupLabel}`;
+      if (!map[key]) map[key] = { color: item.color, groupLabel: item.groupLabel, severity: item.severity, items: [] };
+      map[key].items.push(item);
+    });
+    return Object.values(map).sort((a, b) => a.severity - b.severity);
+  }, [attentionItems]);
+
+  const [expandedAttentionGroups, setExpandedAttentionGroups] = useState(new Set());
+  const [groupByLocation, setGroupByLocation] = useState(false);
+  const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
 
   const jumpToAccount = async (account) => {
     setSearch(account.name);
@@ -1530,30 +1593,59 @@ export default function AccountsBoard({ companyId, companyName }) {
             </span>
           </div>
         </div>
-        {attentionItems.length > 0 && (
+        {attentionGroups.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {attentionItems.slice(0, 5).map((item) => (
-              <button
-                key={item.id}
-                onClick={() => jumpToAccount(item.account)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontSize: 12.5,
-                  color: "var(--muted)",
-                }}
-              >
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
-                {item.message}
-              </button>
-            ))}
-            {attentionItems.length > 5 && <span style={{ fontSize: 12, color: "var(--muted)" }}>+ {attentionItems.length - 5} more</span>}
+            {attentionGroups.map((group) => {
+              const key = `${group.color}::${group.groupLabel}`;
+              const isExpanded = expandedAttentionGroups.has(key);
+              if (group.items.length === 1) {
+                const item = group.items[0];
+                return (
+                  <button
+                    key={key}
+                    onClick={() => jumpToAccount(item.account)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--muted)" }}
+                  >
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                    {item.account.name}: {group.groupLabel}
+                    {item.detail ? ` (${item.detail})` : ""}
+                  </button>
+                );
+              }
+              return (
+                <div key={key}>
+                  <button
+                    onClick={() =>
+                      setExpandedAttentionGroups((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(key)) next.delete(key);
+                        else next.add(key);
+                        return next;
+                      })
+                    }
+                    style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--muted)", width: "100%" }}
+                  >
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: group.color, flexShrink: 0 }} />
+                    <strong style={{ color: "var(--text)", fontWeight: 600 }}>{group.items.length} accounts</strong>: {group.groupLabel}
+                    <ChevronDown size={12} style={{ marginLeft: "auto", transform: isExpanded ? "rotate(180deg)" : "none", flexShrink: 0 }} />
+                  </button>
+                  {isExpanded && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 13, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
+                      {group.items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => jumpToAccount(item.account)}
+                          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12, color: "var(--muted)" }}
+                        >
+                          {item.account.name}
+                          {item.detail ? ` (${item.detail})` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1603,6 +1695,29 @@ export default function AccountsBoard({ companyId, companyName }) {
                   </span>
                 )}
               </button>
+              {locations.length > 0 && (
+                <button
+                  onClick={() => {
+                    setGroupByLocation((v) => !v);
+                    if (!groupByLocation) setExpandedLocationGroups(new Set());
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: groupByLocation ? "var(--teal)" : "none",
+                    border: `1px solid ${groupByLocation ? "var(--teal)" : "var(--border-light)"}`,
+                    color: groupByLocation ? "#06201d" : "var(--text)",
+                    borderRadius: 7,
+                    padding: "8px 14px",
+                    fontSize: 13,
+                    fontWeight: groupByLocation ? 600 : 400,
+                    cursor: "pointer",
+                  }}
+                >
+                  Group by location
+                </button>
+              )}
             </div>
 
             {filtersOpen && (
@@ -1828,11 +1943,62 @@ export default function AccountsBoard({ companyId, companyName }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {enriched.map((a) => {
+          {displayItems.map((item) => {
+            if (item.type === "location-header") {
+              const isExpanded = expandedLocationGroups.has(item.location);
+              const worstColor = item.accounts.some((a) => overallStatusFor(a).color === "var(--red)")
+                ? "var(--red)"
+                : item.accounts.some((a) => overallStatusFor(a).color === "var(--amber)")
+                ? "var(--amber)"
+                : "var(--green)";
+              return (
+                <button
+                  key={`loc-${item.location}`}
+                  onClick={() =>
+                    setExpandedLocationGroups((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(item.location)) next.delete(item.location);
+                      else next.add(item.location);
+                      return next;
+                    })
+                  }
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    background: "var(--panel)",
+                    border: "1px solid var(--border)",
+                    borderLeft: `3px solid ${worstColor}`,
+                    borderRadius: 10,
+                    padding: "12px 16px",
+                    cursor: "pointer",
+                    width: "100%",
+                    textAlign: "left",
+                  }}
+                >
+                  <ChevronDown size={14} color="var(--muted)" style={{ transform: isExpanded ? "none" : "rotate(-90deg)", flexShrink: 0, transition: "transform 0.15s ease" }} />
+                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>{item.location}</span>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"}
+                  </span>
+                </button>
+              );
+            }
+
+            const a = item.account;
             const overall = overallStatusFor(a);
             const isExpanded = expandedId === a.id;
             return (
-              <div key={a.id} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderLeft: `3px solid ${overall.color}`, borderRadius: 10 }}>
+              <div
+                key={a.id}
+                style={{
+                  background: "var(--panel)",
+                  border: "1px solid var(--border)",
+                  borderLeft: `3px solid ${overall.color}`,
+                  borderRadius: 10,
+                  marginLeft: groupByLocation && a.location ? 20 : 0,
+                }}
+              >
                 <div
                   onClick={() => toggleReadings(a.id)}
                   style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer" }}
