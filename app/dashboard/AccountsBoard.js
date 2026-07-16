@@ -1326,6 +1326,9 @@ export default function AccountsBoard({ companyId, companyName }) {
       });
   }, [accounts, search, filterFuel, filterStatus, filterRenewal, filterLocation, benchmarks, masterRates, readingSummaries]);
 
+  const [groupByLocation, setGroupByLocation] = useState(false);
+  const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
+
   const displayItems = useMemo(() => {
     if (!groupByLocation) {
       return enriched.map((a) => ({ type: "account", account: a }));
@@ -1448,8 +1451,6 @@ export default function AccountsBoard({ companyId, companyName }) {
   }, [attentionItems]);
 
   const [expandedAttentionGroups, setExpandedAttentionGroups] = useState(new Set());
-  const [groupByLocation, setGroupByLocation] = useState(false);
-  const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
 
   const jumpToAccount = async (account) => {
     setSearch(account.name);
