@@ -1636,13 +1636,26 @@ export default function AccountsBoard({ companyId, companyName }) {
           <span>
             <strong style={{ color: "var(--text)" }}>{enriched.length}</strong> account{enriched.length === 1 ? "" : "s"} at {filterLocation}
           </span>
-          <span>
-            Combined spend: <strong style={{ color: "var(--text)" }}>{fmtMoney(enriched.reduce((s, a) => (a.cost ? s + a.cost : s), 0))}</strong>
-          </span>
-          <span>
-            Combined potential savings:{" "}
-            <strong style={{ color: "var(--green)" }}>{fmtMoney(enriched.reduce((s, a) => (a.saving && a.saving > 20 ? s + a.saving : s), 0))}</strong>
-          </span>
+          {(() => {
+            const hasAnyCost = enriched.some((a) => a.cost !== null && a.cost !== undefined);
+            const hasAnyComparison = enriched.some((a) => a.comparison);
+            return (
+              <>
+                <span>
+                  Combined spend:{" "}
+                  <strong style={{ color: hasAnyCost ? "var(--text)" : "var(--muted)" }}>
+                    {hasAnyCost ? fmtMoney(enriched.reduce((s, a) => (a.cost ? s + a.cost : s), 0)) : "no bill data yet"}
+                  </strong>
+                </span>
+                <span>
+                  Combined potential savings:{" "}
+                  <strong style={{ color: hasAnyComparison ? "var(--green)" : "var(--muted)" }}>
+                    {hasAnyComparison ? fmtMoney(enriched.reduce((s, a) => (a.saving && a.saving > 20 ? s + a.saving : s), 0)) : "no comparison yet"}
+                  </strong>
+                </span>
+              </>
+            );
+          })()}
         </div>
       )}
 
