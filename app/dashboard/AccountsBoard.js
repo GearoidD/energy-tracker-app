@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail } from "lucide-react";
+import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import UploadReading from "./UploadReading";
@@ -855,6 +855,7 @@ export default function AccountsBoard({ companyId, companyName }) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRenewal, setFilterRenewal] = useState("all");
   const [filterLocation, setFilterLocation] = useState("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [activityItems, setActivityItems] = useState(null);
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
@@ -1417,8 +1418,6 @@ export default function AccountsBoard({ companyId, companyName }) {
     <div>
       <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 640px) {
-          .wp-summary-grid { flex-wrap: wrap !important; row-gap: 16px !important; }
-          .wp-summary-grid > div { border-left: none !important; padding-left: 0 !important; padding-right: 24px !important; width: 45% !important; }
           .wp-row-collapsed { flex-wrap: wrap !important; }
         }
       ` }} />
@@ -1502,19 +1501,38 @@ export default function AccountsBoard({ companyId, companyName }) {
       <div
         style={{
           borderLeft: `3px solid ${attentionItems.length === 0 ? "var(--green)" : "var(--amber)"}`,
-          padding: "4px 0 4px 16px",
-          marginBottom: 28,
+          padding: "12px 0 12px 16px",
+          marginBottom: 24,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: attentionItems.length === 0 ? 0 : 8 }}>
-          <AlertTriangle size={15} color={attentionItems.length === 0 ? "var(--green)" : "var(--amber)"} />
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 13.5, fontWeight: 600 }}>
-            {attentionItems.length === 0 ? "Nothing needs attention right now" : `${attentionItems.length} thing${attentionItems.length === 1 ? "" : "s"} need attention`}
-          </span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: attentionItems.length === 0 ? 0 : 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertTriangle size={15} color={attentionItems.length === 0 ? "var(--green)" : "var(--amber)"} />
+            <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: 600 }}>
+              {attentionItems.length === 0 ? "Nothing needs attention right now" : `${attentionItems.length} thing${attentionItems.length === 1 ? "" : "s"} need attention`}
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 18, fontSize: 12, color: "var(--muted)", flexWrap: "wrap" }}>
+            <span>
+              {summaryStats.total} account{summaryStats.total === 1 ? "" : "s"}
+            </span>
+            <span style={{ color: summaryStats.renewingSoon90 > 0 ? "var(--amber)" : "var(--muted)" }}>
+              {summaryStats.renewingSoon90} renewing soon
+            </span>
+            <span style={{ color: summaryStats.hasAnyComparison && summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--muted)" }}>
+              {summaryStats.hasAnyComparison ? `${fmtMoney(summaryStats.potentialSavings)} potential savings` : "no comparison yet"}
+            </span>
+            <span
+              title="Extrapolated from the bills you've entered — the more history an account has, the more accurate this is"
+              style={{ cursor: "help", textDecoration: "underline dotted" }}
+            >
+              {summaryStats.hasAnyCost ? `${fmtMoney(summaryStats.totalSpend)} est. spend` : "no bill data yet"}
+            </span>
+          </div>
         </div>
         {attentionItems.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {attentionItems.slice(0, 8).map((item) => (
+            {attentionItems.slice(0, 5).map((item) => (
               <button
                 key={item.id}
                 onClick={() => jumpToAccount(item.account)}
@@ -1535,101 +1553,130 @@ export default function AccountsBoard({ companyId, companyName }) {
                 {item.message}
               </button>
             ))}
-            {attentionItems.length > 8 && (
-              <span style={{ fontSize: 12, color: "var(--muted)" }}>+ {attentionItems.length - 8} more</span>
+            {attentionItems.length > 5 && <span style={{ fontSize: 12, color: "var(--muted)" }}>+ {attentionItems.length - 5} more</span>}
+          </div>
+        )}
+      </div>
+
+      {(() => {
+        const locations = [...new Set(accounts.map((a) => a.location).filter(Boolean))].sort();
+        const activeFilterCount = [filterFuel, filterStatus, filterRenewal, filterLocation].filter((f) => f !== "all").length;
+        const clearAll = () => {
+          setFilterFuel("all");
+          setFilterStatus("all");
+          setFilterRenewal("all");
+          setFilterLocation("all");
+          setSearch("");
+          setFiltersOpen(false);
+        };
+        return (
+          <div style={{ position: "relative", marginBottom: 18 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ position: "relative", maxWidth: 320, flex: 1, minWidth: 200 }}>
+                <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: 10 }} />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search site or provider…"
+                  style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }}
+                />
+              </div>
+              <button
+                onClick={() => setFiltersOpen((v) => !v)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: filtersOpen ? "var(--panel)" : "none",
+                  border: "1px solid var(--border-light)",
+                  color: "var(--text)",
+                  borderRadius: 7,
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                <SlidersHorizontal size={14} /> Filters
+                {activeFilterCount > 0 && (
+                  <span style={{ background: "var(--teal)", color: "#06201d", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {filtersOpen && (
+              <div
+                onClick={() => setFiltersOpen(false)}
+                style={{ position: "fixed", inset: 0, zIndex: 24 }}
+              />
+            )}
+            {filtersOpen && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: 0,
+                  background: "var(--panel)",
+                  border: "1px solid var(--border-light)",
+                  borderRadius: 10,
+                  padding: 16,
+                  zIndex: 25,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  alignItems: "center",
+                  minWidth: 320,
+                }}
+              >
+                <select value={filterFuel} onChange={(e) => setFilterFuel(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+                  <option value="all">All fuel types</option>
+                  <option value="electricity">Electricity</option>
+                  <option value="gas">Gas</option>
+                </select>
+
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+                  <option value="all">All statuses</option>
+                  <option value="Action needed">Action needed</option>
+                  <option value="Missing bill">Missing bill</option>
+                  <option value="Rate jumped">Rate jumped</option>
+                  <option value="Renewing soon">Renewing soon</option>
+                  <option value="Needs review">Needs review</option>
+                  <option value="Quote requested">Quote requested</option>
+                  <option value="Switching">Switching</option>
+                  <option value="On track">On track</option>
+                </select>
+
+                <select value={filterRenewal} onChange={(e) => setFilterRenewal(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+                  <option value="all">All renewal stages</option>
+                  <option value="not_started">Not started</option>
+                  <option value="quote_requested">Quote requested</option>
+                  <option value="switching">Switching</option>
+                  <option value="renewed">Renewed</option>
+                </select>
+
+                {locations.length > 0 && (
+                  <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+                    <option value="all">All locations</option>
+                    {locations.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {(activeFilterCount > 0 || search) && (
+                  <button onClick={clearAll} style={{ background: "none", border: "none", color: "var(--teal)", cursor: "pointer", fontSize: 12.5 }}>
+                    Clear all
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
-
-      <div
-        className="wp-summary-grid"
-        style={{ display: "flex", gap: 0, marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}
-      >
-        <div style={{ padding: "0 24px 0 0" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: "var(--text)" }}>{summaryStats.total}</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Accounts tracked</div>
-        </div>
-        <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: summaryStats.renewingSoon90 > 0 ? "var(--amber)" : "var(--text)" }}>{summaryStats.renewingSoon90}</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Renewing within 90 days</div>
-        </div>
-        <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: !summaryStats.hasAnyComparison ? "var(--muted)" : summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>
-            {summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
-            {summaryStats.hasAnyComparison ? "Potential savings/yr" : "No market comparison yet"}
-          </div>
-        </div>
-        <div style={{ padding: "0 24px", borderLeft: "1px solid var(--border)" }}>
-          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 24, fontWeight: 600, color: summaryStats.hasAnyCost ? "var(--text)" : "var(--muted)" }}>
-            {summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "—"}
-          </div>
-          <div title="Extrapolated from the bills you've entered — the more history an account has, the more accurate this is" style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, cursor: "help", textDecoration: "underline dotted" }}>
-            {summaryStats.hasAnyCost ? "Est. annual spend" : "No bill data yet"}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ position: "relative", maxWidth: 320, flex: 1, minWidth: 200 }}>
-          <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: 10 }} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search site or provider…" style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }} />
-        </div>
-
-        <select value={filterFuel} onChange={(e) => setFilterFuel(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
-          <option value="all">All fuel types</option>
-          <option value="electricity">Electricity</option>
-          <option value="gas">Gas</option>
-        </select>
-
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
-          <option value="all">All statuses</option>
-          <option value="Action needed">Action needed</option>
-          <option value="Missing bill">Missing bill</option>
-          <option value="Rate jumped">Rate jumped</option>
-          <option value="Renewing soon">Renewing soon</option>
-          <option value="Needs review">Needs review</option>
-          <option value="Quote requested">Quote requested</option>
-          <option value="Switching">Switching</option>
-          <option value="On track">On track</option>
-        </select>
-
-        <select value={filterRenewal} onChange={(e) => setFilterRenewal(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
-          <option value="all">All renewal stages</option>
-          <option value="not_started">Not started</option>
-          <option value="quote_requested">Quote requested</option>
-          <option value="switching">Switching</option>
-          <option value="renewed">Renewed</option>
-        </select>
-
-        {[...new Set(accounts.map((a) => a.location).filter(Boolean))].length > 0 && (
-          <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
-            <option value="all">All locations</option>
-            {[...new Set(accounts.map((a) => a.location).filter(Boolean))].sort().map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {(filterFuel !== "all" || filterStatus !== "all" || filterRenewal !== "all" || filterLocation !== "all" || search) && (
-          <button
-            onClick={() => {
-              setFilterFuel("all");
-              setFilterStatus("all");
-              setFilterRenewal("all");
-              setFilterLocation("all");
-              setSearch("");
-            }}
-            style={{ background: "none", border: "none", color: "var(--teal)", cursor: "pointer", fontSize: 12.5 }}
-          >
-            Clear filters
-          </button>
-        )}
-      </div>
+        );
+      })()}
 
       {filterLocation !== "all" && (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 16px", marginBottom: 14, display: "flex", gap: 20, fontSize: 12.5, color: "var(--muted)" }}>
