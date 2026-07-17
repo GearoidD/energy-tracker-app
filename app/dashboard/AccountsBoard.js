@@ -1331,7 +1331,7 @@ export default function AccountsBoard({ companyId, companyName }) {
       });
   }, [accounts, search, filterFuel, filterStatus, filterRenewal, filterLocation, benchmarks, masterRates, readingSummaries]);
 
-  const [groupByLocation, setGroupByLocation] = useState(false);
+  const [groupByLocation, setGroupByLocation] = useState(true);
   const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
 
   const displayItems = useMemo(() => {
