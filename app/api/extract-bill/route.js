@@ -75,7 +75,7 @@ If a field isn't visible on the bill, use null for it. Do not guess or estimate 
 
     const textBlock = data.content?.find((c) => c.type === "text");
     if (!textBlock) {
-      return NextResponse.json({ error: "No response from Claude" }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't read this bill — try retaking the photo with better lighting and less glare, or make sure the whole page is in frame." }, { status: 500 });
     }
 
     const cleaned = textBlock.text.replace(/```json|```/g, "").trim();
@@ -83,7 +83,7 @@ If a field isn't visible on the bill, use null for it. Do not guess or estimate 
     try {
       extracted = JSON.parse(cleaned);
     } catch (e) {
-      return NextResponse.json({ error: "Couldn't parse the extracted data" }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't read this bill clearly enough — try retaking the photo with better lighting, holding the camera steady, and keeping the whole page in frame." }, { status: 500 });
     }
 
     return NextResponse.json({ extracted });

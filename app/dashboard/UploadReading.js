@@ -23,6 +23,22 @@ function fileToBase64(file) {
   });
 }
 
+// iPhones default to saving camera photos as HEIC, which Claude's vision API
+// doesn't support — convert to JPEG in the browser before it's ever sent.
+async function convertHeicIfNeeded(file) {
+  const isHeic =
+    file.type === "image/heic" ||
+    file.type === "image/heif" ||
+    /\.heic$/i.test(file.name) ||
+    /\.heif$/i.test(file.name);
+  if (!isHeic) return file;
+
+  const heic2any = (await import("heic2any")).default;
+  const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+  const finalBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+  return new File([finalBlob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+}
+
 // accountId: an existing account's id, or null if this bill might be for a new site
 export default function UploadReading({ accountId, companyId, accounts = [], onDone, onCancel }) {
   const [stage, setStage] = useState("pick"); // pick, extracting, confirm, saving
@@ -73,11 +89,12 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
     setError(null);
     setStage("extracting");
     try {
-      const base64 = await fileToBase64(file);
+      const convertedFile = await convertHeicIfNeeded(file);
+      const base64 = await fileToBase64(convertedFile);
       const res = await fetch("/api/extract-bill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, mediaType: file.type }),
+        body: JSON.stringify({ base64, mediaType: convertedFile.type }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Extraction failed");
