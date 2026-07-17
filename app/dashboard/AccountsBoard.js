@@ -856,6 +856,8 @@ export default function AccountsBoard({ companyId, companyName }) {
   const [filterRenewal, setFilterRenewal] = useState("all");
   const [filterLocation, setFilterLocation] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [locationOverflowOpen, setLocationOverflowOpen] = useState(false);
+  const [locationSearchText, setLocationSearchText] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [activityItems, setActivityItems] = useState(null);
   const [activityExpanded, setActivityExpanded] = useState(false);
@@ -1569,8 +1571,8 @@ export default function AccountsBoard({ companyId, companyName }) {
       </div>
 
       {(() => {
+        const severityOrder = { "var(--red)": 0, "var(--amber)": 1, "var(--green)": 2 };
         const locationPillInfo = [...new Set(accounts.map((a) => a.location).filter(Boolean))]
-          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
           .map((loc) => {
             const accts = accounts.filter((a) => a.location === loc);
             const enrichedAccts = enriched.filter((a) => a.location === loc);
@@ -1580,55 +1582,124 @@ export default function AccountsBoard({ companyId, companyName }) {
               ? "var(--amber)"
               : "var(--green)";
             return { loc, count: accts.length, worstColor };
+          })
+          .sort((a, b) => {
+            const rankDiff = severityOrder[a.worstColor] - severityOrder[b.worstColor];
+            if (rankDiff !== 0) return rankDiff;
+            return a.loc.localeCompare(b.loc, undefined, { numeric: true });
           });
 
         if (locationPillInfo.length === 0) return null;
 
+        const MAX_PILLS = 4;
+        const shown = locationPillInfo.slice(0, MAX_PILLS);
+        const overflow = locationPillInfo.slice(MAX_PILLS);
+
+        const pillStyle = (active, worstColor) => ({
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          borderRadius: 999,
+          padding: "9px 18px",
+          fontSize: 13.5,
+          fontWeight: 600,
+          cursor: "pointer",
+          background: active ? "var(--teal)" : "var(--panel)",
+          color: active ? "#06201d" : "var(--text)",
+          border: `1.5px solid ${active ? "var(--teal)" : "var(--border-light)"}`,
+        });
+
         return (
           <div style={{ marginBottom: 22 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 10 }}>LOCATIONS</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              <button
-                onClick={() => setFilterLocation("all")}
-                style={{
-                  borderRadius: 999,
-                  padding: "9px 18px",
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  background: filterLocation === "all" ? "var(--teal)" : "none",
-                  color: filterLocation === "all" ? "#06201d" : "var(--text)",
-                  border: `1.5px solid ${filterLocation === "all" ? "var(--teal)" : "var(--border-light)"}`,
-                }}
-              >
-                All locations
-              </button>
-              {locationPillInfo.map(({ loc, count, worstColor }) => {
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", position: "relative" }}>
+              {filterLocation !== "all" && (
+                <button onClick={() => setFilterLocation("all")} style={pillStyle(true, "var(--teal)")}>
+                  {filterLocation} · clear ✕
+                </button>
+              )}
+              {shown.map(({ loc, count, worstColor }) => {
                 const active = filterLocation === loc;
+                if (active) return null; // already shown above as the active/clear pill
                 return (
-                  <button
-                    key={loc}
-                    onClick={() => setFilterLocation(active ? "all" : loc)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      borderRadius: 999,
-                      padding: "9px 18px",
-                      fontSize: 13.5,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      background: active ? "var(--teal)" : "var(--panel)",
-                      color: active ? "#06201d" : "var(--text)",
-                      border: `1.5px solid ${active ? "var(--teal)" : "var(--border-light)"}`,
-                    }}
-                  >
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: active ? "#06201d" : worstColor, flexShrink: 0 }} />
+                  <button key={loc} onClick={() => setFilterLocation(loc)} style={pillStyle(false, worstColor)}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: worstColor, flexShrink: 0 }} />
                     {loc}
                     <span style={{ opacity: 0.75, fontWeight: 400 }}>{count}</span>
                   </button>
                 );
               })}
+              {overflow.length > 0 && (
+                <button onClick={() => setLocationOverflowOpen((v) => !v)} style={pillStyle(false, "var(--border-light)")}>
+                  + {overflow.length} more
+                  <ChevronDown size={13} style={{ transform: locationOverflowOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+                </button>
+              )}
+
+              {locationOverflowOpen && (
+                <div
+                  onClick={() => setLocationOverflowOpen(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 24 }}
+                />
+              )}
+              {locationOverflowOpen && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="wp-soft-in"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    background: "var(--panel)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: 10,
+                    padding: 12,
+                    zIndex: 25,
+                    width: 260,
+                    maxHeight: 320,
+                    overflowY: "auto",
+                  }}
+                >
+                  <input
+                    value={locationSearchText}
+                    onChange={(e) => setLocationSearchText(e.target.value)}
+                    placeholder="Search locations…"
+                    style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginBottom: 8 }}
+                    autoFocus
+                  />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {locationPillInfo
+                      .filter(({ loc }) => loc.toLowerCase().includes(locationSearchText.toLowerCase()))
+                      .map(({ loc, count, worstColor }) => (
+                        <button
+                          key={loc}
+                          onClick={() => {
+                            setFilterLocation(loc);
+                            setLocationOverflowOpen(false);
+                            setLocationSearchText("");
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            background: "none",
+                            border: "none",
+                            padding: "8px 10px",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            textAlign: "left",
+                            fontSize: 13,
+                            color: "var(--text)",
+                          }}
+                        >
+                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: worstColor, flexShrink: 0 }} />
+                          <span style={{ flex: 1 }}>{loc}</span>
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>{count}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
