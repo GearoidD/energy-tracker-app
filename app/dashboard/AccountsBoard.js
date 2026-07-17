@@ -858,6 +858,7 @@ export default function AccountsBoard({ companyId, companyName }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [activityItems, setActivityItems] = useState(null);
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
   const [bulkQuoteSupplierSelection, setBulkQuoteSupplierSelection] = useState(new Set());
   const [uploadingFor, setUploadingFor] = useState(null);
@@ -1566,6 +1567,72 @@ export default function AccountsBoard({ companyId, companyName }) {
           </div>
         </div>
       </div>
+
+      {(() => {
+        const locationPillInfo = [...new Set(accounts.map((a) => a.location).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+          .map((loc) => {
+            const accts = accounts.filter((a) => a.location === loc);
+            const enrichedAccts = enriched.filter((a) => a.location === loc);
+            const worstColor = enrichedAccts.some((a) => overallStatusFor(a).color === "var(--red)")
+              ? "var(--red)"
+              : enrichedAccts.some((a) => overallStatusFor(a).color === "var(--amber)")
+              ? "var(--amber)"
+              : "var(--green)";
+            return { loc, count: accts.length, worstColor };
+          });
+
+        if (locationPillInfo.length === 0) return null;
+
+        return (
+          <div style={{ marginBottom: 22 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 10 }}>LOCATIONS</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <button
+                onClick={() => setFilterLocation("all")}
+                style={{
+                  borderRadius: 999,
+                  padding: "9px 18px",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: filterLocation === "all" ? "var(--teal)" : "none",
+                  color: filterLocation === "all" ? "#06201d" : "var(--text)",
+                  border: `1.5px solid ${filterLocation === "all" ? "var(--teal)" : "var(--border-light)"}`,
+                }}
+              >
+                All locations
+              </button>
+              {locationPillInfo.map(({ loc, count, worstColor }) => {
+                const active = filterLocation === loc;
+                return (
+                  <button
+                    key={loc}
+                    onClick={() => setFilterLocation(active ? "all" : loc)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 999,
+                      padding: "9px 18px",
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      background: active ? "var(--teal)" : "var(--panel)",
+                      color: active ? "#06201d" : "var(--text)",
+                      border: `1.5px solid ${active ? "var(--teal)" : "var(--border-light)"}`,
+                    }}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: active ? "#06201d" : worstColor, flexShrink: 0 }} />
+                    {loc}
+                    <span style={{ opacity: 0.75, fontWeight: 400 }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       <div
         style={{
@@ -2611,15 +2678,23 @@ export default function AccountsBoard({ companyId, companyName }) {
 
       {activityItems && activityItems.length > 0 && (
         <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 14 }}>RECENT ACTIVITY</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {activityItems.map((item) => (
-              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--muted)" }}>
-                <span>{item.text}</span>
-                <span style={{ flexShrink: 0, marginLeft: 12 }}>{timeAgo(item.timestamp)}</span>
-              </div>
-            ))}
-          </div>
+          <button
+            onClick={() => setActivityExpanded((v) => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: activityExpanded ? 14 : 0 }}
+          >
+            <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, margin: 0 }}>RECENT ACTIVITY</p>
+            <ChevronDown size={13} color="var(--muted)" style={{ transform: activityExpanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+          </button>
+          {activityExpanded && (
+            <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+              {activityItems.map((item) => (
+                <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--muted)" }}>
+                  <span>{item.text}</span>
+                  <span style={{ flexShrink: 0, marginLeft: 12 }}>{timeAgo(item.timestamp)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
