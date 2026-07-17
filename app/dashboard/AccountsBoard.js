@@ -864,6 +864,9 @@ export default function AccountsBoard({ companyId, companyName }) {
   const [activityItems, setActivityItems] = useState(null);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkEditForm, setBulkEditForm] = useState({ location: "", contract_end: "", provider: "", renewal_status: "" });
+  const [bulkEditSaving, setBulkEditSaving] = useState(false);
   const [bulkQuoteSupplierSelection, setBulkQuoteSupplierSelection] = useState(new Set());
   const [uploadingFor, setUploadingFor] = useState(null);
   const [addingReadingFor, setAddingReadingFor] = useState(null);
@@ -1057,6 +1060,32 @@ export default function AccountsBoard({ companyId, companyName }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts, searchParams]);
+
+  const saveBulkEdit = async () => {
+    const payload = {};
+    if (bulkEditForm.location.trim()) payload.location = bulkEditForm.location.trim();
+    if (bulkEditForm.contract_end) payload.contract_end = bulkEditForm.contract_end;
+    if (bulkEditForm.provider.trim()) payload.provider = bulkEditForm.provider.trim();
+    if (bulkEditForm.renewal_status) payload.renewal_status = bulkEditForm.renewal_status;
+
+    if (Object.keys(payload).length === 0) {
+      alert("Fill in at least one field to apply.");
+      return;
+    }
+
+    setBulkEditSaving(true);
+    const { error } = await supabase.from("accounts").update(payload).in("id", [...selectedIds]);
+    setBulkEditSaving(false);
+
+    if (error) {
+      alert("Couldn't save: " + error.message);
+      return;
+    }
+
+    setBulkEditOpen(false);
+    setSelectedIds(new Set());
+    loadAccounts();
+  };
 
   const saveQuickRenew = async (accountId) => {
     if (!quickRenewForm.contract_end) {
@@ -1993,6 +2022,15 @@ export default function AccountsBoard({ companyId, companyName }) {
             <Mail size={13} /> Email selected accounts
           </button>
           <button
+            onClick={() => {
+              setBulkEditForm({ location: "", contract_end: "", provider: "", renewal_status: "" });
+              setBulkEditOpen(true);
+            }}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 12px", color: "var(--teal)", cursor: "pointer", fontSize: 12.5 }}
+          >
+            <Pencil size={13} /> Bulk edit
+          </button>
+          <button
             onClick={() => setSelectedIds(new Set())}
             style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 12.5 }}
           >
@@ -2841,6 +2879,89 @@ export default function AccountsBoard({ companyId, companyName }) {
             loadAccounts();
           }}
         />
+      )}
+
+      {bulkEditOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(6,12,14,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 65, padding: 20 }}
+          onClick={() => setBulkEditOpen(false)}
+        >
+          <div
+            style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 420, maxWidth: "100%", padding: 24 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>
+              Bulk edit {selectedIds.size} account{selectedIds.size === 1 ? "" : "s"}
+            </h2>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>
+              Only fields you fill in get applied — leave the rest blank to keep each account's existing value.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 18 }}>
+              <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
+                Location
+                <input
+                  style={inputStyle}
+                  value={bulkEditForm.location}
+                  onChange={(e) => setBulkEditForm((f) => ({ ...f, location: e.target.value }))}
+                  placeholder="e.g. Bishop Street"
+                  list="bulk-location-suggestions"
+                />
+                <datalist id="bulk-location-suggestions">
+                  {[...new Set(accounts.map((a) => a.location).filter(Boolean))].map((loc) => (
+                    <option key={loc} value={loc} />
+                  ))}
+                </datalist>
+              </label>
+              <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
+                Contract end date
+                <input
+                  type="date"
+                  style={inputStyle}
+                  value={bulkEditForm.contract_end}
+                  onChange={(e) => setBulkEditForm((f) => ({ ...f, contract_end: e.target.value }))}
+                />
+              </label>
+              <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
+                Provider
+                <input
+                  style={inputStyle}
+                  value={bulkEditForm.provider}
+                  onChange={(e) => setBulkEditForm((f) => ({ ...f, provider: e.target.value }))}
+                  placeholder="e.g. Electric Ireland"
+                />
+              </label>
+              <label style={{ fontSize: 12, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 5 }}>
+                Renewal stage
+                <select
+                  style={inputStyle}
+                  value={bulkEditForm.renewal_status}
+                  onChange={(e) => setBulkEditForm((f) => ({ ...f, renewal_status: e.target.value }))}
+                >
+                  <option value="">Don't change</option>
+                  <option value="not_started">Not started</option>
+                  <option value="quote_requested">Quote requested</option>
+                  <option value="switching">Switching</option>
+                  <option value="renewed">Renewed</option>
+                </select>
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                onClick={() => setBulkEditOpen(false)}
+                style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)", padding: "9px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveBulkEdit}
+                disabled={bulkEditSaving}
+                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              >
+                {bulkEditSaving ? "Saving…" : `Apply to ${selectedIds.size} account${selectedIds.size === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {quickRenewFor && (
