@@ -2010,7 +2010,6 @@ export default function AccountsBoard({ companyId, companyName }) {
             return (
               <div
                 key={a.id}
-                className="wp-soft-in"
                 style={{
                   background: "var(--panel)",
                   border: "1px solid var(--border)",
