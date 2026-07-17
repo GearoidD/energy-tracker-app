@@ -1663,6 +1663,11 @@ export default function AccountsBoard({ companyId, companyName }) {
 
       {(() => {
         const locations = [...new Set(accounts.map((a) => a.location).filter(Boolean))].sort();
+        const locationFuelInfo = {};
+        locations.forEach((loc) => {
+          const fuels = new Set(accounts.filter((a) => a.location === loc).map((a) => a.fuel_type || "electricity"));
+          locationFuelInfo[loc] = fuels.size > 1 ? "Mixed" : fuels.has("gas") ? "Gas" : "Electricity";
+        });
         const activeFilterCount = [filterFuel, filterStatus, filterRenewal, filterLocation].filter((f) => f !== "all").length;
         const clearAll = () => {
           setFilterFuel("all");
@@ -1788,7 +1793,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                     <option value="all">All locations</option>
                     {locations.map((loc) => (
                       <option key={loc} value={loc}>
-                        {loc}
+                        {loc} ({locationFuelInfo[loc]})
                       </option>
                     ))}
                   </select>
@@ -1963,6 +1968,8 @@ export default function AccountsBoard({ companyId, companyName }) {
                 : item.accounts.some((a) => overallStatusFor(a).color === "var(--amber)")
                 ? "var(--amber)"
                 : "var(--green)";
+              const fuelsHere = new Set(item.accounts.map((a) => a.fuel_type || "electricity"));
+              const fuelLabel = fuelsHere.size > 1 ? "Mixed" : fuelsHere.has("gas") ? "Gas" : "Electricity";
               return (
                 <button
                   key={`loc-${item.location}`}
@@ -1991,7 +1998,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                   <ChevronDown size={14} color="var(--muted)" style={{ transform: isExpanded ? "none" : "rotate(-90deg)", flexShrink: 0, transition: "transform 0.15s ease" }} />
                   <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>{item.location}</span>
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                    {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"}
+                    {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"} · {fuelLabel}
                   </span>
                 </button>
               );
