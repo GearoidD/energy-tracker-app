@@ -1346,9 +1346,9 @@ export default function AccountsBoard({ companyId, companyName }) {
     const groupList = Object.entries(groups)
       .map(([location, accts]) => ({
         location,
-        accounts: [...accts].sort((a, b) => a.name.localeCompare(b.name)),
+        accounts: [...accts].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
       }))
-      .sort((a, b) => a.location.localeCompare(b.location));
+      .sort((a, b) => a.location.localeCompare(b.location, undefined, { numeric: true }));
 
     const items = [];
     groupList.forEach((g) => {
@@ -1357,7 +1357,7 @@ export default function AccountsBoard({ companyId, companyName }) {
         g.accounts.forEach((a) => items.push({ type: "account", account: a }));
       }
     });
-    standalone.sort((a, b) => a.name.localeCompare(b.name));
+    standalone.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     standalone.forEach((a) => items.push({ type: "account", account: a }));
     return items;
   }, [enriched, groupByLocation, expandedLocationGroups]);
@@ -1482,8 +1482,8 @@ export default function AccountsBoard({ companyId, companyName }) {
     <div>
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes wpSoftIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .wp-soft-in { animation: wpSoftIn 0.22s ease both; }
         @media (max-width: 640px) {
