@@ -1481,6 +1481,11 @@ export default function AccountsBoard({ companyId, companyName }) {
   return (
     <div>
       <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes wpSoftIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .wp-soft-in { animation: wpSoftIn 0.22s ease both; }
         @media (max-width: 640px) {
           .wp-row-collapsed { flex-wrap: wrap !important; }
         }
@@ -1631,7 +1636,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                     <ChevronDown size={12} style={{ marginLeft: "auto", transform: isExpanded ? "rotate(180deg)" : "none", flexShrink: 0 }} />
                   </button>
                   {isExpanded && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 13, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
+                    <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 13, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
                       {group.items.map((item) => (
                         <button
                           key={item.id}
@@ -1730,6 +1735,7 @@ export default function AccountsBoard({ companyId, companyName }) {
             {filtersOpen && (
               <div
                 onClick={(e) => e.stopPropagation()}
+                className="wp-soft-in"
                 style={{
                   position: "absolute",
                   top: "calc(100% + 8px)",
@@ -1992,6 +1998,7 @@ export default function AccountsBoard({ companyId, companyName }) {
             return (
               <div
                 key={a.id}
+                className="wp-soft-in"
                 style={{
                   background: "var(--panel)",
                   border: "1px solid var(--border)",
