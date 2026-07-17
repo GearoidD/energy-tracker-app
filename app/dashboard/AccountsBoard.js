@@ -2038,6 +2038,11 @@ export default function AccountsBoard({ companyId, companyName }) {
                     style={{ flexShrink: 0, cursor: "pointer", width: 15, height: 15 }}
                   />
                   <RateSparkline readings={readingSummaries[a.id]} />
+                  {(a.fuel_type || "electricity") === "gas" ? (
+                    <Flame size={13} color="var(--amber)" style={{ flexShrink: 0 }} />
+                  ) : (
+                    <Zap size={13} color="var(--teal)" style={{ flexShrink: 0 }} />
+                  )}
                   <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 8, overflow: "hidden" }}>
                     <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {a.name}
