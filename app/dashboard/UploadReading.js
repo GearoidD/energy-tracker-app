@@ -39,6 +39,50 @@ async function convertHeicIfNeeded(file) {
   return new File([finalBlob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
 }
 
+// Modern phone photos can be several MB even after HEIC conversion — resize
+// and re-compress so the request never exceeds the hosting platform's size limit.
+async function compressImage(file, maxDimension = 2000, quality = 0.82) {
+  if (file.type === "application/pdf") return file; // PDFs pass through untouched
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          if (!blob) {
+            reject(new Error("Couldn't process this image"));
+            return;
+          }
+          resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Couldn't read this image file"));
+    };
+    img.src = url;
+  });
+}
+
 // accountId: an existing account's id, or null if this bill might be for a new site
 export default function UploadReading({ accountId, companyId, accounts = [], onDone, onCancel }) {
   const [stage, setStage] = useState("pick"); // pick, extracting, confirm, saving
@@ -89,14 +133,25 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
     setError(null);
     setStage("extracting");
     try {
-      const convertedFile = await convertHeicIfNeeded(file);
+      const heicConverted = await convertHeicIfNeeded(file);
+      const convertedFile = await compressImage(heicConverted);
       const base64 = await fileToBase64(convertedFile);
       const res = await fetch("/api/extract-bill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ base64, mediaType: convertedFile.type }),
       });
-      const data = await res.json();
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(
+          res.status === 413
+            ? "This photo is too large to upload — try again, it should compress automatically now."
+            : "Something went wrong reading this file — try again or use a different photo."
+        );
+      }
       if (!res.ok) throw new Error(data.error || "Extraction failed");
 
       const extractedData = { ...data.extracted };
