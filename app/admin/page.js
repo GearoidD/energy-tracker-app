@@ -58,11 +58,11 @@ export default async function AdminOverviewPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", padding: "40px 24px", fontFamily: "Inter, sans-serif" }}>
-      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');` }} />
+      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');` }} />
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <Zap size={20} color="var(--teal)" />
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16 }}>
+          <span style={{ fontFamily: "'Lora', serif", fontWeight: 600, fontSize: 16 }}>
             Watt<span style={{ color: "var(--teal)" }}>pryce</span> — Platform
           </span>
         </div>
@@ -76,7 +76,7 @@ export default async function AdminOverviewPage() {
           </Link>
         </div>
 
-        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: "0 0 24px" }}>
+        <h1 style={{ fontFamily: "'Lora', serif", fontSize: 24, fontWeight: 700, margin: "0 0 24px" }}>
           Platform overview
         </h1>
 
