@@ -12,17 +12,19 @@ export async function POST(request) {
       return NextResponse.json({ error: "Not logged in" }, { status: 401 });
     }
 
-    const { base64, mediaType } = await request.json();
+    const body = await request.json();
+    const pages = body.pages || (body.base64 ? [{ base64: body.base64, mediaType: body.mediaType }] : []);
 
-    if (!base64 || !mediaType) {
+    if (pages.length === 0) {
       return NextResponse.json({ error: "Missing file data" }, { status: 400 });
     }
 
-    const isPdf = mediaType === "application/pdf";
-
-    const contentBlock = isPdf
-      ? { type: "document", source: { type: "base64", media_type: mediaType, data: base64 } }
-      : { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } };
+    const contentBlocks = pages.map(({ base64, mediaType }) => {
+      const isPdf = mediaType === "application/pdf";
+      return isPdf
+        ? { type: "document", source: { type: "base64", media_type: mediaType, data: base64 } }
+        : { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } };
+    });
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -38,10 +40,10 @@ export async function POST(request) {
           {
             role: "user",
             content: [
-              contentBlock,
+              ...contentBlocks,
               {
                 type: "text",
-                text: `This is an energy bill (electricity or gas). Read it and return ONLY a JSON object, no other text, no markdown fences, with these exact keys:
+                text: `This is an energy bill (electricity or gas)${pages.length > 1 ? ", possibly spanning multiple pages/photos of the same bill (e.g. front and back) — combine information across all of them" : ""}. Read it and return ONLY a JSON object, no other text, no markdown fences, with these exact keys:
 {
   "reading_date": "YYYY-MM-DD or null, the billing period end date",
   "usage": number or null, the energy used in kWh for this billing period,

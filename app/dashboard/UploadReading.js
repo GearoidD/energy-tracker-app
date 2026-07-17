@@ -98,6 +98,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
   const [capacityValue, setCapacityValue] = useState("");
   const [syncCapacity, setSyncCapacity] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [multiPageMode, setMultiPageMode] = useState(false);
   const [fuelTypeUncertain, setFuelTypeUncertain] = useState(false);
   const [rateCarriedOver, setRateCarriedOver] = useState(false);
   const [dgGroupValue, setDgGroupValue] = useState("");
@@ -207,9 +208,94 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
   };
 
   // Kicks off processing for one or more files, whether picked or dropped
+  const handleMultiPageFile = async (files) => {
+    if (!files || files.length === 0) return;
+    setError(null);
+    setStage("extracting");
+    try {
+      const pages = [];
+      for (const file of files) {
+        const heicConverted = await convertHeicIfNeeded(file);
+        const compressed = await compressImage(heicConverted);
+        const base64 = await fileToBase64(compressed);
+        pages.push({ base64, mediaType: compressed.type });
+      }
+
+      const res = await fetch("/api/extract-bill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pages }),
+      });
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(
+          res.status === 413
+            ? "These photos are too large together — try fewer pages or lower resolution."
+            : "Something went wrong reading these files — try again."
+        );
+      }
+      if (!res.ok) throw new Error(data.error || "Extraction failed");
+
+      const extractedData = { ...data.extracted };
+      const uncertainFuel = extractedData.fuel_type !== "gas" && extractedData.fuel_type !== "electricity";
+      setFuelTypeUncertain(uncertainFuel);
+
+      let targetAccountId = accountId || null;
+
+      if (!accountId) {
+        const matched = extractedData.account_number
+          ? accounts.find((a) => a.account_number && a.account_number === extractedData.account_number)
+          : null;
+
+        if (matched) {
+          setTargetMode("existing");
+          setSelectedAccountId(matched.id);
+          targetAccountId = matched.id;
+        } else {
+          setTargetMode("new");
+          setNewSiteName(extractedData.supply_address || (extractedData.provider ? `${extractedData.provider} account` : ""));
+          setNewSiteAccountNumber(extractedData.account_number || "");
+          setNewSiteFuelType(extractedData.fuel_type === "gas" ? "gas" : "electricity");
+        }
+      }
+
+      let carriedOverRate = false;
+      if ((extractedData.rate === null || extractedData.rate === undefined) && targetAccountId) {
+        const supabaseCheck = createClient();
+        const { data: prevReadings } = await supabaseCheck
+          .from("readings")
+          .select("rate, reading_date")
+          .eq("account_id", targetAccountId)
+          .not("rate", "is", null)
+          .order("reading_date", { ascending: false })
+          .limit(1);
+        if (prevReadings && prevReadings.length > 0) {
+          extractedData.rate = prevReadings[0].rate;
+          carriedOverRate = true;
+        }
+      }
+      setRateCarriedOver(carriedOverRate);
+      setExtracted(extractedData);
+      setContractEndValue(extractedData.contract_end || "");
+      setCapacityValue(extractedData.fuel_type === "gas" ? extractedData.spc_kwh || "" : extractedData.mic_kva || "");
+      setDgGroupValue(extractedData.dg_group || "");
+      setStage("confirm");
+    } catch (e) {
+      setError(e.message);
+      setStage("pick");
+    }
+  };
+
   const handleFiles = (fileList) => {
     const files = Array.from(fileList || []);
     if (files.length === 0) return;
+    if (multiPageMode) {
+      handleMultiPageFile(files);
+      return;
+    }
     setBatchTotal(files.length);
     setBatchIndex(1);
     setFileQueue(files.slice(1));
@@ -370,6 +456,10 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
               onChange={(e) => handleFiles(e.target.files)}
               style={{ display: "none" }}
             />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text)", cursor: "pointer", marginBottom: 12 }}>
+              <input type="checkbox" checked={multiPageMode} onChange={(e) => setMultiPageMode(e.target.checked)} />
+              This bill spans multiple photos (e.g. front + back) — combine them into one bill
+            </label>
             <button
               onClick={openPicker}
               onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
@@ -391,7 +481,9 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
             >
               <Upload size={22} color="var(--teal)" />
               <span style={{ fontSize: 13 }}>{isDragOver ? "Drop to upload" : "Drag files here, or tap to choose"}</span>
-              <span style={{ fontSize: 11, color: "var(--muted)" }}>You can select several at once</span>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                {multiPageMode ? "Select all pages of this one bill together" : "You can select several at once"}
+              </span>
             </button>
             {error && (
               <div style={{ display: "flex", gap: 6, alignItems: "flex-start", color: "var(--red)", fontSize: 13, marginTop: 12 }}>
