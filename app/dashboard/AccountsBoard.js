@@ -1346,10 +1346,9 @@ export default function AccountsBoard({ companyId, companyName }) {
     const groupList = Object.entries(groups)
       .map(([location, accts]) => ({
         location,
-        accounts: accts,
-        worstRank: Math.min(...accts.map((a) => severityRank(a))),
+        accounts: [...accts].sort((a, b) => a.name.localeCompare(b.name)),
       }))
-      .sort((a, b) => a.worstRank - b.worstRank);
+      .sort((a, b) => a.location.localeCompare(b.location));
 
     const items = [];
     groupList.forEach((g) => {
@@ -1358,6 +1357,7 @@ export default function AccountsBoard({ companyId, companyName }) {
         g.accounts.forEach((a) => items.push({ type: "account", account: a }));
       }
     });
+    standalone.sort((a, b) => a.name.localeCompare(b.name));
     standalone.forEach((a) => items.push({ type: "account", account: a }));
     return items;
   }, [enriched, groupByLocation, expandedLocationGroups]);
