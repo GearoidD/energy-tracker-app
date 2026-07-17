@@ -99,6 +99,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
   const [syncCapacity, setSyncCapacity] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const [multiPageMode, setMultiPageMode] = useState(false);
+  const [multiPageFiles, setMultiPageFiles] = useState([]);
   const [fuelTypeUncertain, setFuelTypeUncertain] = useState(false);
   const [rateCarriedOver, setRateCarriedOver] = useState(false);
   const [dgGroupValue, setDgGroupValue] = useState("");
@@ -127,6 +128,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
     setFuelTypeUncertain(false);
     setRateCarriedOver(false);
     setDgGroupValue("");
+    setMultiPageFiles([]);
   };
 
   const handleFile = async (file) => {
@@ -293,7 +295,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
     const files = Array.from(fileList || []);
     if (files.length === 0) return;
     if (multiPageMode) {
-      handleMultiPageFile(files);
+      setMultiPageFiles((prev) => [...prev, ...files]);
       return;
     }
     setBatchTotal(files.length);
@@ -480,11 +482,49 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
               }}
             >
               <Upload size={22} color="var(--teal)" />
-              <span style={{ fontSize: 13 }}>{isDragOver ? "Drop to upload" : "Drag files here, or tap to choose"}</span>
+              <span style={{ fontSize: 13 }}>
+                {isDragOver ? "Drop to upload" : multiPageMode ? "Tap to take or choose a photo" : "Drag files here, or tap to choose"}
+              </span>
               <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                {multiPageMode ? "Select all pages of this one bill together" : "You can select several at once"}
+                {multiPageMode ? "Add each page one at a time — camera only captures one photo per tap" : "You can select several at once"}
               </span>
             </button>
+
+            {multiPageMode && multiPageFiles.length > 0 && (
+              <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 14px", marginTop: 12 }}>
+                <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 8, fontWeight: 600 }}>
+                  {multiPageFiles.length} page{multiPageFiles.length === 1 ? "" : "s"} added
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+                  {multiPageFiles.map((f, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
+                      <span>Page {i + 1}: {f.name}</span>
+                      <button
+                        onClick={() => setMultiPageFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                        style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: 11, padding: 0 }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => handleMultiPageFile(multiPageFiles)}
+                    style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 12.5 }}
+                  >
+                    Done — read {multiPageFiles.length} page{multiPageFiles.length === 1 ? "" : "s"} as one bill
+                  </button>
+                  <button
+                    onClick={() => setMultiPageFiles([])}
+                    style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)", padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12.5 }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+
             {error && (
               <div style={{ display: "flex", gap: 6, alignItems: "flex-start", color: "var(--red)", fontSize: 13, marginTop: 12 }}>
                 <AlertTriangle size={14} style={{ marginTop: 2, flexShrink: 0 }} />
