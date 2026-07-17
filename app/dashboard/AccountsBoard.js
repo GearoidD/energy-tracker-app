@@ -1513,8 +1513,30 @@ export default function AccountsBoard({ companyId, companyName }) {
   }
 
   return (
-    <div>
+    <div className="wp-dashboard-root">
       <style dangerouslySetInnerHTML={{ __html: `
+        .wp-dashboard-root select {
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238fa6a3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 10px center;
+          padding-right: 30px !important;
+          cursor: pointer;
+        }
+        .wp-dashboard-root input:focus,
+        .wp-dashboard-root select:focus,
+        .wp-dashboard-root textarea:focus {
+          outline: none;
+          border-color: var(--teal) !important;
+          box-shadow: 0 0 0 3px rgba(47, 167, 154, 0.15);
+        }
+        .wp-dashboard-root input,
+        .wp-dashboard-root select,
+        .wp-dashboard-root textarea {
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
         @keyframes wpSoftIn {
           from { opacity: 0; }
           to { opacity: 1; }
