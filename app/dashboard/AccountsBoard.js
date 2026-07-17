@@ -1637,7 +1637,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                   </button>
                   {isExpanded && (
                     <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 13, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
-                      {group.items.map((item) => (
+                      {group.items.slice(0, 6).map((item) => (
                         <button
                           key={item.id}
                           onClick={() => jumpToAccount(item.account)}
@@ -1647,6 +1647,11 @@ export default function AccountsBoard({ companyId, companyName }) {
                           {item.detail ? ` (${item.detail})` : ""}
                         </button>
                       ))}
+                      {group.items.length > 6 && (
+                        <span style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.75 }}>
+                          + {group.items.length - 6} more — use search or Filters below to see the full list
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1711,9 +1716,9 @@ export default function AccountsBoard({ companyId, companyName }) {
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
-                    background: groupByLocation ? "var(--teal)" : "none",
+                    background: "none",
                     border: `1px solid ${groupByLocation ? "var(--teal)" : "var(--border-light)"}`,
-                    color: groupByLocation ? "#06201d" : "var(--text)",
+                    color: groupByLocation ? "var(--teal)" : "var(--text)",
                     borderRadius: 7,
                     padding: "8px 14px",
                     fontSize: 13,
@@ -2041,14 +2046,15 @@ export default function AccountsBoard({ companyId, companyName }) {
                       gap: 4,
                       fontSize: 11,
                       fontWeight: 700,
-                      color: "#0E1A1D",
-                      background: overall.color,
+                      whiteSpace: "nowrap",
                       borderRadius: 5,
                       padding: "3px 9px",
-                      whiteSpace: "nowrap",
+                      ...(overall.color === "var(--red)"
+                        ? { color: "#0E1A1D", background: overall.color }
+                        : { color: overall.color, background: "none", border: `1px solid ${overall.color}66` }),
                     }}
                   >
-                    {overall.label !== "On track" && <AlertTriangle size={11} />}
+                    {overall.color === "var(--red)" && <AlertTriangle size={11} />}
                     {overall.label}
                   </span>
                   <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} title="Days until contract end date">
