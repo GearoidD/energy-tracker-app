@@ -1,18 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg: #f3efe6;
-  --panel: #faf7f0;
-  --panel2: #eee8d9;
-  --border: #d9d2bf;
-  --border-light: #c7bfa8;
-  --text: #1c2a22;
-  --muted: #5c6b5e;
-  --teal: #3c5a3e;
-  --teal-dim: #2c4530;
-  --amber: #b8860b;
-  --red: #a13d2e;
-  --green: #3c5a3e;
+  --bg: #fafaf8;
+  --panel: #ffffff;
+  --panel2: #f5f4f0;
+  --border: #e5e3dd;
+  --border-light: #d5d2c8;
+  --text: #1f2124;
+  --muted: #6b6d70;
+  --teal: #1f2124;
+  --teal-dim: #4a4c4f;
+  --amber: #a67c3d;
+  --red: #b54a3f;
+  --green: #5a6b52;
 }
 
 * {
