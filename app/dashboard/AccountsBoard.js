@@ -42,7 +42,7 @@ const STATUS_META = {
 const RENEWAL_STATUS_META = {
   not_started: { label: "Not started", color: "var(--muted)" },
   quote_requested: { label: "Quote requested", color: "var(--amber)" },
-  switching: { label: "Switching", color: "var(--teal)" },
+  switching: { label: "Switching", color: "var(--state)" },
   renewed: { label: "Renewed", color: "var(--green)" },
 };
 
@@ -1544,8 +1544,8 @@ export default function AccountsBoard({ companyId, companyName }) {
         .wp-dashboard-root select:focus,
         .wp-dashboard-root textarea:focus {
           outline: none;
-          border-color: var(--teal) !important;
-          box-shadow: 0 0 0 3px rgba(47, 167, 154, 0.15);
+          border-color: var(--state) !important;
+          box-shadow: 0 0 0 3px rgba(59, 91, 122, 0.15);
         }
         .wp-dashboard-root input,
         .wp-dashboard-root select,
@@ -1571,8 +1571,8 @@ export default function AccountsBoard({ companyId, companyName }) {
             onClick={() => setShowAccountNumbers((v) => !v)}
             style={{
               background: showAccountNumbers ? "var(--panel)" : "none",
-              border: `1px solid ${showAccountNumbers ? "var(--teal)" : "var(--border-light)"}`,
-              color: showAccountNumbers ? "var(--teal)" : "var(--muted)",
+              border: `1px solid ${showAccountNumbers ? "var(--state)" : "var(--border-light)"}`,
+              color: showAccountNumbers ? "var(--state)" : "var(--muted)",
               padding: "10px 14px",
               borderRadius: 8,
               cursor: "pointer",
@@ -1943,8 +1943,8 @@ export default function AccountsBoard({ companyId, companyName }) {
                     alignItems: "center",
                     gap: 6,
                     background: "none",
-                    border: `1px solid ${groupByLocation ? "var(--teal)" : "var(--border-light)"}`,
-                    color: groupByLocation ? "var(--teal)" : "var(--text)",
+                    border: `1px solid ${groupByLocation ? "var(--state)" : "var(--border-light)"}`,
+                    color: groupByLocation ? "var(--state)" : "var(--text)",
                     borderRadius: 7,
                     padding: "8px 14px",
                     fontSize: 13,
@@ -2366,7 +2366,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                           style={{
                             background: "none",
                             border: "none",
-                            borderBottom: expandedTab === t.key ? "2px solid var(--teal)" : "2px solid transparent",
+                            borderBottom: expandedTab === t.key ? "2px solid var(--state)" : "2px solid transparent",
                             color: expandedTab === t.key ? "var(--text)" : "var(--muted)",
                             fontWeight: expandedTab === t.key ? 600 : 400,
                             padding: "6px 10px",
@@ -2513,8 +2513,8 @@ export default function AccountsBoard({ companyId, companyName }) {
                             fontSize: 9,
                             fontWeight: 600,
                             textTransform: "uppercase",
-                            color: a.comparison.source === "verified" ? "var(--teal)" : "var(--muted)",
-                            border: `1px solid ${a.comparison.source === "verified" ? "var(--teal)" : "var(--border)"}`,
+                            color: a.comparison.source === "verified" ? "var(--state)" : "var(--muted)",
+                            border: `1px solid ${a.comparison.source === "verified" ? "var(--state)" : "var(--border)"}`,
                             borderRadius: 4,
                             padding: "1px 5px",
                           }}
