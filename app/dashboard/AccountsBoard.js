@@ -586,7 +586,7 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
               setFormError(null);
               onSave(form);
             }}
-            style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             {initial ? "Save changes" : "Add account"}
           </button>
@@ -701,7 +701,7 @@ function ManualReadingForm({ onSave, onCancel }) {
           </button>
           <button
             onClick={() => onSave(form)}
-            style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             Save reading
           </button>
@@ -1593,7 +1593,7 @@ export default function AccountsBoard({ companyId, companyName }) {
               setEditing(null);
               setShowForm(true);
             }}
-            style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             <Plus size={16} /> Add account
           </button>
@@ -1688,7 +1688,7 @@ export default function AccountsBoard({ companyId, companyName }) {
           fontWeight: 600,
           cursor: "pointer",
           background: active ? "var(--teal)" : "var(--panel)",
-          color: active ? "#FAFAF8" : "var(--text)",
+          color: active ? "#06201d" : "var(--text)",
           border: `1.5px solid ${active ? "var(--teal)" : "var(--border-light)"}`,
         });
 
@@ -1927,7 +1927,7 @@ export default function AccountsBoard({ companyId, companyName }) {
               >
                 <SlidersHorizontal size={14} /> Filters
                 {activeFilterCount > 0 && (
-                  <span style={{ background: "var(--teal)", color: "#FAFAF8", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>
+                  <span style={{ background: "var(--teal)", color: "#06201d", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>
                     {activeFilterCount}
                   </span>
                 )}
@@ -2133,7 +2133,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                         alignItems: "center",
                         gap: 6,
                         background: "var(--teal)",
-                        color: "#FAFAF8",
+                        color: "#06201d",
                         textDecoration: "none",
                         borderRadius: 6,
                         padding: "8px 12px",
@@ -2643,7 +2643,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                                             alignItems: "center",
                                             gap: 6,
                                             background: "var(--teal)",
-                                            color: "#FAFAF8",
+                                            color: "#06201d",
                                             textDecoration: "none",
                                             borderRadius: 6,
                                             padding: "6px 10px",
@@ -2745,7 +2745,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                             </button>
                             <button
                               onClick={() => acceptPulledRate(a.id)}
-                              style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                              style={{ background: "var(--teal)", border: "none", color: "#06201d", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                             >
                               Use this rate
                             </button>
@@ -2818,7 +2818,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                           />
                           <button
                             onClick={() => addNote(a.id)}
-                            style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", borderRadius: 6, padding: "0 16px", cursor: "pointer", fontWeight: 600, fontSize: 12.5, flexShrink: 0 }}
+                            style={{ background: "var(--teal)", border: "none", color: "#06201d", borderRadius: 6, padding: "0 16px", cursor: "pointer", fontWeight: 600, fontSize: 12.5, flexShrink: 0 }}
                           >
                             Add
                           </button>
@@ -3025,7 +3025,7 @@ export default function AccountsBoard({ companyId, companyName }) {
               <button
                 onClick={saveBulkEdit}
                 disabled={bulkEditSaving}
-                style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
               >
                 {bulkEditSaving ? "Saving…" : `Apply to ${selectedIds.size} account${selectedIds.size === 1 ? "" : "s"}`}
               </button>
@@ -3095,7 +3095,7 @@ export default function AccountsBoard({ companyId, companyName }) {
               </button>
               <button
                 onClick={() => saveQuickRenew(quickRenewFor)}
-                style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
               >
                 Save
               </button>

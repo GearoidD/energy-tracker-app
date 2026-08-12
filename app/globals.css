@@ -1,19 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg: #fafaf8;
-  --panel: #ffffff;
-  --panel2: #f5f4f0;
-  --border: #e5e3dd;
-  --border-light: #d5d2c8;
-  --text: #1f2124;
-  --muted: #6b6d70;
-  --teal: #1f2124;
-  --teal-dim: #4a4c4f;
-  --state: #3b5b7a;
-  --amber: #a67c3d;
-  --red: #b54a3f;
-  --green: #5a6b52;
+  --bg: #0e1a1d;
+  --panel: #142a2e;
+  --panel2: #193034;
+  --border: #24403f;
+  --border-light: #2e4c4a;
+  --text: #edf3f1;
+  --muted: #8fa6a3;
+  --teal: #2fa79a;
+  --teal-dim: #1f6e68;
+  --state: #2fa79a;
+  --amber: #e8a33d;
+  --red: #d9573b;
+  --green: #4c9a6a;
 }
 
 * {
