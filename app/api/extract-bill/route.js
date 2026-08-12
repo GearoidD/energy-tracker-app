@@ -53,6 +53,7 @@ export async function POST(request) {
   "provider": "string or null, the supplier name",
   "supply_address": "string or null, the physical supply address / site address the bill is for (not the billing/postal address if they differ) — this is usually near the MPRN/GPRN or account details section",
   "account_number": "string or null, the MPRN (electricity) or GPRN (gas) shown on the bill — this is the meter point reference number, not the supplier's customer/account number",
+  "supplier_account_number": "string or null, the supplier's own customer/account number if shown (distinct from the MPRN/GPRN) — this is what the supplier uses in their own correspondence and portal, and what appears on renewal letters etc.",
   "fuel_type": "electricity or gas — read this from the bill itself, don't guess",
   "contract_end": "YYYY-MM-DD or null — only if the bill explicitly states a contract end/renewal/expiry date, not the billing period date",
   "mic_kva": number or null — only for electricity bills, the Maximum Import Capacity in kVA if shown,

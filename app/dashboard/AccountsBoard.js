@@ -495,6 +495,14 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
               placeholder={form.fuel_type === "gas" ? "7-digit GPRN, on your bill" : "11-digit MPRN, on your bill"}
             />
           </Field>
+          <Field label="Supplier account number" hint="The supplier's own customer/account number — different from the MPRN/GPRN, but useful for matching their correspondence.">
+            <input
+              style={inputStyle}
+              value={form.supplier_account_number || ""}
+              onChange={set("supplier_account_number")}
+              placeholder="e.g. the number on their renewal letter"
+            />
+          </Field>
           <Field label="Provider">
             <input style={inputStyle} value={form.provider || ""} onChange={set("provider")} placeholder="e.g. Energia" />
           </Field>
@@ -891,6 +899,7 @@ export default function AccountsBoard({ companyId, companyName }) {
   const [ratePullLoading, setRatePullLoading] = useState(false);
   const [ratePullResult, setRatePullResult] = useState(null);
   const [ratePullError, setRatePullError] = useState(null);
+  const [showAccountNumbers, setShowAccountNumbers] = useState(false);
 
   const pullMarketRate = async (account) => {
     setRatePullFor(account.id);
@@ -1250,6 +1259,7 @@ export default function AccountsBoard({ companyId, companyName }) {
       location: form.location || null,
       provider: form.provider || null,
       account_number: form.account_number || null,
+      supplier_account_number: form.supplier_account_number || null,
       fuel_type: form.fuel_type || "electricity",
       contract_end: form.contract_end || null,
       rate: form.rate || null,
@@ -1346,7 +1356,12 @@ export default function AccountsBoard({ companyId, companyName }) {
       })
       .filter((a) => {
         const q = search.toLowerCase();
-        const matchesSearch = !q || a.name.toLowerCase().includes(q) || (a.provider || "").toLowerCase().includes(q);
+        const matchesSearch =
+          !q ||
+          a.name.toLowerCase().includes(q) ||
+          (a.provider || "").toLowerCase().includes(q) ||
+          (a.account_number || "").toLowerCase().includes(q) ||
+          (a.supplier_account_number || "").toLowerCase().includes(q);
         const matchesFuel = filterFuel === "all" || (a.fuel_type || "electricity") === filterFuel;
         const matchesStatus = filterStatus === "all" || overallStatusFor(a).label === filterStatus;
         const matchesRenewal = filterRenewal === "all" || (a.renewal_status || "not_started") === filterRenewal;
@@ -1552,6 +1567,21 @@ export default function AccountsBoard({ companyId, companyName }) {
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Everyone on your team sees this same list.</p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", position: "relative" }}>
+          <button
+            onClick={() => setShowAccountNumbers((v) => !v)}
+            style={{
+              background: showAccountNumbers ? "var(--panel)" : "none",
+              border: `1px solid ${showAccountNumbers ? "var(--teal)" : "var(--border-light)"}`,
+              color: showAccountNumbers ? "var(--teal)" : "var(--muted)",
+              padding: "10px 14px",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: showAccountNumbers ? 600 : 400,
+            }}
+          >
+            {showAccountNumbers ? "Hide" : "Show"} account numbers
+          </button>
           <button
             onClick={() => setUploadingFor("new")}
             style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
@@ -1876,7 +1906,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search site or provider…"
+                  placeholder="Search site, provider, or account number…"
                   style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }}
                 />
               </div>
@@ -2249,6 +2279,13 @@ export default function AccountsBoard({ companyId, companyName }) {
                     {a.location && (
                       <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>📍 {a.location}</span>
                     )}
+                    {showAccountNumbers && (a.account_number || a.supplier_account_number) && (
+                      <span style={{ fontSize: 10.5, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" }}>
+                        {a.account_number ? `${a.fuel_type === "gas" ? "GPRN" : "MPRN"} ${a.account_number}` : ""}
+                        {a.account_number && a.supplier_account_number ? " · " : ""}
+                        {a.supplier_account_number ? `Supplier # ${a.supplier_account_number}` : ""}
+                      </span>
+                    )}
                   </span>
                   <span
                     style={{
@@ -2374,6 +2411,17 @@ export default function AccountsBoard({ companyId, companyName }) {
                           style={{ fontSize: 9, fontWeight: 600, color: "var(--teal)", border: "1px solid var(--teal)55", borderRadius: 4, padding: "1px 5px", cursor: "help" }}
                         >
                           {gasTariffFor(a)} TARIFF
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11.5, color: "var(--muted)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                        {a.fuel_type === "gas" ? "GPRN" : "MPRN"}: {a.account_number || "not set"}
+                      </span>
+                      {a.supplier_account_number && (
+                        <span style={{ fontSize: 11.5, color: "var(--muted)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                          · Supplier account #: {a.supplier_account_number}
                         </span>
                       )}
                     </div>

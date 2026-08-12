@@ -104,6 +104,8 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
   const [rateCarriedOver, setRateCarriedOver] = useState(false);
   const [dgGroupValue, setDgGroupValue] = useState("");
   const [syncDgGroup, setSyncDgGroup] = useState(true);
+  const [supplierAccountNumberValue, setSupplierAccountNumberValue] = useState("");
+  const [syncSupplierAccountNumber, setSyncSupplierAccountNumber] = useState(true);
 
   // Batch upload state — lets someone pick or drop several bills at once
   const [fileQueue, setFileQueue] = useState([]);
@@ -129,6 +131,37 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
     setRateCarriedOver(false);
     setDgGroupValue("");
     setMultiPageFiles([]);
+    setSupplierAccountNumberValue("");
+    setSyncSupplierAccountNumber(true);
+  };
+
+  const applyExtractedData = (data, targetAccountId) => {
+    const extractedData = { ...data.extracted };
+    const uncertainFuel = extractedData.fuel_type !== "gas" && extractedData.fuel_type !== "electricity";
+    setFuelTypeUncertain(uncertainFuel);
+
+    if (!accountId) {
+      const matched = extractedData.account_number
+        ? accounts.find((a) => a.account_number && a.account_number === extractedData.account_number)
+        : null;
+
+      if (matched) {
+        setTargetMode("existing");
+        setSelectedAccountId(matched.id);
+      } else {
+        setTargetMode("new");
+        setNewSiteName(extractedData.supply_address || (extractedData.provider ? `${extractedData.provider} account` : ""));
+        setNewSiteAccountNumber(extractedData.account_number || "");
+        setNewSiteFuelType(extractedData.fuel_type === "gas" ? "gas" : "electricity");
+      }
+    }
+
+    setExtracted(extractedData);
+    setContractEndValue(extractedData.contract_end || "");
+    setCapacityValue(extractedData.fuel_type === "gas" ? extractedData.spc_kwh || "" : extractedData.mic_kva || "");
+    setDgGroupValue(extractedData.dg_group || "");
+    setSupplierAccountNumberValue(extractedData.supplier_account_number || "");
+    return extractedData;
   };
 
   const handleFile = async (file) => {
@@ -157,27 +190,13 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       }
       if (!res.ok) throw new Error(data.error || "Extraction failed");
 
-      const extractedData = { ...data.extracted };
-      const uncertainFuel = extractedData.fuel_type !== "gas" && extractedData.fuel_type !== "electricity";
-      setFuelTypeUncertain(uncertainFuel);
-
       let targetAccountId = accountId || null;
-
+      const extractedData = applyExtractedData(data, targetAccountId);
       if (!accountId) {
         const matched = extractedData.account_number
           ? accounts.find((a) => a.account_number && a.account_number === extractedData.account_number)
           : null;
-
-        if (matched) {
-          setTargetMode("existing");
-          setSelectedAccountId(matched.id);
-          targetAccountId = matched.id;
-        } else {
-          setTargetMode("new");
-          setNewSiteName(extractedData.supply_address || (extractedData.provider ? `${extractedData.provider} account` : ""));
-          setNewSiteAccountNumber(extractedData.account_number || "");
-          setNewSiteFuelType(extractedData.fuel_type === "gas" ? "gas" : "electricity");
-        }
+        if (matched) targetAccountId = matched.id;
       }
 
       // If the bill didn't show a rate but this account has prior bill history,
@@ -199,9 +218,6 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       }
       setRateCarriedOver(carriedOverRate);
       setExtracted(extractedData);
-      setContractEndValue(extractedData.contract_end || "");
-      setCapacityValue(extractedData.fuel_type === "gas" ? extractedData.spc_kwh || "" : extractedData.mic_kva || "");
-      setDgGroupValue(extractedData.dg_group || "");
       setStage("confirm");
     } catch (e) {
       setError(e.message);
@@ -241,27 +257,13 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       }
       if (!res.ok) throw new Error(data.error || "Extraction failed");
 
-      const extractedData = { ...data.extracted };
-      const uncertainFuel = extractedData.fuel_type !== "gas" && extractedData.fuel_type !== "electricity";
-      setFuelTypeUncertain(uncertainFuel);
-
       let targetAccountId = accountId || null;
-
+      const extractedData = applyExtractedData(data, targetAccountId);
       if (!accountId) {
         const matched = extractedData.account_number
           ? accounts.find((a) => a.account_number && a.account_number === extractedData.account_number)
           : null;
-
-        if (matched) {
-          setTargetMode("existing");
-          setSelectedAccountId(matched.id);
-          targetAccountId = matched.id;
-        } else {
-          setTargetMode("new");
-          setNewSiteName(extractedData.supply_address || (extractedData.provider ? `${extractedData.provider} account` : ""));
-          setNewSiteAccountNumber(extractedData.account_number || "");
-          setNewSiteFuelType(extractedData.fuel_type === "gas" ? "gas" : "electricity");
-        }
+        if (matched) targetAccountId = matched.id;
       }
 
       let carriedOverRate = false;
@@ -281,9 +283,6 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       }
       setRateCarriedOver(carriedOverRate);
       setExtracted(extractedData);
-      setContractEndValue(extractedData.contract_end || "");
-      setCapacityValue(extractedData.fuel_type === "gas" ? extractedData.spc_kwh || "" : extractedData.mic_kva || "");
-      setDgGroupValue(extractedData.dg_group || "");
       setStage("confirm");
     } catch (e) {
       setError(e.message);
@@ -339,6 +338,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
           name: newSiteName,
           provider: extracted.provider || null,
           account_number: newSiteAccountNumber,
+          supplier_account_number: supplierAccountNumberValue || null,
           fuel_type: newSiteFuelType,
           rate: extracted.rate || null,
           standing_charge: extracted.standing_charge || null,
@@ -377,6 +377,9 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
       }
       if (syncDgGroup && dgGroupValue) {
         await supabase.from("accounts").update({ dg_group: dgGroupValue }).eq("id", finalAccountId);
+      }
+      if (syncSupplierAccountNumber && supplierAccountNumberValue) {
+        await supabase.from("accounts").update({ supplier_account_number: supplierAccountNumberValue }).eq("id", finalAccountId);
       }
     }
 
@@ -700,6 +703,21 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
                   value={dgGroupValue}
                   onChange={(e) => setDgGroupValue(e.target.value)}
                   disabled={!syncDgGroup}
+                />
+              </div>
+            )}
+
+            {extracted.supplier_account_number && (
+              <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", marginBottom: 16 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text)", marginBottom: 8 }}>
+                  <input type="checkbox" checked={syncSupplierAccountNumber} onChange={(e) => setSyncSupplierAccountNumber(e.target.checked)} />
+                  This bill shows the supplier's own account number — update the account to:
+                </label>
+                <input
+                  style={{ ...inputStyle, opacity: syncSupplierAccountNumber ? 1 : 0.5 }}
+                  value={supplierAccountNumberValue}
+                  onChange={(e) => setSupplierAccountNumberValue(e.target.value)}
+                  disabled={!syncSupplierAccountNumber}
                 />
               </div>
             )}
