@@ -514,7 +514,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     onClick={() => handleMultiPageFile(multiPageFiles)}
-                    style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 12.5 }}
+                    style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 12.5 }}
                   >
                     Done — read {multiPageFiles.length} page{multiPageFiles.length === 1 ? "" : "s"} as one bill
                   </button>
@@ -736,7 +736,7 @@ export default function UploadReading({ accountId, companyId, accounts = [], onD
               )}
               <button
                 onClick={handleSave}
-                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                style={{ background: "var(--teal)", border: "none", color: "#FAFAF8", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
               >
                 Save reading
               </button>
