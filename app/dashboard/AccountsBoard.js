@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -852,9 +852,10 @@ function quoteRequestMailto(acc, supplierEmail, companyName) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-export default function AccountsBoard({ companyId, companyName }) {
+export default function AccountsBoard({ companyId, companyName, lockedLocation }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -864,7 +865,7 @@ export default function AccountsBoard({ companyId, companyName }) {
   const [filterFuel, setFilterFuel] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRenewal, setFilterRenewal] = useState("all");
-  const [filterLocation, setFilterLocation] = useState("all");
+  const [filterLocation, setFilterLocation] = useState(lockedLocation || "all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [locationOverflowOpen, setLocationOverflowOpen] = useState(false);
   const [locationSearchText, setLocationSearchText] = useState("");
@@ -1375,7 +1376,7 @@ export default function AccountsBoard({ companyId, companyName }) {
       });
   }, [accounts, search, filterFuel, filterStatus, filterRenewal, filterLocation, benchmarks, masterRates, readingSummaries]);
 
-  const [groupByLocation, setGroupByLocation] = useState(true);
+  const [groupByLocation, setGroupByLocation] = useState(!lockedLocation);
   const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
 
   const displayItems = useMemo(() => {
@@ -1653,7 +1654,15 @@ export default function AccountsBoard({ companyId, companyName }) {
         </div>
       </div>
 
-      {(() => {
+      {lockedLocation ? (
+        <div style={{ marginBottom: 22 }}>
+          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--muted)", textDecoration: "none", marginBottom: 12, width: "fit-content" }}>
+            <ChevronDown size={13} style={{ transform: "rotate(90deg)" }} /> All locations
+          </Link>
+          <h2 style={{ fontFamily: "'Lora', serif", fontSize: 20, fontWeight: 600, margin: 0 }}>{lockedLocation}</h2>
+        </div>
+      ) : (
+        (() => {
         const severityOrder = { "var(--red)": 0, "var(--amber)": 1, "var(--green)": 2 };
         const locationPillInfo = [...new Set(accounts.map((a) => a.location).filter(Boolean))]
           .map((loc) => {
@@ -1705,7 +1714,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                 const active = filterLocation === loc;
                 if (active) return null; // already shown above as the active/clear pill
                 return (
-                  <button key={loc} onClick={() => setFilterLocation(loc)} style={pillStyle(false, worstColor)}>
+                  <button key={loc} onClick={() => router.push(`/dashboard/locations/${encodeURIComponent(loc)}`)} style={pillStyle(false, worstColor)}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: worstColor, flexShrink: 0 }} />
                     {loc}
                     <span style={{ opacity: 0.75, fontWeight: 400 }}>{count}</span>
@@ -1757,9 +1766,9 @@ export default function AccountsBoard({ companyId, companyName }) {
                         <button
                           key={loc}
                           onClick={() => {
-                            setFilterLocation(loc);
                             setLocationOverflowOpen(false);
                             setLocationSearchText("");
+                            router.push(`/dashboard/locations/${encodeURIComponent(loc)}`);
                           }}
                           style={{
                             display: "flex",
@@ -1786,7 +1795,8 @@ export default function AccountsBoard({ companyId, companyName }) {
             </div>
           </div>
         );
-      })()}
+        })()
+      )}
 
       <div
         style={{
@@ -1932,7 +1942,7 @@ export default function AccountsBoard({ companyId, companyName }) {
                   </span>
                 )}
               </button>
-              {locations.length > 0 && (
+              {locations.length > 0 && !lockedLocation && (
                 <button
                   onClick={() => {
                     setGroupByLocation((v) => !v);

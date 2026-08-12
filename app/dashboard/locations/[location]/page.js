@@ -1,0 +1,60 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import AccountsBoard from "../../AccountsBoard";
+import Header from "../../Header";
+
+export const dynamic = "force-dynamic";
+
+export default async function LocationPage({ params }) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+
+  const { data: memberships } = await supabase
+    .from("company_members")
+    .select("company_id, role, companies(id, name)")
+    .eq("user_id", user.id);
+
+  const companies = (memberships || [])
+    .filter((m) => m.companies)
+    .map((m) => ({ ...m.companies, role: m.role }));
+
+  if (companies.length === 0) redirect("/dashboard");
+
+  let profile = profileData;
+
+  if (!profile && companies.length > 0) {
+    const { data: healedProfile } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, email: user.email, active_company_id: companies[0].id })
+      .select()
+      .maybeSingle();
+    profile = healedProfile;
+  }
+
+  const activeCompanyId =
+    profile?.active_company_id && companies.some((c) => c.id === profile.active_company_id)
+      ? profile.active_company_id
+      : companies[0].id;
+
+  const locationName = decodeURIComponent(params.location);
+
+  return (
+    <div style={{ minHeight: "100vh" }}>
+      <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
+      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
+        <AccountsBoard
+          companyId={activeCompanyId}
+          companyName={companies.find((c) => c.id === activeCompanyId)?.name || ""}
+          lockedLocation={locationName}
+        />
+      </div>
+    </div>
+  );
+}
