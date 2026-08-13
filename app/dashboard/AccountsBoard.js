@@ -331,7 +331,7 @@ function RateSparkline({ readings }) {
   if (rated.length < 2) {
     return (
       <div style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <span style={{ fontSize: 8.5, color: "var(--muted)", textAlign: "center" }}>no trend yet</span>
+        <span style={{ fontSize: 13, color: "var(--border-light)" }}>—</span>
       </div>
     );
   }
@@ -740,7 +740,7 @@ function recommendationFor(a) {
   };
 }
 
-function providerNegotiationMailto(acc, providerEmail, comparison, companyName) {
+function buildProviderNegotiationContent(acc, comparison, companyName) {
   const fuel = (acc.fuel_type || "electricity") === "gas" ? "gas" : "electricity";
   const subject = `Renewal check-in — ${acc.name}${acc.account_number ? ` (${acc.account_number})` : ""}`;
 
@@ -764,7 +764,12 @@ function providerNegotiationMailto(acc, providerEmail, comparison, companyName) 
     "Thanks,",
   ].filter(Boolean);
 
-  return `mailto:${providerEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
+  return { subject, body: lines.join("\n") };
+}
+
+function providerNegotiationMailto(acc, providerEmail, comparison, companyName) {
+  const { subject, body } = buildProviderNegotiationContent(acc, comparison, companyName);
+  return `mailto:${providerEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function buildBulkQuoteRequestContent(accs, companyName) {
@@ -873,6 +878,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   const [activityItems, setActivityItems] = useState(null);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkEditForm, setBulkEditForm] = useState({ location: "", contract_end: "", provider: "", renewal_status: "" });
   const [bulkEditSaving, setBulkEditSaving] = useState(false);
@@ -1068,8 +1074,36 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       const match = accounts.find((a) => a.id === renewId);
       if (match) openQuickRenew(match);
     }
+    const uploadId = searchParams.get("upload");
+    if (uploadId && accounts.length > 0) {
+      const match = accounts.find((a) => a.id === uploadId);
+      if (match) setUploadingFor(match.id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts, searchParams]);
+
+  const sendSupplierEmail = async ({ to, bcc, subject, body, accountIds, supplierName, logNote }) => {
+    setSendingEmail(true);
+    try {
+      const res = await fetch("/api/send-supplier-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, bcc, subject, body, companyId, accountIds, supplierName, logNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert("Couldn't send: " + (data.error || "Unknown error"));
+        return false;
+      }
+      loadActivity();
+      return true;
+    } catch (e) {
+      alert("Couldn't send: " + e.message);
+      return false;
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   const saveBulkEdit = async () => {
     const payload = {};
@@ -2135,25 +2169,39 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
               return (
                 <>
                   {chosenSuppliers.length > 1 && emailableChosen.length === chosenSuppliers.length && (
-                    <a
-                      href={bulkQuoteRequestMailtoBCC(selectedAccounts, emailableChosen.map((s) => s.contact_email), companyName)}
-                      onClick={() => setBulkQuotePickerOpen(false)}
+                    <button
+                      disabled={sendingEmail}
+                      onClick={async () => {
+                        const { subject, body } = buildBulkQuoteRequestContent(selectedAccounts, companyName);
+                        const ok = await sendSupplierEmail({
+                          bcc: emailableChosen.map((s) => s.contact_email),
+                          subject,
+                          body,
+                          accountIds: selectedAccounts.map((a) => a.id),
+                          logNote: `Quote request emailed to ${emailableChosen.length} suppliers at once — sent via Wattpryce.`,
+                        });
+                        if (ok) {
+                          setBulkQuotePickerOpen(false);
+                          alert(`Sent to all ${emailableChosen.length} suppliers.`);
+                        }
+                      }}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
                         background: "var(--teal)",
                         color: "#06201d",
-                        textDecoration: "none",
+                        border: "none",
                         borderRadius: 6,
                         padding: "8px 12px",
                         fontSize: 12.5,
                         fontWeight: 600,
                         marginBottom: 10,
+                        cursor: sendingEmail ? "default" : "pointer",
                       }}
                     >
-                      <Mail size={12} /> Email all {emailableChosen.length} selected at once (BCC — they won't see each other)
-                    </a>
+                      <Mail size={12} /> {sendingEmail ? "Sending…" : `Email all ${emailableChosen.length} selected at once (BCC — they won't see each other)`}
+                    </button>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {matching.map((s) => (
@@ -2163,13 +2211,26 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                           {s.name}
                         </label>
                         {s.accepts_email_quotes && s.contact_email ? (
-                          <a
-                            href={bulkQuoteRequestMailto(selectedAccounts, s.contact_email, companyName)}
-                            onClick={() => setBulkQuotePickerOpen(false)}
-                            style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}
+                          <button
+                            disabled={sendingEmail}
+                            onClick={async () => {
+                              const { subject, body } = buildBulkQuoteRequestContent(selectedAccounts, companyName);
+                              const ok = await sendSupplierEmail({
+                                to: s.contact_email,
+                                subject,
+                                body,
+                                accountIds: selectedAccounts.map((a) => a.id),
+                                supplierName: s.name,
+                              });
+                              if (ok) {
+                                setBulkQuotePickerOpen(false);
+                                alert(`Quote request sent to ${s.name}.`);
+                              }
+                            }}
+                            style={{ background: "none", border: "none", color: "var(--teal)", cursor: sendingEmail ? "default" : "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, padding: 0 }}
                           >
-                            <Mail size={12} /> Email
-                          </a>
+                            <Mail size={12} /> {sendingEmail ? "Sending…" : "Email"}
+                          </button>
                         ) : (
                           <span style={{ color: "var(--muted)", fontSize: 11.5 }}>Call {s.contact_phone || "— no number saved"}</span>
                         )}
@@ -2286,7 +2347,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                     <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {a.name}
                     </span>
-                    {a.location && (
+                    {a.location && !groupByLocation && (
                       <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>📍 {a.location}</span>
                     )}
                     {showAccountNumbers && (a.account_number || a.supplier_account_number) && (
@@ -2603,17 +2664,29 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                         <Mail size={12} /> Request a quote
                       </button>
                       {a.provider && (
-                        <a
-                          href={providerNegotiationMailto(
-                            a,
-                            suppliers.find((s) => s.name.toLowerCase() === a.provider.toLowerCase())?.contact_email,
-                            a.comparison,
-                            companyName
-                          )}
-                          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", color: "var(--muted)", cursor: "pointer", fontSize: 12, textDecoration: "none" }}
+                        <button
+                          disabled={sendingEmail}
+                          onClick={async () => {
+                            const providerEmail = suppliers.find((s) => s.name.toLowerCase() === a.provider.toLowerCase())?.contact_email;
+                            if (!providerEmail) {
+                              alert(`No saved email for ${a.provider} — add one in the admin Suppliers page first.`);
+                              return;
+                            }
+                            const { subject, body } = buildProviderNegotiationContent(a, a.comparison, companyName);
+                            const ok = await sendSupplierEmail({
+                              to: providerEmail,
+                              subject,
+                              body,
+                              accountIds: [a.id],
+                              supplierName: a.provider,
+                              logNote: `Renewal check-in emailed to ${a.provider} — sent via Wattpryce.`,
+                            });
+                            if (ok) alert(`Sent to ${a.provider}.`);
+                          }}
+                          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", color: "var(--muted)", cursor: sendingEmail ? "default" : "pointer", fontSize: 12 }}
                         >
-                          <Mail size={12} /> Email {a.provider}
-                        </a>
+                          <Mail size={12} /> {sendingEmail ? "Sending…" : `Email ${a.provider}`}
+                        </button>
                       )}
                     </div>
 
@@ -2646,25 +2719,37 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                                     const emailable = selectedSuppliers.filter((s) => s.accepts_email_quotes && s.contact_email);
                                     if (emailable.length === selectedSuppliers.length) {
                                       return (
-                                        <a
-                                          href={quoteRequestMailtoBCC(a, emailable.map((s) => s.contact_email), companyName)}
+                                        <button
+                                          disabled={sendingEmail}
+                                          onClick={async () => {
+                                            const { subject, body } = buildQuoteRequestContent(a, companyName);
+                                            const ok = await sendSupplierEmail({
+                                              bcc: emailable.map((s) => s.contact_email),
+                                              subject,
+                                              body,
+                                              accountIds: [a.id],
+                                              logNote: `Quote request emailed to ${emailable.length} suppliers at once — sent via Wattpryce.`,
+                                            });
+                                            if (ok) alert(`Sent to all ${emailable.length} suppliers.`);
+                                          }}
                                           style={{
                                             display: "flex",
                                             alignItems: "center",
                                             gap: 6,
                                             background: "var(--teal)",
                                             color: "#06201d",
-                                            textDecoration: "none",
+                                            border: "none",
                                             borderRadius: 6,
                                             padding: "6px 10px",
                                             fontSize: 12.5,
                                             fontWeight: 600,
                                             marginBottom: 8,
                                             width: "fit-content",
+                                            cursor: sendingEmail ? "default" : "pointer",
                                           }}
                                         >
-                                          <Mail size={12} /> Email all {emailable.length} at once (BCC — they won't see each other)
-                                        </a>
+                                          <Mail size={12} /> {sendingEmail ? "Sending…" : `Email all ${emailable.length} at once (BCC — they won't see each other)`}
+                                        </button>
                                       );
                                     }
                                     return (
@@ -2678,12 +2763,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                                       <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
                                         <span style={{ color: "var(--text)" }}>{s.name}</span>
                                         {s.accepts_email_quotes && s.contact_email ? (
-                                          <a
-                                            href={quoteRequestMailto(a, s.contact_email, companyName)}
-                                            style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+                                          <button
+                                            disabled={sendingEmail}
+                                            onClick={async () => {
+                                              const { subject, body } = buildQuoteRequestContent(a, companyName);
+                                              const ok = await sendSupplierEmail({ to: s.contact_email, subject, body, accountIds: [a.id], supplierName: s.name });
+                                              if (ok) alert(`Quote request sent to ${s.name}.`);
+                                            }}
+                                            style={{ background: "none", border: "none", color: "var(--teal)", cursor: sendingEmail ? "default" : "pointer", display: "flex", alignItems: "center", gap: 4, padding: 0, fontSize: 12.5 }}
                                           >
-                                            <Mail size={11} /> Email
-                                          </a>
+                                            <Mail size={11} /> {sendingEmail ? "Sending…" : "Email"}
+                                          </button>
                                         ) : (
                                           <span style={{ color: "var(--muted)", fontSize: 11.5 }}>Call {s.contact_phone || "— no number saved"}</span>
                                         )}
@@ -2700,12 +2790,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                                       {s.name}
                                     </label>
                                     {s.accepts_email_quotes && s.contact_email ? (
-                                      <a
-                                        href={quoteRequestMailto(a, s.contact_email, companyName)}
-                                        style={{ color: "var(--teal)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+                                      <button
+                                        disabled={sendingEmail}
+                                        onClick={async () => {
+                                          const { subject, body } = buildQuoteRequestContent(a, companyName);
+                                          const ok = await sendSupplierEmail({ to: s.contact_email, subject, body, accountIds: [a.id], supplierName: s.name });
+                                          if (ok) alert(`Quote request sent to ${s.name}.`);
+                                        }}
+                                        style={{ background: "none", border: "none", color: "var(--teal)", cursor: sendingEmail ? "default" : "pointer", display: "flex", alignItems: "center", gap: 4, padding: 0, fontSize: 12.5 }}
                                       >
-                                        <Mail size={11} /> Email
-                                      </a>
+                                        <Mail size={11} /> {sendingEmail ? "Sending…" : "Email"}
+                                      </button>
                                     ) : (
                                       <span style={{ color: "var(--muted)", fontSize: 11.5 }}>
                                         Call {s.contact_phone || "— no number saved"}
