@@ -879,6 +879,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [bulkQuotePickerOpen, setBulkQuotePickerOpen] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [spendBreakdownOpen, setSpendBreakdownOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkEditForm, setBulkEditForm] = useState({ location: "", contract_end: "", provider: "", renewal_status: "" });
   const [bulkEditSaving, setBulkEditSaving] = useState(false);
@@ -1459,6 +1460,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
     const hasAnyComparison = enriched.some((a) => a.comparison);
     const hasAnyCost = enriched.some((a) => a.cost !== null && a.cost !== undefined);
 
+    let realBillCount = 0;
+    let fallbackCount = 0;
+    let noCostCount = 0;
+    enriched.forEach((a) => {
+      const rated = (readingSummaries[a.id] || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
+      if (a.cost === null || a.cost === undefined) noCostCount++;
+      else if (rated.length > 0) realBillCount++;
+      else fallbackCount++;
+    });
+
     return {
       total: enriched.length,
       needAttention,
@@ -1467,8 +1478,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       totalSpend,
       hasAnyComparison,
       hasAnyCost,
+      realBillCount,
+      fallbackCount,
+      noCostCount,
     };
-  }, [enriched]);
+  }, [enriched, readingSummaries]);
 
   const attentionItems = useMemo(() => {
     const items = [];
@@ -1856,11 +1870,61 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
             <span style={{ color: summaryStats.hasAnyComparison && summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--muted)" }}>
               {summaryStats.hasAnyComparison ? `${fmtMoney(summaryStats.potentialSavings)} potential savings` : "no comparison yet"}
             </span>
-            <span
-              title="Extrapolated from the bills you've entered — the more history an account has, the more accurate this is"
-              style={{ cursor: "help", textDecoration: "underline dotted" }}
-            >
-              {summaryStats.hasAnyCost ? `${fmtMoney(summaryStats.totalSpend)} est. spend` : "no bill data yet"}
+            <span style={{ position: "relative" }}>
+              <button
+                onClick={() => setSpendBreakdownOpen((v) => !v)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  font: "inherit",
+                  color: "var(--muted)",
+                  cursor: summaryStats.hasAnyCost ? "pointer" : "default",
+                  textDecoration: summaryStats.hasAnyCost ? "underline dotted" : "none",
+                }}
+              >
+                {summaryStats.hasAnyCost ? `${fmtMoney(summaryStats.totalSpend)} est. spend` : "no bill data yet"}
+              </button>
+              {spendBreakdownOpen && summaryStats.hasAnyCost && (
+                <>
+                  <div onClick={() => setSpendBreakdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 24 }} />
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="wp-soft-in"
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 8px)",
+                      right: 0,
+                      background: "var(--panel)",
+                      border: "1px solid var(--border-light)",
+                      borderRadius: 10,
+                      padding: 14,
+                      zIndex: 25,
+                      width: 260,
+                      textAlign: "left",
+                    }}
+                  >
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>
+                      HOW THIS IS CALCULATED
+                    </p>
+                    {summaryStats.realBillCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                        <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — from real uploaded bill history
+                      </div>
+                    )}
+                    {summaryStats.fallbackCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                        <strong>{summaryStats.fallbackCount}</strong> account{summaryStats.fallbackCount === 1 ? "" : "s"} — estimated from the rate and usage entered directly, no bill uploaded yet
+                      </div>
+                    )}
+                    {summaryStats.noCostCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                        <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — not included, missing rate or usage
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -2379,6 +2443,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                   <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} title="Days until contract end date">
                     {a.daysLeft === null ? "–" : a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d overdue` : `${a.daysLeft}d to renew`}
                   </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setUploadingFor(a.id); }}
+                    title="Upload a bill for this account"
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", padding: 5, flexShrink: 0 }}
+                  >
+                    <Upload size={14} />
+                  </button>
                   <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setMenuForId(menuForId === a.id ? null : a.id)}
@@ -2393,12 +2464,6 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                           style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "9px 12px", color: "var(--teal)", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
                         >
                           Just renewed?
-                        </button>
-                        <button
-                          onClick={() => { setMenuForId(null); setUploadingFor(a.id); }}
-                          style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "9px 12px", color: "var(--text)", cursor: "pointer", fontSize: 13 }}
-                        >
-                          Upload bill
                         </button>
                         <button
                           onClick={() => { setMenuForId(null); setEditing(a); setShowForm(true); }}
