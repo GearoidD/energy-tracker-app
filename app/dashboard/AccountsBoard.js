@@ -12,6 +12,7 @@ import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
 import BenchmarksBoard from "./BenchmarksBoard";
 import CompanyOverview from "./CompanyOverview";
+import WoodpeckerMascot from "@/app/WoodpeckerMascot";
 
 const HORIZON_DAYS = 120;
 
@@ -1643,14 +1644,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
         }
       ` }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 14 }}>
-        <div>
-          <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Accounts</h1>
-          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Everyone on your team sees this same list.</p>
-          {lastUpdated && (
-            <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 3, opacity: 0.75 }}>
-              Data updated {lastUpdated.toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })} · {lastUpdated.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}
-            </p>
-          )}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <WoodpeckerMascot size={48} />
+          <div>
+            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Accounts</h1>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Everyone on your team sees this same list.</p>
+            {lastUpdated && (
+              <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 3, opacity: 0.75 }}>
+                Data updated {lastUpdated.toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })} · {lastUpdated.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", position: "relative" }}>
           <button
