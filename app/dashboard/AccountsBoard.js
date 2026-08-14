@@ -908,6 +908,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   const [ratePullResult, setRatePullResult] = useState(null);
   const [ratePullError, setRatePullError] = useState(null);
   const [showAccountNumbers, setShowAccountNumbers] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const pullMarketRate = async (account) => {
     setRatePullFor(account.id);
@@ -1276,7 +1277,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       .eq("company_id", companyId)
       .order("contract_end", { ascending: true, nullsFirst: false });
     if (error) setError(error.message);
-    else setAccounts(data || []);
+    else {
+      setAccounts(data || []);
+      setLastUpdated(new Date());
+    }
     setLoading(false);
   }, [companyId]);
 
@@ -1417,6 +1421,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
 
   const [groupByLocation, setGroupByLocation] = useState(!lockedLocation);
   const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
+  const [locationSortMode, setLocationSortMode] = useState("alphabetical"); // alphabetical or attention
 
   const displayItems = useMemo(() => {
     if (!groupByLocation) {
@@ -1432,12 +1437,23 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
         standalone.push(a);
       }
     });
+    const attentionCountFor = (accts) =>
+      accts.filter((a) => {
+        const c = overallStatusFor(a).color;
+        return c === "var(--red)" || c === "var(--amber)";
+      }).length;
+
     const groupList = Object.entries(groups)
       .map(([location, accts]) => ({
         location,
         accounts: [...accts].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+        attentionCount: attentionCountFor(accts),
       }))
-      .sort((a, b) => a.location.localeCompare(b.location, undefined, { numeric: true }));
+      .sort((a, b) =>
+        locationSortMode === "attention"
+          ? b.attentionCount - a.attentionCount || a.location.localeCompare(b.location, undefined, { numeric: true })
+          : a.location.localeCompare(b.location, undefined, { numeric: true })
+      );
 
     const items = [];
     groupList.forEach((g) => {
@@ -1449,7 +1465,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
     standalone.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     standalone.forEach((a) => items.push({ type: "account", account: a }));
     return items;
-  }, [enriched, groupByLocation, expandedLocationGroups]);
+  }, [enriched, groupByLocation, expandedLocationGroups, locationSortMode]);
 
   const summaryStats = useMemo(() => {
     const needAttention = enriched.filter((a) => {
@@ -1621,6 +1637,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
         <div>
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Accounts</h1>
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Everyone on your team sees this same list.</p>
+          {lastUpdated && (
+            <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 3, opacity: 0.75 }}>
+              Data updated {lastUpdated.toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })} · {lastUpdated.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", position: "relative" }}>
           <button
@@ -1713,11 +1734,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
               const c = overallStatusFor(a).color;
               return c === "var(--red)" || c === "var(--amber)";
             }).length;
-            const worstColor = enrichedAccts.some((a) => overallStatusFor(a).color === "var(--red)")
-              ? "var(--red)"
-              : enrichedAccts.some((a) => overallStatusFor(a).color === "var(--amber)")
-              ? "var(--amber)"
-              : "var(--green)";
+            const attentionRatio = enrichedAccts.length > 0 ? attentionCount / enrichedAccts.length : 0;
+            const worstColor = attentionRatio >= 0.5 ? "var(--red)" : attentionRatio > 0 ? "var(--amber)" : "var(--green)";
             return { loc, count: accts.length, attentionCount, worstColor };
           })
           .sort((a, b) => {
@@ -1750,15 +1768,15 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           <div style={{ marginBottom: 22 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, margin: 0 }}>LOCATIONS</p>
-              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }}>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }} title="Based on the share of accounts at that property needing attention">
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)" }} /> needs attention
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)" }} /> half or more need attention
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)" }} /> some issues
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)" }} /> some need attention
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)" }} /> up to date
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)" }} /> none need attention
                 </span>
               </div>
             </div>
@@ -1958,6 +1976,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
               {summaryStats.overdueCount}
             </div>
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Out of contract now</div>
+            {summaryStats.overdueCount > 0 && (
+              <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4, fontWeight: 600 }}>Review accounts →</div>
+            )}
           </button>
         )}
       </div>
@@ -2011,8 +2032,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                   >
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: group.color, flexShrink: 0 }} />
                     <strong style={{ color: "var(--text)", fontWeight: 600 }}>{group.items.length} accounts</strong>: {group.groupLabel}
-                    <span style={{ marginLeft: "auto", color: group.color, fontWeight: 600, fontSize: 11.5, flexShrink: 0 }}>Review →</span>
-                    <ChevronDown size={12} style={{ transform: isExpanded ? "rotate(180deg)" : "none", flexShrink: 0 }} />
+                    <span style={{ color: group.color, fontWeight: 600, fontSize: 11.5, flexShrink: 0 }}>Review →</span>
+                    <ChevronDown size={12} style={{ marginLeft: "auto", transform: isExpanded ? "rotate(180deg)" : "none", flexShrink: 0 }} />
                   </button>
                   {isExpanded && (
                     <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 13, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
@@ -2114,6 +2135,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                 >
                   Group by location
                 </button>
+              )}
+              {locations.length > 0 && !lockedLocation && groupByLocation && (
+                <select
+                  value={locationSortMode}
+                  onChange={(e) => setLocationSortMode(e.target.value)}
+                  style={{ ...inputStyle, width: "auto" }}
+                >
+                  <option value="alphabetical">Sort: A–Z</option>
+                  <option value="attention">Sort: most issues first</option>
+                </select>
               )}
             </div>
 
@@ -2380,18 +2411,15 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           {displayItems.map((item) => {
             if (item.type === "location-header") {
               const isExpanded = expandedLocationGroups.has(item.location);
-              const worstColor = item.accounts.some((a) => overallStatusFor(a).color === "var(--red)")
-                ? "var(--red)"
-                : item.accounts.some((a) => overallStatusFor(a).color === "var(--amber)")
-                ? "var(--amber)"
-                : "var(--green)";
-              const elecCount = item.accounts.filter((a) => (a.fuel_type || "electricity") !== "gas").length;
-              const gasCount = item.accounts.filter((a) => a.fuel_type === "gas").length;
-              const fuelLabel = elecCount > 0 && gasCount > 0 ? `${elecCount} Electricity, ${gasCount} Gas` : elecCount > 0 ? "Electricity" : "Gas";
               const groupAttentionCount = item.accounts.filter((a) => {
                 const c = overallStatusFor(a).color;
                 return c === "var(--red)" || c === "var(--amber)";
               }).length;
+              const groupAttentionRatio = item.accounts.length > 0 ? groupAttentionCount / item.accounts.length : 0;
+              const worstColor = groupAttentionRatio >= 0.5 ? "var(--red)" : groupAttentionRatio > 0 ? "var(--amber)" : "var(--green)";
+              const elecCount = item.accounts.filter((a) => (a.fuel_type || "electricity") !== "gas").length;
+              const gasCount = item.accounts.filter((a) => a.fuel_type === "gas").length;
+              const fuelLabel = elecCount > 0 && gasCount > 0 ? `${elecCount} Electricity, ${gasCount} Gas` : elecCount > 0 ? "Electricity" : "Gas";
               return (
                 <button
                   key={`loc-${item.location}`}
@@ -3091,10 +3119,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
         <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
           <button
             onClick={() => setActivityExpanded((v) => !v)}
-            style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: activityExpanded ? 14 : 0 }}
+            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: activityExpanded ? 14 : 0, width: "100%", textAlign: "left" }}
           >
-            <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, margin: 0 }}>RECENT ACTIVITY</p>
-            <ChevronDown size={13} color="var(--muted)" style={{ transform: activityExpanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+            <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, margin: 0, flexShrink: 0 }}>RECENT ACTIVITY</p>
+            {!activityExpanded && (
+              <span style={{ fontSize: 12, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {activityItems[0].text} · {timeAgo(activityItems[0].timestamp)}
+                {activityItems.length > 1 ? ` · +${activityItems.length - 1} more` : ""}
+              </span>
+            )}
+            <ChevronDown size={13} color="var(--muted)" style={{ transform: activityExpanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease", marginLeft: "auto", flexShrink: 0 }} />
           </button>
           {activityExpanded && (
             <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 9 }}>
