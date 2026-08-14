@@ -103,7 +103,7 @@ function AttentionQueueInner({ companyId, companyName }) {
   const [expandedGroups, setExpandedGroups] = useState(new Set());
 
   const load = useCallback(async () => {
-    if (!companyId) {
+    if (!companyId || companyId === "undefined" || companyId === "null") {
       setLoading(false);
       return;
     }
