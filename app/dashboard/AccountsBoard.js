@@ -12,7 +12,6 @@ import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
 import BenchmarksBoard from "./BenchmarksBoard";
 import CompanyOverview from "./CompanyOverview";
-import InboundUpdatesQueue from "./InboundUpdatesQueue";
 
 const HORIZON_DAYS = 120;
 
@@ -858,7 +857,7 @@ function quoteRequestMailto(acc, supplierEmail, companyName) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-export default function AccountsBoard({ companyId, companyName, forwardingSlug, lockedLocation }) {
+export default function AccountsBoard({ companyId, companyName, lockedLocation }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1618,21 +1617,6 @@ export default function AccountsBoard({ companyId, companyName, forwardingSlug, 
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", position: "relative" }}>
           <button
-            onClick={() => setShowAccountNumbers((v) => !v)}
-            style={{
-              background: showAccountNumbers ? "var(--panel)" : "none",
-              border: `1px solid ${showAccountNumbers ? "var(--state)" : "var(--border-light)"}`,
-              color: showAccountNumbers ? "var(--state)" : "var(--muted)",
-              padding: "10px 14px",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: showAccountNumbers ? 600 : 400,
-            }}
-          >
-            {showAccountNumbers ? "Hide" : "Show"} account numbers
-          </button>
-          <button
             onClick={() => setUploadingFor("new")}
             style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
@@ -1673,6 +1657,7 @@ export default function AccountsBoard({ companyId, companyName, forwardingSlug, 
                   { icon: Upload, label: "Import accounts", onClick: () => setShowImport(true) },
                   { icon: Download, label: "Export CSV", onClick: () => exportAccountsCSV(accounts) },
                   { icon: LineChartIcon, label: "Market rates", onClick: () => setShowBenchmarks(true) },
+                  { icon: SlidersHorizontal, label: showAccountNumbers ? "Hide account numbers" : "Show account numbers", onClick: () => setShowAccountNumbers((v) => !v) },
                 ].map((item) => (
                   <button
                     key={item.label}
@@ -1732,7 +1717,7 @@ export default function AccountsBoard({ companyId, companyName, forwardingSlug, 
 
         if (locationPillInfo.length === 0) return null;
 
-        const MAX_PILLS = 4;
+        const MAX_PILLS = locationPillInfo.length <= 6 ? locationPillInfo.length : 4;
         const shown = locationPillInfo.slice(0, MAX_PILLS);
         const overflow = locationPillInfo.slice(MAX_PILLS);
 
@@ -1847,6 +1832,80 @@ export default function AccountsBoard({ companyId, companyName, forwardingSlug, 
         })()
       )}
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{summaryStats.total}</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Total accounts</div>
+        </div>
+        <div style={{ background: "var(--panel)", border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
+            {summaryStats.needAttention}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Need attention</div>
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px", position: "relative" }}>
+          <button
+            onClick={() => summaryStats.hasAnyCost && setSpendBreakdownOpen((v) => !v)}
+            style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: summaryStats.hasAnyCost ? "pointer" : "default", width: "100%" }}
+          >
+            <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: "var(--text)" }}>
+              {summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "—"}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, textDecoration: summaryStats.hasAnyCost ? "underline dotted" : "none" }}>
+              {summaryStats.hasAnyCost ? "Estimated annual spend" : "No bill data yet"}
+            </div>
+          </button>
+          {spendBreakdownOpen && summaryStats.hasAnyCost && (
+            <>
+              <div onClick={() => setSpendBreakdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 24 }} />
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="wp-soft-in"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: 0,
+                  background: "var(--panel)",
+                  border: "1px solid var(--border-light)",
+                  borderRadius: 10,
+                  padding: 14,
+                  zIndex: 25,
+                  width: 260,
+                  textAlign: "left",
+                }}
+              >
+                <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>
+                  HOW THIS IS CALCULATED
+                </p>
+                {summaryStats.realBillCount > 0 && (
+                  <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                    <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — from real uploaded bill history
+                  </div>
+                )}
+                {summaryStats.fallbackCount > 0 && (
+                  <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                    <strong>{summaryStats.fallbackCount}</strong> account{summaryStats.fallbackCount === 1 ? "" : "s"} — estimated from the rate and usage entered directly, no bill uploaded yet
+                  </div>
+                )}
+                {summaryStats.noCostCount > 0 && (
+                  <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                    <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — not included, missing rate or usage
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.hasAnyComparison && summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>
+            {summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+            {summaryStats.hasAnyComparison ? "Potential savings/yr" : "No comparison yet"}
+          </div>
+        </div>
+      </div>
+
       <div
         style={{
           borderLeft: `3px solid ${attentionItems.length === 0 ? "var(--green)" : "var(--amber)"}`,
@@ -1854,80 +1913,13 @@ export default function AccountsBoard({ companyId, companyName, forwardingSlug, 
           marginBottom: 24,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: attentionItems.length === 0 ? 0 : 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <AlertTriangle size={15} color={attentionItems.length === 0 ? "var(--green)" : "var(--amber)"} />
-            <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: 600 }}>
-              {attentionItems.length === 0 ? "Nothing needs attention right now" : `${attentionItems.length} thing${attentionItems.length === 1 ? "" : "s"} need attention`}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: 18, fontSize: 12, color: "var(--muted)", flexWrap: "wrap" }}>
-            <span>
-              {summaryStats.total} account{summaryStats.total === 1 ? "" : "s"}
-            </span>
-            <span style={{ color: summaryStats.renewingSoon90 > 0 ? "var(--amber)" : "var(--muted)" }}>
-              {summaryStats.renewingSoon90} renewing soon
-            </span>
-            <span style={{ color: summaryStats.hasAnyComparison && summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--muted)" }}>
-              {summaryStats.hasAnyComparison ? `${fmtMoney(summaryStats.potentialSavings)} potential savings` : "no comparison yet"}
-            </span>
-            <span style={{ position: "relative" }}>
-              <button
-                onClick={() => setSpendBreakdownOpen((v) => !v)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  font: "inherit",
-                  color: "var(--muted)",
-                  cursor: summaryStats.hasAnyCost ? "pointer" : "default",
-                  textDecoration: summaryStats.hasAnyCost ? "underline dotted" : "none",
-                }}
-              >
-                {summaryStats.hasAnyCost ? `${fmtMoney(summaryStats.totalSpend)} est. spend` : "no bill data yet"}
-              </button>
-              {spendBreakdownOpen && summaryStats.hasAnyCost && (
-                <>
-                  <div onClick={() => setSpendBreakdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 24 }} />
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="wp-soft-in"
-                    style={{
-                      position: "absolute",
-                      top: "calc(100% + 8px)",
-                      right: 0,
-                      background: "var(--panel)",
-                      border: "1px solid var(--border-light)",
-                      borderRadius: 10,
-                      padding: 14,
-                      zIndex: 25,
-                      width: 260,
-                      textAlign: "left",
-                    }}
-                  >
-                    <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>
-                      HOW THIS IS CALCULATED
-                    </p>
-                    {summaryStats.realBillCount > 0 && (
-                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
-                        <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — from real uploaded bill history
-                      </div>
-                    )}
-                    {summaryStats.fallbackCount > 0 && (
-                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
-                        <strong>{summaryStats.fallbackCount}</strong> account{summaryStats.fallbackCount === 1 ? "" : "s"} — estimated from the rate and usage entered directly, no bill uploaded yet
-                      </div>
-                    )}
-                    {summaryStats.noCostCount > 0 && (
-                      <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                        <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — not included, missing rate or usage
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </span>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: attentionItems.length === 0 ? 0 : 8 }}>
+          <AlertTriangle size={15} color={attentionItems.length === 0 ? "var(--green)" : "var(--amber)"} />
+          <span style={{ fontFamily: "'Lora', serif", fontSize: 14, fontWeight: 600 }}>
+            {attentionItems.length === 0
+              ? "Nothing needs attention right now"
+              : `${attentionItems.length} issue${attentionItems.length === 1 ? "" : "s"} across ${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? "" : "s"}`}
+          </span>
         </div>
         {attentionGroups.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -1991,33 +1983,14 @@ export default function AccountsBoard({ companyId, companyName, forwardingSlug, 
         )}
       </div>
 
-      {forwardingSlug && !lockedLocation && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 16px", marginBottom: 20, fontSize: 12.5, color: "var(--muted)" }}>
-          <Mail size={14} color="var(--teal)" style={{ flexShrink: 0 }} />
-          <span>
-            Forward supplier emails (renewal confirmations, new bills) to{" "}
-            <strong style={{ color: "var(--text)", fontFamily: "'IBM Plex Mono', monospace" }}>{forwardingSlug}@bills.wattpryce.com</strong> and we'll read them automatically.
-          </span>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(`${forwardingSlug}@bills.wattpryce.com`);
-              alert("Copied!");
-            }}
-            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--teal)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 11.5, flexShrink: 0, marginLeft: "auto" }}
-          >
-            Copy
-          </button>
-        </div>
-      )}
-
-      {!lockedLocation && <InboundUpdatesQueue companyId={companyId} accounts={accounts} onApplied={loadAccounts} />}
-
       {(() => {
         const locations = [...new Set(accounts.map((a) => a.location).filter(Boolean))].sort();
         const locationFuelInfo = {};
         locations.forEach((loc) => {
-          const fuels = new Set(accounts.filter((a) => a.location === loc).map((a) => a.fuel_type || "electricity"));
-          locationFuelInfo[loc] = fuels.size > 1 ? "Mixed" : fuels.has("gas") ? "Gas" : "Electricity";
+          const locAccounts = accounts.filter((a) => a.location === loc);
+          const elecCount = locAccounts.filter((a) => (a.fuel_type || "electricity") !== "gas").length;
+          const gasCount = locAccounts.filter((a) => a.fuel_type === "gas").length;
+          locationFuelInfo[loc] = elecCount > 0 && gasCount > 0 ? `${elecCount} Elec, ${gasCount} Gas` : elecCount > 0 ? "Electricity" : "Gas";
         });
         const activeFilterCount = [filterFuel, filterStatus, filterRenewal, filterLocation].filter((f) => f !== "all").length;
         const clearAll = () => {
@@ -2355,8 +2328,9 @@ export default function AccountsBoard({ companyId, companyName, forwardingSlug, 
                 : item.accounts.some((a) => overallStatusFor(a).color === "var(--amber)")
                 ? "var(--amber)"
                 : "var(--green)";
-              const fuelsHere = new Set(item.accounts.map((a) => a.fuel_type || "electricity"));
-              const fuelLabel = fuelsHere.size > 1 ? "Mixed" : fuelsHere.has("gas") ? "Gas" : "Electricity";
+              const elecCount = item.accounts.filter((a) => (a.fuel_type || "electricity") !== "gas").length;
+              const gasCount = item.accounts.filter((a) => a.fuel_type === "gas").length;
+              const fuelLabel = elecCount > 0 && gasCount > 0 ? `${elecCount} Electricity, ${gasCount} Gas` : elecCount > 0 ? "Electricity" : "Gas";
               return (
                 <button
                   key={`loc-${item.location}`}
