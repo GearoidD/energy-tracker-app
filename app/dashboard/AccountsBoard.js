@@ -1737,7 +1737,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           {/* HERO — the dominant element on the page: what needs attention, why, where, what to do next */}
           <div style={{ border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 14, padding: "20px 22px 18px", marginBottom: 16, background: "var(--panel)" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 4 }}>
-              <span style={{ fontFamily: "'Lora', serif", fontSize: 44, fontWeight: 700, lineHeight: 1, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
+              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 44, fontWeight: 700, lineHeight: 1, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
                 {summaryStats.needAttention}
               </span>
               <span style={{ fontSize: 18, color: "var(--text)" }}>
