@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronLeft, Mail, Zap, Flame } from "lucide-react";
@@ -92,7 +92,7 @@ function overallLabelFor(a) {
   return null; // determined by the issue-detection pass below
 }
 
-export default function AttentionQueue({ companyId, companyName }) {
+function AttentionQueueInner({ companyId, companyName }) {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -103,6 +103,10 @@ export default function AttentionQueue({ companyId, companyName }) {
   const [expandedGroups, setExpandedGroups] = useState(new Set());
 
   const load = useCallback(async () => {
+    if (!companyId) {
+      setLoading(false);
+      return;
+    }
     const { data: accts } = await supabase.from("accounts").select("*").eq("company_id", companyId);
     const { data: readings } = await supabase
       .from("readings")
@@ -276,5 +280,13 @@ export default function AttentionQueue({ companyId, companyName }) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AttentionQueue(props) {
+  return (
+    <Suspense fallback={<div style={{ color: "var(--muted)", padding: 40 }}>Loading attention queue…</div>}>
+      <AttentionQueueInner {...props} />
+    </Suspense>
   );
 }
