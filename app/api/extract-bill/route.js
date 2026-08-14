@@ -35,7 +35,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 500,
+        max_tokens: 800,
         messages: [
           {
             role: "user",
@@ -81,7 +81,14 @@ If a field isn't visible on the bill, use null for it. Do not guess or estimate 
       return NextResponse.json({ error: "Couldn't read this bill — try retaking the photo with better lighting and less glare, or make sure the whole page is in frame." }, { status: 500 });
     }
 
-    const cleaned = textBlock.text.replace(/```json|```/g, "").trim();
+    let cleaned = textBlock.text.replace(/```json|```/g, "").trim();
+    // If Claude added any stray text before/after the JSON despite instructions,
+    // salvage just the object itself rather than failing the whole extraction.
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+    }
     let extracted;
     try {
       extracted = JSON.parse(cleaned);

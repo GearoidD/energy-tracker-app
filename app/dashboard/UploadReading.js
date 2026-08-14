@@ -34,14 +34,14 @@ async function convertHeicIfNeeded(file) {
   if (!isHeic) return file;
 
   const heic2any = (await import("heic2any")).default;
-  const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+  const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.95 });
   const finalBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
   return new File([finalBlob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
 }
 
 // Modern phone photos can be several MB even after HEIC conversion — resize
 // and re-compress so the request never exceeds the hosting platform's size limit.
-async function compressImage(file, maxDimension = 2000, quality = 0.82) {
+async function compressImage(file, maxDimension = 2800, quality = 0.92) {
   if (file.type === "application/pdf") return file; // PDFs pass through untouched
   return new Promise((resolve, reject) => {
     const img = new window.Image();
