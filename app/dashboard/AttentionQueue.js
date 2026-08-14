@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronLeft, Mail, Zap, Flame } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -94,6 +94,8 @@ function overallLabelFor(a) {
 export default function AttentionQueue({ companyId, companyName }) {
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const criticalOnly = searchParams.get("filter") === "critical";
   const [accounts, setAccounts] = useState([]);
   const [readingSummaries, setReadingSummaries] = useState({});
   const [loading, setLoading] = useState(true);
@@ -173,9 +175,10 @@ export default function AttentionQueue({ companyId, companyName }) {
     }
   });
 
-  const sortedGroups = Object.entries(issueGroups).sort((a, b) => a[1].severity - b[1].severity);
-  const totalAccounts = new Set(Object.values(issueGroups).flatMap((g) => g.items.map((i) => i.account.id))).size;
-  const totalIssues = Object.values(issueGroups).reduce((sum, g) => sum + g.items.length, 0);
+  const allGroups = Object.entries(issueGroups).sort((a, b) => a[1].severity - b[1].severity);
+  const sortedGroups = criticalOnly ? allGroups.filter(([, g]) => g.color === "var(--red)") : allGroups;
+  const totalAccounts = new Set(sortedGroups.flatMap(([, g]) => g.items.map((i) => i.account.id))).size;
+  const totalIssues = sortedGroups.reduce((sum, [, g]) => sum + g.items.length, 0);
 
   return (
     <div>
@@ -188,7 +191,7 @@ export default function AttentionQueue({ companyId, companyName }) {
         <ChevronLeft size={14} /> All accounts
       </Link>
 
-      <h1 style={{ fontFamily: "'Lora', serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>Attention queue</h1>
+      <h1 style={{ fontFamily: "'Lora', serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>{criticalOnly ? "Critical accounts" : "Attention queue"}</h1>
       <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 14 }}>
         {totalAccounts} account{totalAccounts === 1 ? "" : "s"} · {totalIssues} issue{totalIssues === 1 ? "" : "s"}
       </p>
@@ -200,6 +203,14 @@ export default function AttentionQueue({ companyId, companyName }) {
         <span style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--text)" }}>
           Grouped: Issue
         </span>
+        {criticalOnly && (
+          <button
+            onClick={() => router.push("/dashboard/attention")}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--red)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--red)", cursor: "pointer", fontWeight: 600 }}
+          >
+            Critical only ×
+          </button>
+        )}
       </div>
 
       {sortedGroups.length === 0 ? (

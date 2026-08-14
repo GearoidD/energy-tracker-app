@@ -1865,7 +1865,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                           color: count > 0 ? (count / total >= 0.5 ? "var(--red)" : "var(--amber)") : "var(--green)",
                         }}
                       >
-                        {loc} — {count > 0 ? `${count}/${total} affected` : `${total} accounts · 0 requiring action`}
+                        {loc} — {count > 0 ? `${count}/${total} need attention` : `${total} accounts · 0 requiring action`}
                       </button>
                     ))}
                   </div>
@@ -1874,7 +1874,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
             })()}
 
             <button
-              onClick={() => router.push("/dashboard/attention")}
+              onClick={() => router.push(summaryStats.criticalCount > 0 ? "/dashboard/attention?filter=critical" : "/dashboard/attention")}
               disabled={summaryStats.needAttention === 0}
               style={{
                 background: summaryStats.needAttention > 0 ? "var(--teal)" : "var(--border)",
