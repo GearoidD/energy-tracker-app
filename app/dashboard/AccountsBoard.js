@@ -12,6 +12,7 @@ import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
 import BenchmarksBoard from "./BenchmarksBoard";
 import CompanyOverview from "./CompanyOverview";
+import InboundUpdatesQueue from "./InboundUpdatesQueue";
 
 const HORIZON_DAYS = 120;
 
@@ -857,7 +858,7 @@ function quoteRequestMailto(acc, supplierEmail, companyName) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-export default function AccountsBoard({ companyId, companyName, lockedLocation }) {
+export default function AccountsBoard({ companyId, companyName, forwardingSlug, lockedLocation }) {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1989,6 +1990,27 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           </div>
         )}
       </div>
+
+      {forwardingSlug && !lockedLocation && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 16px", marginBottom: 20, fontSize: 12.5, color: "var(--muted)" }}>
+          <Mail size={14} color="var(--teal)" style={{ flexShrink: 0 }} />
+          <span>
+            Forward supplier emails (renewal confirmations, new bills) to{" "}
+            <strong style={{ color: "var(--text)", fontFamily: "'IBM Plex Mono', monospace" }}>{forwardingSlug}@bills.wattpryce.com</strong> and we'll read them automatically.
+          </span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`${forwardingSlug}@bills.wattpryce.com`);
+              alert("Copied!");
+            }}
+            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--teal)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 11.5, flexShrink: 0, marginLeft: "auto" }}
+          >
+            Copy
+          </button>
+        </div>
+      )}
+
+      {!lockedLocation && <InboundUpdatesQueue companyId={companyId} accounts={accounts} onApplied={loadAccounts} />}
 
       {(() => {
         const locations = [...new Set(accounts.map((a) => a.location).filter(Boolean))].sort();
