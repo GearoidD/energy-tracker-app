@@ -1407,6 +1407,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           filterStatus === "all" ||
           (filterStatus === "__needs_attention__"
             ? ["var(--red)", "var(--amber)"].includes(overallStatusFor(a).color)
+            : filterStatus === "__needs_review_only__"
+            ? overallStatusFor(a).color === "var(--amber)"
             : overallStatusFor(a).label === filterStatus);
         const matchesRenewal = filterRenewal === "all" || (a.renewal_status || "not_started") === filterRenewal;
         const matchesLocation = filterLocation === "all" || (a.location || "") === filterLocation;
@@ -1474,6 +1476,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
     }).length;
 
     const overdueCount = enriched.filter((a) => overallStatusFor(a).label === "Action needed").length;
+    const criticalCount = overdueCount; // "Action needed" - genuinely urgent
+    const reviewCount = needAttention - criticalCount; // everything else amber - lower-stakes, administrative
 
     const renewingSoon90 = enriched.filter((a) => a.daysLeft !== null && a.daysLeft >= 0 && a.daysLeft <= 90).length;
 
@@ -1496,6 +1500,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       total: enriched.length,
       needAttention,
       overdueCount,
+      criticalCount,
+      reviewCount,
       renewingSoon90,
       potentialSavings,
       totalSpend,
@@ -1794,9 +1800,6 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: worstColor, flexShrink: 0 }} />
                     {loc}
                     <span style={{ opacity: 0.75, fontWeight: 400 }}>{count}</span>
-                    {attentionCount > 0 && (
-                      <span style={{ color: worstColor, fontWeight: 600, fontSize: 11.5 }}>· {attentionCount} need attention</span>
-                    )}
                   </button>
                 );
               })}
@@ -1901,7 +1904,32 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           </div>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Accounts needing attention</div>
           {summaryStats.needAttention > 0 && (
-            <div style={{ fontSize: 11, color: "var(--amber)", marginTop: 4, fontWeight: 600 }}>View issues →</div>
+            <div style={{ display: "flex", gap: 10, marginTop: 6, fontSize: 11, fontWeight: 600 }}>
+              {summaryStats.criticalCount > 0 && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterStatus("Action needed");
+                    setGroupByLocation(false);
+                  }}
+                  style={{ color: "var(--red)" }}
+                >
+                  {summaryStats.criticalCount} critical
+                </span>
+              )}
+              {summaryStats.reviewCount > 0 && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterStatus("__needs_review_only__");
+                    setGroupByLocation(false);
+                  }}
+                  style={{ color: "var(--amber)" }}
+                >
+                  {summaryStats.reviewCount} to review
+                </span>
+              )}
+            </div>
           )}
         </button>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px", position: "relative" }}>
@@ -2449,8 +2477,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                   <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>{item.location}</span>
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>
                     {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"} · {fuelLabel}
-                    {groupAttentionCount > 0 && (
+                    {groupAttentionCount > 0 ? (
                       <span style={{ color: worstColor, fontWeight: 600 }}> · {groupAttentionCount} need attention</span>
+                    ) : (
+                      <span style={{ color: "var(--green)", fontWeight: 600 }}> · All healthy</span>
                     )}
                   </span>
                 </button>
