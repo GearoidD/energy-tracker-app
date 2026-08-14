@@ -1399,7 +1399,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           (a.account_number || "").toLowerCase().includes(q) ||
           (a.supplier_account_number || "").toLowerCase().includes(q);
         const matchesFuel = filterFuel === "all" || (a.fuel_type || "electricity") === filterFuel;
-        const matchesStatus = filterStatus === "all" || overallStatusFor(a).label === filterStatus;
+        const matchesStatus =
+          filterStatus === "all" ||
+          (filterStatus === "__needs_attention__"
+            ? ["var(--red)", "var(--amber)"].includes(overallStatusFor(a).color)
+            : overallStatusFor(a).label === filterStatus);
         const matchesRenewal = filterRenewal === "all" || (a.renewal_status || "not_started") === filterRenewal;
         const matchesLocation = filterLocation === "all" || (a.location || "") === filterLocation;
         return matchesSearch && matchesFuel && matchesStatus && matchesRenewal && matchesLocation;
@@ -1453,6 +1457,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       return c === "var(--red)" || c === "var(--amber)";
     }).length;
 
+    const overdueCount = enriched.filter((a) => overallStatusFor(a).label === "Action needed").length;
+
     const renewingSoon90 = enriched.filter((a) => a.daysLeft !== null && a.daysLeft >= 0 && a.daysLeft <= 90).length;
 
     const potentialSavings = enriched.reduce((sum, a) => (a.saving && a.saving > 20 ? sum + a.saving : sum), 0);
@@ -1473,6 +1479,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
     return {
       total: enriched.length,
       needAttention,
+      overdueCount,
       renewingSoon90,
       potentialSavings,
       totalSpend,
@@ -1702,12 +1709,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           .map((loc) => {
             const accts = accounts.filter((a) => a.location === loc);
             const enrichedAccts = enriched.filter((a) => a.location === loc);
+            const attentionCount = enrichedAccts.filter((a) => {
+              const c = overallStatusFor(a).color;
+              return c === "var(--red)" || c === "var(--amber)";
+            }).length;
             const worstColor = enrichedAccts.some((a) => overallStatusFor(a).color === "var(--red)")
               ? "var(--red)"
               : enrichedAccts.some((a) => overallStatusFor(a).color === "var(--amber)")
               ? "var(--amber)"
               : "var(--green)";
-            return { loc, count: accts.length, worstColor };
+            return { loc, count: accts.length, attentionCount, worstColor };
           })
           .sort((a, b) => {
             const rankDiff = severityOrder[a.worstColor] - severityOrder[b.worstColor];
@@ -1737,14 +1748,27 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
 
         return (
           <div style={{ marginBottom: 22 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 10 }}>LOCATIONS</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, margin: 0 }}>LOCATIONS</p>
+              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)" }} /> needs attention
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)" }} /> some issues
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)" }} /> up to date
+                </span>
+              </div>
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", position: "relative" }}>
               {filterLocation !== "all" && (
                 <button onClick={() => setFilterLocation("all")} style={pillStyle(true, "var(--teal)")}>
                   {filterLocation} · clear ✕
                 </button>
               )}
-              {shown.map(({ loc, count, worstColor }) => {
+              {shown.map(({ loc, count, attentionCount, worstColor }) => {
                 const active = filterLocation === loc;
                 if (active) return null; // already shown above as the active/clear pill
                 return (
@@ -1752,6 +1776,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: worstColor, flexShrink: 0 }} />
                     {loc}
                     <span style={{ opacity: 0.75, fontWeight: 400 }}>{count}</span>
+                    {attentionCount > 0 && (
+                      <span style={{ color: worstColor, fontWeight: 600, fontSize: 11.5 }}>· {attentionCount} need attention</span>
+                    )}
                   </button>
                 );
               })}
@@ -1837,12 +1864,28 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{summaryStats.total}</div>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Total accounts</div>
         </div>
-        <div style={{ background: "var(--panel)", border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 10, padding: "16px 18px" }}>
+        <button
+          onClick={() => {
+            setFilterStatus("__needs_attention__");
+            setGroupByLocation(false);
+          }}
+          style={{
+            background: "var(--panel)",
+            border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`,
+            borderRadius: 10,
+            padding: "16px 18px",
+            textAlign: "left",
+            cursor: summaryStats.needAttention > 0 ? "pointer" : "default",
+          }}
+        >
           <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
             {summaryStats.needAttention}
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Need attention</div>
-        </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Accounts needing attention</div>
+          {summaryStats.needAttention > 0 && (
+            <div style={{ fontSize: 11, color: "var(--amber)", marginTop: 4, fontWeight: 600 }}>View issues →</div>
+          )}
+        </button>
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px", position: "relative" }}>
           <button
             onClick={() => summaryStats.hasAnyCost && setSpendBreakdownOpen((v) => !v)}
@@ -1896,14 +1939,27 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
             </>
           )}
         </div>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.hasAnyComparison && summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>
-            {summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}
+        {summaryStats.hasAnyComparison ? (
+          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px" }}>
+            <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>
+              {fmtMoney(summaryStats.potentialSavings)}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Potential savings/yr</div>
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-            {summaryStats.hasAnyComparison ? "Potential savings/yr" : "No comparison yet"}
-          </div>
-        </div>
+        ) : (
+          <button
+            onClick={() => {
+              setFilterStatus("Action needed");
+              setGroupByLocation(false);
+            }}
+            style={{ background: "var(--panel)", border: `1px solid ${summaryStats.overdueCount > 0 ? "var(--red)" : "var(--border)"}`, borderRadius: 10, padding: "16px 18px", textAlign: "left", cursor: summaryStats.overdueCount > 0 ? "pointer" : "default" }}
+          >
+            <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.overdueCount > 0 ? "var(--red)" : "var(--text)" }}>
+              {summaryStats.overdueCount}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Out of contract now</div>
+          </button>
+        )}
       </div>
 
       <div
@@ -1955,7 +2011,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                   >
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: group.color, flexShrink: 0 }} />
                     <strong style={{ color: "var(--text)", fontWeight: 600 }}>{group.items.length} accounts</strong>: {group.groupLabel}
-                    <ChevronDown size={12} style={{ marginLeft: "auto", transform: isExpanded ? "rotate(180deg)" : "none", flexShrink: 0 }} />
+                    <span style={{ marginLeft: "auto", color: group.color, fontWeight: 600, fontSize: 11.5, flexShrink: 0 }}>Review →</span>
+                    <ChevronDown size={12} style={{ transform: isExpanded ? "rotate(180deg)" : "none", flexShrink: 0 }} />
                   </button>
                   {isExpanded && (
                     <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 13, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
@@ -2331,6 +2388,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
               const elecCount = item.accounts.filter((a) => (a.fuel_type || "electricity") !== "gas").length;
               const gasCount = item.accounts.filter((a) => a.fuel_type === "gas").length;
               const fuelLabel = elecCount > 0 && gasCount > 0 ? `${elecCount} Electricity, ${gasCount} Gas` : elecCount > 0 ? "Electricity" : "Gas";
+              const groupAttentionCount = item.accounts.filter((a) => {
+                const c = overallStatusFor(a).color;
+                return c === "var(--red)" || c === "var(--amber)";
+              }).length;
               return (
                 <button
                   key={`loc-${item.location}`}
@@ -2360,6 +2421,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                   <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>{item.location}</span>
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>
                     {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"} · {fuelLabel}
+                    {groupAttentionCount > 0 && (
+                      <span style={{ color: worstColor, fontWeight: 600 }}> · {groupAttentionCount} need attention</span>
+                    )}
                   </span>
                 </button>
               );
