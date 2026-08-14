@@ -1368,32 +1368,35 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
     else loadAccounts();
   };
 
-  const enriched = useMemo(() => {
-    return accounts
-      .map((a) => {
-        const daysLeft = daysUntil(a.contract_end);
-        const status = statusOf(daysLeft);
-        const comparison = marketComparisonFor(a, benchmarks, masterRates);
-        const usageNum = parseFloat(a.usage);
-        const rateNum = parseFloat(a.rate);
-        const saving =
-          comparison && !isNaN(usageNum) && !isNaN(rateNum)
-            ? ((rateNum - comparison.rate) / 100) * usageNum
-            : null;
-        const confidence = accountConfidence(a, readingSummaries[a.id]?.[0]);
+  const enrichedAll = useMemo(() => {
+    return accounts.map((a) => {
+      const daysLeft = daysUntil(a.contract_end);
+      const status = statusOf(daysLeft);
+      const comparison = marketComparisonFor(a, benchmarks, masterRates);
+      const usageNum = parseFloat(a.usage);
+      const rateNum = parseFloat(a.rate);
+      const saving =
+        comparison && !isNaN(usageNum) && !isNaN(rateNum)
+          ? ((rateNum - comparison.rate) / 100) * usageNum
+          : null;
+      const confidence = accountConfidence(a, readingSummaries[a.id]?.[0]);
 
-        const ratedReadings = (readingSummaries[a.id] || []).filter((r) => r.rate !== null && r.rate !== undefined);
-        let rateChange = null;
-        if (ratedReadings.length >= 2) {
-          const [newest, prev] = ratedReadings;
-          if (prev.rate) {
-            const pct = ((newest.rate - prev.rate) / prev.rate) * 100;
-            rateChange = { pct, from: prev.rate, to: newest.rate, fromDate: prev.reading_date, toDate: newest.reading_date };
-          }
+      const ratedReadings = (readingSummaries[a.id] || []).filter((r) => r.rate !== null && r.rate !== undefined);
+      let rateChange = null;
+      if (ratedReadings.length >= 2) {
+        const [newest, prev] = ratedReadings;
+        if (prev.rate) {
+          const pct = ((newest.rate - prev.rate) / prev.rate) * 100;
+          rateChange = { pct, from: prev.rate, to: newest.rate, fromDate: prev.reading_date, toDate: newest.reading_date };
         }
+      }
 
-        return { ...a, daysLeft, status, saving, cost: estimatedAnnualSpend(a, readingSummaries[a.id]), comparison, confidence, rateChange };
-      })
+      return { ...a, daysLeft, status, saving, cost: estimatedAnnualSpend(a, readingSummaries[a.id]), comparison, confidence, rateChange };
+    });
+  }, [accounts, benchmarks, masterRates, readingSummaries]);
+
+  const enriched = useMemo(() => {
+    return enrichedAll
       .filter((a) => {
         const q = search.toLowerCase();
         const matchesSearch =
@@ -1419,7 +1422,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
         if (rankDiff !== 0) return rankDiff;
         return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
       });
-  }, [accounts, search, filterFuel, filterStatus, filterRenewal, filterLocation, benchmarks, masterRates, readingSummaries]);
+  }, [enrichedAll, search, filterFuel, filterStatus, filterRenewal, filterLocation]);
 
   const [groupByLocation, setGroupByLocation] = useState(!lockedLocation);
   const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
@@ -1470,26 +1473,26 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   }, [enriched, groupByLocation, expandedLocationGroups, locationSortMode]);
 
   const summaryStats = useMemo(() => {
-    const needAttention = enriched.filter((a) => {
+    const needAttention = enrichedAll.filter((a) => {
       const c = overallStatusFor(a).color;
       return c === "var(--red)" || c === "var(--amber)";
     }).length;
 
-    const overdueCount = enriched.filter((a) => overallStatusFor(a).label === "Action needed").length;
+    const overdueCount = enrichedAll.filter((a) => overallStatusFor(a).label === "Action needed").length;
     const criticalCount = overdueCount; // "Action needed" - genuinely urgent
     const reviewCount = needAttention - criticalCount; // everything else amber - lower-stakes, administrative
 
-    const renewingSoon90 = enriched.filter((a) => a.daysLeft !== null && a.daysLeft >= 0 && a.daysLeft <= 90).length;
+    const renewingSoon90 = enrichedAll.filter((a) => a.daysLeft !== null && a.daysLeft >= 0 && a.daysLeft <= 90).length;
 
-    const potentialSavings = enriched.reduce((sum, a) => (a.saving && a.saving > 20 ? sum + a.saving : sum), 0);
-    const totalSpend = enriched.reduce((sum, a) => (a.cost ? sum + a.cost : sum), 0);
-    const hasAnyComparison = enriched.some((a) => a.comparison);
-    const hasAnyCost = enriched.some((a) => a.cost !== null && a.cost !== undefined);
+    const potentialSavings = enrichedAll.reduce((sum, a) => (a.saving && a.saving > 20 ? sum + a.saving : sum), 0);
+    const totalSpend = enrichedAll.reduce((sum, a) => (a.cost ? sum + a.cost : sum), 0);
+    const hasAnyComparison = enrichedAll.some((a) => a.comparison);
+    const hasAnyCost = enrichedAll.some((a) => a.cost !== null && a.cost !== undefined);
 
     let realBillCount = 0;
     let fallbackCount = 0;
     let noCostCount = 0;
-    enriched.forEach((a) => {
+    enrichedAll.forEach((a) => {
       const rated = (readingSummaries[a.id] || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
       if (a.cost === null || a.cost === undefined) noCostCount++;
       else if (rated.length > 0) realBillCount++;
@@ -1497,7 +1500,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
     });
 
     return {
-      total: enriched.length,
+      total: enrichedAll.length,
       needAttention,
       overdueCount,
       criticalCount,
@@ -1511,11 +1514,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       fallbackCount,
       noCostCount,
     };
-  }, [enriched, readingSummaries]);
+  }, [enrichedAll, readingSummaries]);
 
   const attentionItems = useMemo(() => {
     const items = [];
-    enriched.forEach((a) => {
+    enrichedAll.forEach((a) => {
       const status = a.renewal_status || "not_started";
       const beingHandled = status === "quote_requested" || status === "switching";
       const statusSuffix = beingHandled ? ` — ${RENEWAL_STATUS_META[status].label}` : "";
@@ -1565,7 +1568,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       }
     });
     return items.sort((x, y) => x.severity - y.severity);
-  }, [enriched, readingSummaries]);
+  }, [enrichedAll, readingSummaries]);
 
   const attentionGroups = useMemo(() => {
     const map = {};
@@ -1834,7 +1837,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
             {(() => {
               const locAttention = [...new Set(accounts.map((a) => a.location).filter(Boolean))]
                 .map((loc) => {
-                  const locAccts = enriched.filter((a) => a.location === loc);
+                  const locAccts = enrichedAll.filter((a) => a.location === loc);
                   const count = locAccts.filter((a) => {
                     const c = overallStatusFor(a).color;
                     return c === "var(--red)" || c === "var(--amber)";
@@ -1871,11 +1874,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
             })()}
 
             <button
-              onClick={() => { setFilterStatus("__needs_attention__"); setGroupByLocation(false); }}
+              onClick={() => router.push("/dashboard/attention")}
               disabled={summaryStats.needAttention === 0}
               style={{
-                background: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)",
-                color: "#1a1200",
+                background: summaryStats.needAttention > 0 ? "var(--teal)" : "var(--border)",
+                color: "#06201d",
                 border: "none",
                 borderRadius: 8,
                 padding: "11px 20px",
@@ -1891,7 +1894,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           {/* Supporting stats — deliberately smaller than the hero above */}
           <div style={{ display: "flex", gap: 24, marginBottom: 24, flexWrap: "wrap", fontSize: 12.5, color: "var(--muted)" }}>
             <span>
-              <strong style={{ color: "var(--text)" }}>{summaryStats.total}</strong> total accounts
+              <strong style={{ color: "var(--text)" }}>{accounts.length}</strong> total accounts
             </span>
             <span style={{ position: "relative" }}>
               <button
