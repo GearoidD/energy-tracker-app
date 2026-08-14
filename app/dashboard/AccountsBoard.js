@@ -1730,364 +1730,218 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           <h2 style={{ fontFamily: "'Lora', serif", fontSize: 20, fontWeight: 600, margin: 0 }}>{lockedLocation}</h2>
         </div>
       ) : (
-        (() => {
-        const severityOrder = { "var(--red)": 0, "var(--amber)": 1, "var(--green)": 2 };
-        const locationPillInfo = [...new Set(accounts.map((a) => a.location).filter(Boolean))]
-          .map((loc) => {
-            const accts = accounts.filter((a) => a.location === loc);
-            const enrichedAccts = enriched.filter((a) => a.location === loc);
-            const attentionCount = enrichedAccts.filter((a) => {
-              const c = overallStatusFor(a).color;
-              return c === "var(--red)" || c === "var(--amber)";
-            }).length;
-            const attentionRatio = enrichedAccts.length > 0 ? attentionCount / enrichedAccts.length : 0;
-            const worstColor = attentionRatio >= 0.5 ? "var(--red)" : attentionRatio > 0 ? "var(--amber)" : "var(--green)";
-            return { loc, count: accts.length, attentionCount, worstColor };
-          })
-          .sort((a, b) => {
-            const rankDiff = severityOrder[a.worstColor] - severityOrder[b.worstColor];
-            if (rankDiff !== 0) return rankDiff;
-            return a.loc.localeCompare(b.loc, undefined, { numeric: true });
-          });
-
-        if (locationPillInfo.length === 0) return null;
-
-        const MAX_PILLS = locationPillInfo.length <= 6 ? locationPillInfo.length : 4;
-        const shown = locationPillInfo.slice(0, MAX_PILLS);
-        const overflow = locationPillInfo.slice(MAX_PILLS);
-
-        const pillStyle = (active, worstColor) => ({
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          borderRadius: 999,
-          padding: "9px 18px",
-          fontSize: 13.5,
-          fontWeight: 600,
-          cursor: "pointer",
-          background: active ? "var(--teal)" : "var(--panel)",
-          color: active ? "#06201d" : "var(--text)",
-          border: `1.5px solid ${active ? "var(--teal)" : "var(--border-light)"}`,
-        });
-
-        return (
-          <div style={{ marginBottom: 22 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, margin: 0 }}>LOCATIONS</p>
-              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--muted)" }} title="Based on the share of accounts at that property needing attention">
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)" }} /> half or more need attention
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)" }} /> some need attention
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)" }} /> none need attention
-                </span>
-              </div>
+        <>
+          {/* HERO — the dominant element on the page: what needs attention, why, where, what to do next */}
+          <div style={{ border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 14, padding: "28px 28px 24px", marginBottom: 20, background: "var(--panel)" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 4 }}>
+              <span style={{ fontFamily: "'Lora', serif", fontSize: 44, fontWeight: 700, lineHeight: 1, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
+                {summaryStats.needAttention}
+              </span>
+              <span style={{ fontSize: 18, color: "var(--text)" }}>
+                account{summaryStats.needAttention === 1 ? "" : "s"} need{summaryStats.needAttention === 1 ? "s" : ""} attention
+              </span>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", position: "relative" }}>
-              {filterLocation !== "all" && (
-                <button onClick={() => setFilterLocation("all")} style={pillStyle(true, "var(--teal)")}>
-                  {filterLocation} · clear ✕
-                </button>
-              )}
-              {shown.map(({ loc, count, attentionCount, worstColor }) => {
-                const active = filterLocation === loc;
-                if (active) return null; // already shown above as the active/clear pill
-                return (
-                  <button key={loc} onClick={() => router.push(`/dashboard/locations/${encodeURIComponent(loc)}`)} style={pillStyle(false, worstColor)}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: worstColor, flexShrink: 0 }} />
-                    {loc}
-                    <span style={{ opacity: 0.75, fontWeight: 400 }}>{count}</span>
+            {summaryStats.needAttention > 0 && (
+              <div style={{ display: "flex", gap: 16, fontSize: 13, fontWeight: 600, marginBottom: 18 }}>
+                {summaryStats.criticalCount > 0 && (
+                  <button
+                    onClick={() => { setFilterStatus("Action needed"); setGroupByLocation(false); }}
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--red)", cursor: "pointer" }}
+                  >
+                    {summaryStats.criticalCount} critical
                   </button>
-                );
-              })}
-              {overflow.length > 0 && (
-                <button onClick={() => setLocationOverflowOpen((v) => !v)} style={pillStyle(false, "var(--border-light)")}>
-                  + {overflow.length} more
-                  <ChevronDown size={13} style={{ transform: locationOverflowOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
-                </button>
-              )}
+                )}
+                {summaryStats.reviewCount > 0 && (
+                  <button
+                    onClick={() => { setFilterStatus("__needs_review_only__"); setGroupByLocation(false); }}
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--amber)", cursor: "pointer" }}
+                  >
+                    {summaryStats.reviewCount} to review
+                  </button>
+                )}
+              </div>
+            )}
 
-              {locationOverflowOpen && (
-                <div
-                  onClick={() => setLocationOverflowOpen(false)}
-                  style={{ position: "fixed", inset: 0, zIndex: 24 }}
-                />
-              )}
-              {locationOverflowOpen && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="wp-soft-in"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
-                    background: "var(--panel)",
-                    border: "1px solid var(--border-light)",
-                    borderRadius: 10,
-                    padding: 12,
-                    zIndex: 25,
-                    width: 260,
-                    maxHeight: 320,
-                    overflowY: "auto",
-                  }}
-                >
-                  <input
-                    value={locationSearchText}
-                    onChange={(e) => setLocationSearchText(e.target.value)}
-                    placeholder="Search locations…"
-                    style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginBottom: 8 }}
-                    autoFocus
-                  />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    {locationPillInfo
-                      .filter(({ loc }) => loc.toLowerCase().includes(locationSearchText.toLowerCase()))
-                      .map(({ loc, count, worstColor }) => (
+            {attentionGroups.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 4 }}>
+                  WHY — {attentionItems.length} issue{attentionItems.length === 1 ? "" : "s"} across {summaryStats.needAttention} account{summaryStats.needAttention === 1 ? "" : "s"}
+                  {attentionItems.length !== summaryStats.needAttention ? " (some accounts have more than one issue)" : ""}
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {attentionGroups.map((group) => {
+                    const key = `${group.color}::${group.groupLabel}`;
+                    const isExpanded = expandedAttentionGroups.has(key);
+                    return (
+                      <div key={key}>
                         <button
-                          key={loc}
-                          onClick={() => {
-                            setLocationOverflowOpen(false);
-                            setLocationSearchText("");
-                            router.push(`/dashboard/locations/${encodeURIComponent(loc)}`);
-                          }}
+                          onClick={() =>
+                            group.items.length === 1
+                              ? jumpToAccount(group.items[0].account)
+                              : setExpandedAttentionGroups((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(key)) next.delete(key);
+                                  else next.add(key);
+                                  return next;
+                                })
+                          }
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 8,
-                            background: "none",
-                            border: "none",
-                            padding: "8px 10px",
-                            borderRadius: 6,
+                            gap: 10,
+                            background: "var(--bg)",
+                            border: "1px solid var(--border)",
+                            borderLeft: `3px solid ${group.color}`,
+                            borderRadius: 8,
+                            padding: "10px 14px",
                             cursor: "pointer",
                             textAlign: "left",
-                            fontSize: 13,
-                            color: "var(--text)",
+                            width: "100%",
                           }}
                         >
-                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: worstColor, flexShrink: 0 }} />
-                          <span style={{ flex: 1 }}>{loc}</span>
-                          <span style={{ color: "var(--muted)", fontSize: 12 }}>{count}</span>
+                          <strong style={{ color: "var(--text)", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{group.items.length}</strong>
+                          <span style={{ fontSize: 13, color: "var(--text)" }}>{group.groupLabel}</span>
+                          <span style={{ marginLeft: "auto", color: group.color, fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
+                            {group.items.length === 1 ? "Review →" : isExpanded ? "Hide" : "Review →"}
+                          </span>
                         </button>
-                      ))}
-                  </div>
+                        {isExpanded && group.items.length > 1 && (
+                          <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 16, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
+                            {group.items.slice(0, 6).map((item) => (
+                              <button
+                                key={item.id}
+                                onClick={() => jumpToAccount(item.account)}
+                                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12, color: "var(--muted)" }}
+                              >
+                                {item.account.name}
+                                {item.detail ? ` (${item.detail})` : ""}
+                              </button>
+                            ))}
+                            {group.items.length > 6 && (
+                              <span style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.75 }}>
+                                + {group.items.length - 6} more — use search or Filters below
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          </div>
-        );
-        })()
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{summaryStats.total}</div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Total accounts</div>
-        </div>
-        <button
-          onClick={() => {
-            setFilterStatus("__needs_attention__");
-            setGroupByLocation(false);
-          }}
-          style={{
-            background: "var(--panel)",
-            border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`,
-            borderRadius: 10,
-            padding: "16px 18px",
-            textAlign: "left",
-            cursor: summaryStats.needAttention > 0 ? "pointer" : "default",
-          }}
-        >
-          <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
-            {summaryStats.needAttention}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Accounts needing attention</div>
-          {summaryStats.needAttention > 0 && (
-            <div style={{ display: "flex", gap: 10, marginTop: 6, fontSize: 11, fontWeight: 600 }}>
-              {summaryStats.criticalCount > 0 && (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFilterStatus("Action needed");
-                    setGroupByLocation(false);
-                  }}
-                  style={{ color: "var(--red)" }}
-                >
-                  {summaryStats.criticalCount} critical
-                </span>
-              )}
-              {summaryStats.reviewCount > 0 && (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFilterStatus("__needs_review_only__");
-                    setGroupByLocation(false);
-                  }}
-                  style={{ color: "var(--amber)" }}
-                >
-                  {summaryStats.reviewCount} to review
-                </span>
-              )}
-            </div>
-          )}
-        </button>
-        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px", position: "relative" }}>
-          <button
-            onClick={() => summaryStats.hasAnyCost && setSpendBreakdownOpen((v) => !v)}
-            style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: summaryStats.hasAnyCost ? "pointer" : "default", width: "100%" }}
-          >
-            <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: "var(--text)" }}>
-              {summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "—"}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, textDecoration: summaryStats.hasAnyCost ? "underline dotted" : "none" }}>
-              {summaryStats.hasAnyCost ? "Estimated annual spend" : "No bill data yet"}
-            </div>
-          </button>
-          {spendBreakdownOpen && summaryStats.hasAnyCost && (
-            <>
-              <div onClick={() => setSpendBreakdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 24 }} />
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="wp-soft-in"
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 8px)",
-                  left: 0,
-                  background: "var(--panel)",
-                  border: "1px solid var(--border-light)",
-                  borderRadius: 10,
-                  padding: 14,
-                  zIndex: 25,
-                  width: 260,
-                  textAlign: "left",
-                }}
-              >
-                <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>
-                  HOW THIS IS CALCULATED
-                </p>
-                {summaryStats.realBillCount > 0 && (
-                  <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
-                    <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — from real uploaded bill history
-                  </div>
-                )}
-                {summaryStats.fallbackCount > 0 && (
-                  <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
-                    <strong>{summaryStats.fallbackCount}</strong> account{summaryStats.fallbackCount === 1 ? "" : "s"} — estimated from the rate and usage entered directly, no bill uploaded yet
-                  </div>
-                )}
-                {summaryStats.noCostCount > 0 && (
-                  <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                    <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — not included, missing rate or usage
-                  </div>
-                )}
               </div>
-            </>
-          )}
-        </div>
-        {summaryStats.hasAnyComparison ? (
-          <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 18px" }}>
-            <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.potentialSavings > 0 ? "var(--green)" : "var(--text)" }}>
-              {fmtMoney(summaryStats.potentialSavings)}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Potential savings/yr</div>
-          </div>
-        ) : (
-          <button
-            onClick={() => {
-              setFilterStatus("Action needed");
-              setGroupByLocation(false);
-            }}
-            style={{ background: "var(--panel)", border: `1px solid ${summaryStats.overdueCount > 0 ? "var(--red)" : "var(--border)"}`, borderRadius: 10, padding: "16px 18px", textAlign: "left", cursor: summaryStats.overdueCount > 0 ? "pointer" : "default" }}
-          >
-            <div style={{ fontFamily: "'Lora', serif", fontSize: 28, fontWeight: 700, color: summaryStats.overdueCount > 0 ? "var(--red)" : "var(--text)" }}>
-              {summaryStats.overdueCount}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Out of contract now</div>
-            {summaryStats.overdueCount > 0 && (
-              <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4, fontWeight: 600 }}>Review accounts →</div>
             )}
-          </button>
-        )}
-      </div>
 
-      <div
-        style={{
-          borderLeft: `3px solid ${attentionItems.length === 0 ? "var(--green)" : "var(--amber)"}`,
-          padding: "12px 0 12px 16px",
-          marginBottom: 24,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: attentionItems.length === 0 ? 0 : 8 }}>
-          <AlertTriangle size={15} color={attentionItems.length === 0 ? "var(--green)" : "var(--amber)"} />
-          <span style={{ fontFamily: "'Lora', serif", fontSize: 14, fontWeight: 600 }}>
-            {attentionItems.length === 0
-              ? "Nothing needs attention right now"
-              : `${attentionItems.length} issue${attentionItems.length === 1 ? "" : "s"} across ${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? "" : "s"}`}
-          </span>
-        </div>
-        {attentionGroups.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {attentionGroups.map((group) => {
-              const key = `${group.color}::${group.groupLabel}`;
-              const isExpanded = expandedAttentionGroups.has(key);
-              if (group.items.length === 1) {
-                const item = group.items[0];
-                return (
-                  <button
-                    key={key}
-                    onClick={() => jumpToAccount(item.account)}
-                    style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--muted)" }}
-                  >
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
-                    {item.account.name}: {group.groupLabel}
-                    {item.detail ? ` (${item.detail})` : ""}
-                  </button>
-                );
-              }
+            {(() => {
+              const locAttention = [...new Set(accounts.map((a) => a.location).filter(Boolean))]
+                .map((loc) => {
+                  const locAccts = enriched.filter((a) => a.location === loc);
+                  const count = locAccts.filter((a) => {
+                    const c = overallStatusFor(a).color;
+                    return c === "var(--red)" || c === "var(--amber)";
+                  }).length;
+                  return { loc, count, total: locAccts.length };
+                })
+                .sort((a, b) => b.count - a.count || a.loc.localeCompare(b.loc, undefined, { numeric: true }));
+              if (locAttention.length === 0) return null;
               return (
-                <div key={key}>
-                  <button
-                    onClick={() =>
-                      setExpandedAttentionGroups((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(key)) next.delete(key);
-                        else next.add(key);
-                        return next;
-                      })
-                    }
-                    style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--muted)", width: "100%" }}
-                  >
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: group.color, flexShrink: 0 }} />
-                    <strong style={{ color: "var(--text)", fontWeight: 600 }}>{group.items.length} accounts</strong>: {group.groupLabel}
-                    <span style={{ color: group.color, fontWeight: 600, fontSize: 11.5, flexShrink: 0 }}>Review →</span>
-                    <ChevronDown size={12} style={{ marginLeft: "auto", transform: isExpanded ? "rotate(180deg)" : "none", flexShrink: 0 }} />
-                  </button>
-                  {isExpanded && (
-                    <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 13, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
-                      {group.items.slice(0, 6).map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => jumpToAccount(item.account)}
-                          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12, color: "var(--muted)" }}
-                        >
-                          {item.account.name}
-                          {item.detail ? ` (${item.detail})` : ""}
-                        </button>
-                      ))}
-                      {group.items.length > 6 && (
-                        <span style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.75 }}>
-                          + {group.items.length - 6} more — use search or Filters below to see the full list
-                        </span>
-                      )}
-                    </div>
-                  )}
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>WHERE</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+                    {locAttention.map(({ loc, count, total }) => (
+                      <button
+                        key={loc}
+                        onClick={() => router.push(`/dashboard/locations/${encodeURIComponent(loc)}`)}
+                        style={{
+                          background: "var(--bg)",
+                          border: `1px solid ${count > 0 ? (count / total >= 0.5 ? "var(--red)" : "var(--amber)") : "var(--border)"}`,
+                          borderRadius: 999,
+                          padding: "7px 14px",
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          color: count > 0 ? (count / total >= 0.5 ? "var(--red)" : "var(--amber)") : "var(--green)",
+                        }}
+                      >
+                        {loc} — {count > 0 ? `${count} affected` : "all healthy"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               );
-            })}
+            })()}
+
+            <button
+              onClick={() => { setFilterStatus("__needs_attention__"); setGroupByLocation(false); }}
+              disabled={summaryStats.needAttention === 0}
+              style={{
+                background: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)",
+                color: "#1a1200",
+                border: "none",
+                borderRadius: 8,
+                padding: "11px 20px",
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: summaryStats.needAttention > 0 ? "pointer" : "default",
+              }}
+            >
+              {summaryStats.needAttention > 0 ? "Review highest priority accounts →" : "Nothing needs attention right now"}
+            </button>
           </div>
-        )}
-      </div>
+
+          {/* Supporting stats — deliberately smaller than the hero above */}
+          <div style={{ display: "flex", gap: 24, marginBottom: 24, flexWrap: "wrap", fontSize: 12.5, color: "var(--muted)" }}>
+            <span>
+              <strong style={{ color: "var(--text)" }}>{summaryStats.total}</strong> total accounts
+            </span>
+            <span style={{ position: "relative" }}>
+              <button
+                onClick={() => summaryStats.hasAnyCost && setSpendBreakdownOpen((v) => !v)}
+                style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--muted)", cursor: summaryStats.hasAnyCost ? "pointer" : "default", textDecoration: summaryStats.hasAnyCost ? "underline dotted" : "none" }}
+              >
+                {summaryStats.hasAnyCost ? (
+                  <>
+                    <strong style={{ color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</strong> est. annual spend
+                  </>
+                ) : (
+                  "No bill data yet"
+                )}
+              </button>
+              {spendBreakdownOpen && summaryStats.hasAnyCost && (
+                <>
+                  <div onClick={() => setSpendBreakdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 24 }} />
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="wp-soft-in"
+                    style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 10, padding: 14, zIndex: 25, width: 260, textAlign: "left" }}
+                  >
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>HOW THIS IS CALCULATED</p>
+                    {summaryStats.realBillCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                        <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — from real uploaded bill history
+                      </div>
+                    )}
+                    {summaryStats.fallbackCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                        <strong>{summaryStats.fallbackCount}</strong> account{summaryStats.fallbackCount === 1 ? "" : "s"} — estimated from the rate and usage entered directly, no bill uploaded yet
+                      </div>
+                    )}
+                    {summaryStats.noCostCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                        <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — not included, missing rate or usage
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </span>
+            {summaryStats.hasAnyComparison && (
+              <span>
+                <strong style={{ color: "var(--green)" }}>{fmtMoney(summaryStats.potentialSavings)}</strong> potential savings/yr
+              </span>
+            )}
+          </div>
+        </>
+      )}
 
       {(() => {
         const locations = [...new Set(accounts.map((a) => a.location).filter(Boolean))].sort();
@@ -2115,7 +1969,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search site, provider, or account number…"
+                  placeholder="Search accounts…"
                   style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }}
                 />
               </div>
