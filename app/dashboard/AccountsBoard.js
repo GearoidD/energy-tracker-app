@@ -1548,7 +1548,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           account: a,
           severity: 2,
           color: "var(--amber)",
-          groupLabel: "No bill uploaded recently",
+          groupLabel: `No bill uploaded in ${MISSING_BILL_DAYS}+ days`,
           detail: a.confidence.daysSinceLastReading ? `${a.confidence.daysSinceLastReading} days since last bill` : "no bills added yet",
         });
       }
@@ -1735,7 +1735,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       ) : (
         <>
           {/* HERO — the dominant element on the page: what needs attention, why, where, what to do next */}
-          <div style={{ border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 14, padding: "28px 28px 24px", marginBottom: 20, background: "var(--panel)" }}>
+          <div style={{ border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 14, padding: "20px 22px 18px", marginBottom: 16, background: "var(--panel)" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 4 }}>
               <span style={{ fontFamily: "'Lora', serif", fontSize: 44, fontWeight: 700, lineHeight: 1, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
                 {summaryStats.needAttention}
@@ -1745,7 +1745,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
               </span>
             </div>
             {summaryStats.needAttention > 0 && (
-              <div style={{ display: "flex", gap: 16, fontSize: 13, fontWeight: 600, marginBottom: 18 }}>
+              <div style={{ display: "flex", gap: 16, fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
                 {summaryStats.criticalCount > 0 && (
                   <button
                     onClick={() => { setFilterStatus("Action needed"); setGroupByLocation(false); }}
@@ -1766,12 +1766,12 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
             )}
 
             {attentionGroups.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 14 }}>
                 <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 4 }}>
                   WHY — {attentionItems.length} issue{attentionItems.length === 1 ? "" : "s"} across {summaryStats.needAttention} account{summaryStats.needAttention === 1 ? "" : "s"}
                   {attentionItems.length !== summaryStats.needAttention ? " (some accounts have more than one issue)" : ""}
                 </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {attentionGroups.map((group) => {
                     const key = `${group.color}::${group.groupLabel}`;
                     const isExpanded = expandedAttentionGroups.has(key);
@@ -1849,7 +1849,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
               return (
                 <div>
                   <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>WHERE</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
                     {locAttention.map(({ loc, count, total }) => (
                       <button
                         key={loc}
@@ -1865,7 +1865,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                           color: count > 0 ? (count / total >= 0.5 ? "var(--red)" : "var(--amber)") : "var(--green)",
                         }}
                       >
-                        {loc} — {count > 0 ? `${count} affected` : "all healthy"}
+                        {loc} — {count > 0 ? `${count}/${total} affected` : `${total} accounts · 0 requiring action`}
                       </button>
                     ))}
                   </div>
@@ -1887,7 +1887,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                 cursor: summaryStats.needAttention > 0 ? "pointer" : "default",
               }}
             >
-              {summaryStats.needAttention > 0 ? "Review highest priority accounts →" : "Nothing needs attention right now"}
+              {summaryStats.criticalCount > 0
+                ? `Review ${summaryStats.criticalCount} critical account${summaryStats.criticalCount === 1 ? "" : "s"} →`
+                : summaryStats.needAttention > 0
+                ? "Review accounts →"
+                : "Nothing needs attention right now"}
             </button>
           </div>
 
@@ -2337,7 +2341,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                     {groupAttentionCount > 0 ? (
                       <span style={{ color: worstColor, fontWeight: 600 }}> · {groupAttentionCount} need attention</span>
                     ) : (
-                      <span style={{ color: "var(--green)", fontWeight: 600 }}> · All healthy</span>
+                      <span style={{ color: "var(--green)", fontWeight: 600 }}> · 0 need attention</span>
                     )}
                   </span>
                 </button>

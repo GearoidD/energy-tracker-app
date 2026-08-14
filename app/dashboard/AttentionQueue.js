@@ -16,6 +16,42 @@ const RENEWAL_STATUS_META = {
   renewed: { label: "Renewed", color: "var(--green)" },
 };
 
+function fmtMoney(n) {
+  if (n === null || n === undefined || isNaN(n)) return null;
+  return "€" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function estimatedAnnualSpend(acc, readings) {
+  const rated = (readings || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
+
+  if (rated.length === 0) {
+    const rate = parseFloat(acc.rate);
+    const usage = parseFloat(acc.usage);
+    const standing = parseFloat(acc.standing_charge) || 0;
+    if (isNaN(rate) || isNaN(usage)) return null;
+    return (rate / 100) * usage + (standing / 100) * 365;
+  }
+
+  const sorted = [...rated].sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
+  const first = new Date(sorted[0].reading_date);
+  const last = new Date(sorted[sorted.length - 1].reading_date);
+  const daySpan = Math.max((last - first) / 86400000, 30);
+  const scaleFactor = 365 / daySpan;
+
+  const allHaveTotalCost = sorted.every((r) => r.total_cost !== null && r.total_cost !== undefined);
+
+  if (allHaveTotalCost) {
+    const totalActualCost = sorted.reduce((sum, r) => sum + parseFloat(r.total_cost), 0);
+    return totalActualCost * scaleFactor;
+  }
+
+  const totalEnergyCost = sorted.reduce((sum, r) => sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage), 0);
+  const standing = parseFloat(acc.standing_charge) || 0;
+  const annualStanding = (standing / 100) * 365;
+
+  return totalEnergyCost * scaleFactor + annualStanding;
+}
+
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   const today = new Date();
@@ -122,7 +158,7 @@ export default function AttentionQueue({ companyId, companyName }) {
     }
     if (confidence.missingBill) {
       addTo(
-        "No recent bill — spend may be out of date",
+        `No bill in ${MISSING_BILL_DAYS}+ days — spend may be out of date`,
         "var(--amber)",
         2,
         confidence.daysSinceLastReading ? `${confidence.daysSinceLastReading} days since last bill` : "no bills added yet"
@@ -199,13 +235,17 @@ export default function AttentionQueue({ companyId, companyName }) {
                         {location !== "No location set" && <span style={{ marginLeft: "auto", color: "var(--teal)", fontSize: 11.5, fontWeight: 600 }}>View →</span>}
                       </button>
                       <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
-                        {items.slice(0, 5).map((item) => (
-                          <div key={item.account.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>
-                            {item.account.fuel_type === "gas" ? <Flame size={11} color="var(--amber)" /> : <Zap size={11} color="var(--teal)" />}
-                            {item.account.name}
-                            {item.detail ? ` — ${item.detail}` : ""}
-                          </div>
-                        ))}
+                        {items.slice(0, 5).map((item) => {
+                          const spend = fmtMoney(estimatedAnnualSpend(item.account, readingSummaries[item.account.id]));
+                          return (
+                            <div key={item.account.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>
+                              {item.account.fuel_type === "gas" ? <Flame size={11} color="var(--amber)" /> : <Zap size={11} color="var(--teal)" />}
+                              {item.account.name}
+                              {item.detail ? ` — ${item.detail}` : ""}
+                              {spend && <span style={{ marginLeft: "auto", color: "var(--text)", fontWeight: 600, flexShrink: 0 }}>{spend}/yr</span>}
+                            </div>
+                          );
+                        })}
                         {items.length > 5 && (
                           <span style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.75 }}>+ {items.length - 5} more</span>
                         )}
