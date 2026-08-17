@@ -5,9 +5,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal } from "lucide-react";
+import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal, FileText } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
 import BenchmarksBoard from "./BenchmarksBoard";
@@ -856,6 +858,224 @@ function quoteRequestMailtoBCC(acc, supplierEmails, companyName) {
 function quoteRequestMailto(acc, supplierEmail, companyName) {
   const { subject, body } = buildQuoteRequestContent(acc, companyName);
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups, companyName) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const teal = [47, 167, 154];
+  const dark = [14, 26, 29];
+  const panel = [20, 42, 46];
+  const muted = [143, 166, 163];
+  const amber = [232, 163, 61];
+  const red = [217, 87, 59];
+  const green = [76, 154, 106];
+  const lightBg = [250, 250, 248];
+
+  // ---- Header band ----
+  doc.setFillColor(...dark);
+  doc.rect(0, 0, pageWidth, 38, "F");
+  doc.setFillColor(...teal);
+  doc.rect(0, 38, pageWidth, 1.2, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont(undefined, "bold");
+  doc.text("Watt", 14, 17);
+  const wattWidth = doc.getTextWidth("Watt");
+  doc.setTextColor(...teal);
+  doc.text("pryce", 14 + wattWidth, 17);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont(undefined, "normal");
+  doc.text("Portfolio Renewal Summary", 14, 26);
+  doc.setTextColor(...muted);
+  doc.setFontSize(8.5);
+  doc.text(
+    `${companyName || "All companies"}  ·  Generated ${new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}`,
+    14,
+    33
+  );
+
+  let y = 52;
+
+  // ---- KPI cards ----
+  const cardW = (pageWidth - 28 - 3 * 6) / 4;
+  const cardH = 26;
+  const cards = [
+    { label: "Total accounts", value: String(summaryStats.total), accent: teal },
+    { label: "Need attention", value: String(summaryStats.needAttention), accent: summaryStats.needAttention > 0 ? amber : green },
+    { label: "Est. annual spend", value: summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "—", accent: teal },
+    { label: "Potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—", accent: green },
+  ];
+  cards.forEach((card, i) => {
+    const x = 14 + i * (cardW + 6);
+    doc.setFillColor(...lightBg);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "F");
+    doc.setDrawColor(225, 225, 220);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "S");
+    doc.setFillColor(...card.accent);
+    doc.rect(x, y, 1.2, cardH, "F");
+
+    doc.setTextColor(...dark);
+    doc.setFontSize(15);
+    doc.setFont(undefined, "bold");
+    doc.text(card.value, x + 6, y + 13);
+    doc.setFontSize(7.5);
+    doc.setFont(undefined, "normal");
+    doc.setTextColor(...muted);
+    doc.text(card.label, x + 6, y + 20);
+  });
+
+  y += cardH + 14;
+
+  if (summaryStats.needAttention > 0) {
+    doc.setFontSize(8.5);
+    doc.setTextColor(...muted);
+    doc.text(
+      `${summaryStats.criticalCount} critical  ·  ${summaryStats.reviewCount} to review  ·  ${summaryStats.total - summaryStats.needAttention} healthy`,
+      14,
+      y
+    );
+    y += 10;
+  }
+
+  // ---- Upcoming renewals ----
+  const upcoming = enrichedAccounts
+    .filter((a) => a.daysLeft !== null && a.daysLeft <= 90)
+    .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
+
+  if (upcoming.length > 0) {
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("Upcoming renewals", 14, y);
+    doc.setFontSize(8);
+    doc.setFont(undefined, "normal");
+    doc.setTextColor(...muted);
+    doc.text("Next 90 days, soonest first", 14, y + 5);
+    y += 10;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Account", "Location", "Provider", "Days left", "Rate (c/kWh)"]],
+      body: upcoming.slice(0, 30).map((a) => [
+        a.name,
+        a.location || "—",
+        a.provider || "—",
+        a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d overdue` : `${a.daysLeft}d`,
+        a.rate || "—",
+      ]),
+      theme: "plain",
+      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
+      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
+      alternateRowStyles: { fillColor: lightBg },
+      willDrawCell: (data) => {
+        if (data.section === "body" && data.column.index === 3) {
+          const raw = data.cell.raw;
+          if (typeof raw === "string" && raw.includes("overdue")) {
+            doc.setTextColor(...red);
+          }
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  // ---- Issues breakdown, color-coded by severity ----
+  if (attentionGroups.length > 0) {
+    if (y > 220) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("Issues found", 14, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["", "Issue", "Accounts"]],
+      body: attentionGroups.map((g) => ["", g.groupLabel, String(g.items.length)]),
+      theme: "plain",
+      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
+      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
+      alternateRowStyles: { fillColor: lightBg },
+      columnStyles: { 0: { cellWidth: 6 } },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 0) {
+          const group = attentionGroups[data.row.index];
+          const dotColor = group.color === "var(--red)" ? red : group.color === "var(--amber)" ? amber : muted;
+          data.cell.text = [];
+          data.cell._dotColor = dotColor;
+        }
+      },
+      didDrawCell: (data) => {
+        if (data.section === "body" && data.column.index === 0 && data.cell._dotColor) {
+          doc.setFillColor(...data.cell._dotColor);
+          doc.circle(data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, 1.3, "F");
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  // ---- By location ----
+  const byLocation = {};
+  enrichedAccounts.forEach((a) => {
+    if (!a.location) return;
+    if (!byLocation[a.location]) byLocation[a.location] = { total: 0, attention: 0, spend: 0 };
+    byLocation[a.location].total++;
+    const c = a.status;
+    const isAttention = attentionGroups.some((g) => g.items.some((i) => i.account?.id === a.id));
+    if (isAttention) byLocation[a.location].attention++;
+    if (a.cost) byLocation[a.location].spend += a.cost;
+  });
+  const locationRows = Object.entries(byLocation).sort((a, b) => b[1].attention - a[1].attention);
+
+  if (locationRows.length > 0) {
+    if (y > 220) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("By location", 14, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Location", "Accounts", "Need attention", "Est. annual spend"]],
+      body: locationRows.map(([loc, d]) => [loc, String(d.total), d.attention > 0 ? String(d.attention) : "—", d.spend > 0 ? fmtMoney(d.spend) : "—"]),
+      theme: "plain",
+      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
+      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
+      alternateRowStyles: { fillColor: lightBg },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  // ---- Footer on every page ----
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setDrawColor(230, 230, 225);
+    doc.setLineWidth(0.2);
+    doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...muted);
+    doc.text("Generated by Wattpryce — wattpryce.com", 14, pageHeight - 10);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 30, pageHeight - 10);
+  }
+
+  doc.save(`wattpryce-portfolio-summary-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export default function AccountsBoard({ companyId, companyName, lockedLocation, companyIds, companiesById }) {
@@ -1730,6 +1950,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               >
                 {[
                   { icon: BarChart3, label: "Overview", onClick: () => setShowOverview(true) },
+                  { icon: FileText, label: "Download report (PDF)", onClick: () => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName) },
                   ...(combinedMode ? [] : [{ icon: Upload, label: "Import accounts", onClick: () => setShowImport(true) }]),
                   { icon: Download, label: "Export CSV", onClick: () => exportAccountsCSV(accounts) },
                   ...(combinedMode ? [] : [{ icon: LineChartIcon, label: "Market rates", onClick: () => setShowBenchmarks(true) }]),
