@@ -415,7 +415,7 @@ const inputStyle = {
   borderRadius: 6,
   padding: "9px 10px",
   color: "var(--text)",
-  fontSize: 14,
+  fontSize: 16,
   outline: "none",
 };
 
@@ -3170,7 +3170,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                               borderRadius: 6,
                               padding: "8px 10px",
                               color: "var(--text)",
-                              fontSize: 13,
+                              fontSize: 16,
                               outline: "none",
                               resize: "vertical",
                               fontFamily: "inherit",
