@@ -1369,6 +1369,18 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     loadAccounts();
   };
 
+  const switchToCompany = async (targetCompanyId) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase.from("profiles").update({ active_company_id: targetCompanyId }).eq("id", user.id);
+    if (error) {
+      alert("Couldn't switch company: " + error.message);
+      return;
+    }
+    router.push("/dashboard");
+  };
+
   const deleteAccount = async (id) => {
     const { error } = await supabase.from("accounts").delete().eq("id", id);
     if (error) setError(error.message);
@@ -2418,9 +2430,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                       {a.name}
                     </span>
                     {combinedMode && companiesById?.[a.company_id] && (
-                      <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--state)", border: "1px solid var(--state)55", borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          switchToCompany(a.company_id);
+                        }}
+                        title={`Switch to ${companiesById[a.company_id]}`}
+                        style={{ fontSize: 10.5, fontWeight: 600, color: "var(--state)", background: "none", border: "1px solid var(--state)55", borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", flexShrink: 0, cursor: "pointer" }}
+                      >
                         {companiesById[a.company_id]}
-                      </span>
+                      </button>
                     )}
                     {a.location && !groupByLocation && (
                       <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>📍 {a.location}</span>
