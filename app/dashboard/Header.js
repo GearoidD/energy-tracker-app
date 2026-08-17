@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,8 @@ import TeamMembers from "./TeamMembers";
 
 export default function Header({ email, userId, companies = [], activeCompanyId }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const onAllCompanies = pathname === "/dashboard/all-companies";
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -44,24 +46,33 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
 
   const switchCompany = async (companyId) => {
     setMenuOpen(false);
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from("profiles")
-      .update({ active_company_id: companyId })
-      .eq("id", user.id)
-      .select();
-    if (error) {
-      alert("Couldn't switch company: " + error.message);
-      return;
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError || !user) {
+        alert("Couldn't switch company: not logged in properly. Try refreshing the page.");
+        return;
+      }
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ active_company_id: companyId })
+        .eq("id", user.id)
+        .select();
+      if (error) {
+        alert("Couldn't switch company: " + error.message);
+        return;
+      }
+      if (!data || data.length === 0) {
+        alert("The switch didn't actually save (0 rows updated) — this points to a permissions rule blocking it. Tell Claude this exact message.");
+        return;
+      }
+      window.location.href = "/dashboard";
+    } catch (e) {
+      alert("Something unexpected went wrong switching company: " + (e?.message || String(e)));
     }
-    if (!data || data.length === 0) {
-      alert("The switch didn't actually save (0 rows updated) — this points to a permissions rule blocking it. Tell Claude this exact message.");
-      return;
-    }
-    window.location.reload();
   };
 
   const deleteCompany = async (company) => {
@@ -171,7 +182,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
                 fontSize: 13,
               }}
             >
-              {activeCompany?.name || "Select company"}
+              {onAllCompanies ? "All companies" : activeCompany?.name || "Select company"}
               <ChevronDown size={14} color="var(--muted)" />
             </button>
 
