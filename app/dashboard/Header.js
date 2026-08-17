@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle } from "lucide-react";
+import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import CompanySetup from "./CompanySetup";
@@ -189,6 +189,30 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
                   overflow: "hidden",
                 }}
               >
+                {companies.length > 1 && (
+                  <Link
+                    href="/dashboard/all-companies"
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      width: "100%",
+                      textAlign: "left",
+                      background: "none",
+                      border: "none",
+                      borderBottom: "1px solid var(--border)",
+                      padding: "9px 12px",
+                      color: "var(--teal)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      textDecoration: "none",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Building2 size={13} /> All companies
+                  </Link>
+                )}
                 {companies.map((c) => (
                   <div
                     key={c.id}
