@@ -858,7 +858,8 @@ function quoteRequestMailto(acc, supplierEmail, companyName) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-export default function AccountsBoard({ companyId, companyName, lockedLocation }) {
+export default function AccountsBoard({ companyId, companyName, lockedLocation, companyIds, companiesById }) {
+  const combinedMode = Array.isArray(companyIds) && companyIds.length > 0;
   const supabase = createClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -961,27 +962,30 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   const [readingSummaries, setReadingSummaries] = useState({});
 
   const loadReadingSummaries = useCallback(async () => {
-    const { data } = await supabase
+    let query = supabase
       .from("readings")
       .select("account_id, reading_date, rate, usage, standing_charge, confidence, created_at")
-      .eq("company_id", companyId)
       .order("reading_date", { ascending: false, nullsFirst: false });
+    query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
+    const { data } = await query;
     const grouped = {};
     (data || []).forEach((r) => {
       if (!grouped[r.account_id]) grouped[r.account_id] = [];
       grouped[r.account_id].push(r);
     });
     setReadingSummaries(grouped);
-  }, [companyId]);
+  }, [companyId, combinedMode, companyIds]);
 
   useEffect(() => {
     loadReadingSummaries();
   }, [loadReadingSummaries]);
 
   const loadBenchmarks = useCallback(async () => {
-    const { data } = await supabase.from("benchmarks").select("*").eq("company_id", companyId);
+    let query = supabase.from("benchmarks").select("*");
+    query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
+    const { data } = await query;
     setBenchmarks(data || []);
-  }, [companyId]);
+  }, [companyId, combinedMode, companyIds]);
 
   const loadMasterRates = useCallback(async () => {
     const { data } = await supabase.from("master_rates").select("*, suppliers(name)");
@@ -994,25 +998,29 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   }, []);
 
   const loadActivity = useCallback(async () => {
+    const scoped = (q) => (combinedMode ? q.in("company_id", companyIds) : q.eq("company_id", companyId));
     const [notesRes, readingsRes, accountsRes] = await Promise.all([
-      supabase
-        .from("account_notes")
-        .select("id, body, created_at, accounts(name), profiles(email)")
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false })
-        .limit(8),
-      supabase
-        .from("readings")
-        .select("id, created_at, source, accounts(name)")
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false })
-        .limit(8),
-      supabase
-        .from("accounts")
-        .select("id, name, created_at")
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false })
-        .limit(8),
+      scoped(
+        supabase
+          .from("account_notes")
+          .select("id, body, created_at, accounts(name), profiles(email)")
+          .order("created_at", { ascending: false })
+          .limit(8)
+      ),
+      scoped(
+        supabase
+          .from("readings")
+          .select("id, created_at, source, accounts(name)")
+          .order("created_at", { ascending: false })
+          .limit(8)
+      ),
+      scoped(
+        supabase
+          .from("accounts")
+          .select("id, name, created_at")
+          .order("created_at", { ascending: false })
+          .limit(8)
+      ),
     ]);
 
     const items = [];
@@ -1040,7 +1048,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
 
     items.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     setActivityItems(items.slice(0, 10));
-  }, [companyId]);
+  }, [companyId, combinedMode, companyIds]);
 
   useEffect(() => {
     loadBenchmarks();
@@ -1088,10 +1096,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   const sendSupplierEmail = async ({ to, bcc, subject, body, accountIds, supplierName, logNote }) => {
     setSendingEmail(true);
     try {
+      const resolvedCompanyId = accounts.find((a) => accountIds?.includes(a.id))?.company_id || companyId;
       const res = await fetch("/api/send-supplier-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, bcc, subject, body, companyId, accountIds, supplierName, logNote }),
+        body: JSON.stringify({ to, bcc, subject, body, companyId: resolvedCompanyId, accountIds, supplierName, logNote }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1203,9 +1212,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    const account = accounts.find((a) => a.id === accountId);
     const { error } = await supabase.from("account_notes").insert({
       account_id: accountId,
-      company_id: companyId,
+      company_id: account?.company_id || companyId,
       body: text,
       created_by: user.id,
     });
@@ -1248,9 +1258,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   };
 
   const saveManualReading = async (accountId, form) => {
+    const account = accounts.find((a) => a.id === accountId);
     const { error } = await supabase.from("readings").insert({
       account_id: accountId,
-      company_id: companyId,
+      company_id: account?.company_id || companyId,
       reading_date: form.reading_date || null,
       usage: form.usage || null,
       rate: form.rate || null,
@@ -1272,18 +1283,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
   };
 
   const loadAccounts = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("company_id", companyId)
-      .order("contract_end", { ascending: true, nullsFirst: false });
+    let query = supabase.from("accounts").select("*").order("contract_end", { ascending: true, nullsFirst: false });
+    query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
+    const { data, error } = await query;
     if (error) setError(error.message);
     else {
       setAccounts(data || []);
       setLastUpdated(new Date());
     }
     setLoading(false);
-  }, [companyId]);
+  }, [companyId, combinedMode, companyIds]);
 
   useEffect(() => {
     loadAccounts();
@@ -1311,8 +1320,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       mic_kva: form.mic_kva || null,
       dg_group: form.dg_group || null,
       spc_kwh: form.spc_kwh || null,
-      company_id: companyId,
       updated_at: new Date().toISOString(),
+      // Editing keeps the account's own existing company - never overwrite it.
+      // Only a brand-new account needs a company assigned, and that's only possible
+      // outside combined mode, where companyId is a single real value.
+      ...(form.id ? {} : { company_id: companyId }),
       // A later contract end date means a renewal actually happened —
       // reset the workflow status so next cycle starts fresh, not stuck on "Switching"
       ...(isLaterDate ? { renewal_status: "not_started" } : {}),
@@ -1647,8 +1659,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           <WoodpeckerMascot size={48} />
           <div>
-            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Accounts</h1>
-            <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Everyone on your team sees this same list.</p>
+            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>{combinedMode ? "All companies" : "Accounts"}</h1>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
+              {combinedMode ? "Every account across every company you belong to." : "Everyone on your team sees this same list."}
+            </p>
             {lastUpdated && (
               <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 3, opacity: 0.75 }}>
                 Data updated {lastUpdated.toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })} · {lastUpdated.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}
@@ -1657,21 +1671,30 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", position: "relative" }}>
-          <button
-            onClick={() => setUploadingFor("new")}
-            style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-          >
-            <Upload size={16} /> Upload a bill
-          </button>
-          <button
-            onClick={() => {
-              setEditing(null);
-              setShowForm(true);
-            }}
-            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-          >
-            <Plus size={16} /> Add account
-          </button>
+          {!combinedMode && (
+            <button
+              onClick={() => setUploadingFor("new")}
+              style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            >
+              <Upload size={16} /> Upload a bill
+            </button>
+          )}
+          {!combinedMode && (
+            <button
+              onClick={() => {
+                setEditing(null);
+                setShowForm(true);
+              }}
+              style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            >
+              <Plus size={16} /> Add account
+            </button>
+          )}
+          {combinedMode && (
+            <span style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>
+              Switch to a specific company to add accounts or upload bills
+            </span>
+          )}
           <div style={{ position: "relative" }}>
             <button
               onClick={() => setShowMoreMenu((v) => !v)}
@@ -1695,9 +1718,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
               >
                 {[
                   { icon: BarChart3, label: "Overview", onClick: () => setShowOverview(true) },
-                  { icon: Upload, label: "Import accounts", onClick: () => setShowImport(true) },
+                  ...(combinedMode ? [] : [{ icon: Upload, label: "Import accounts", onClick: () => setShowImport(true) }]),
                   { icon: Download, label: "Export CSV", onClick: () => exportAccountsCSV(accounts) },
-                  { icon: LineChartIcon, label: "Market rates", onClick: () => setShowBenchmarks(true) },
+                  ...(combinedMode ? [] : [{ icon: LineChartIcon, label: "Market rates", onClick: () => setShowBenchmarks(true) }]),
                   { icon: SlidersHorizontal, label: showAccountNumbers ? "Hide account numbers" : "Show account numbers", onClick: () => setShowAccountNumbers((v) => !v) },
                 ].map((item) => (
                   <button
@@ -2394,6 +2417,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
                     <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {a.name}
                     </span>
+                    {combinedMode && companiesById?.[a.company_id] && (
+                      <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--state)", border: "1px solid var(--state)55", borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap", flexShrink: 0 }}>
+                        {companiesById[a.company_id]}
+                      </span>
+                    )}
                     {a.location && !groupByLocation && (
                       <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>📍 {a.location}</span>
                     )}
@@ -3060,7 +3088,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation }
       {uploadingFor && (
         <UploadReading
           accountId={uploadingFor === "new" ? null : uploadingFor}
-          companyId={companyId}
+          companyId={uploadingFor !== "new" ? accounts.find((a) => a.id === uploadingFor)?.company_id || companyId : companyId}
           accounts={accounts}
           onCancel={() => setUploadingFor(null)}
           onDone={(savedAccountIds) => {

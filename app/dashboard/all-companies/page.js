@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import AllCompaniesView from "../AllCompaniesView";
+import AccountsBoard from "../AccountsBoard";
 import Header from "../Header";
 
 export const dynamic = "force-dynamic";
@@ -32,11 +32,20 @@ export default async function AllCompaniesPage() {
       ? profileData.active_company_id
       : companies[0].id;
 
+  const companiesById = {};
+  companies.forEach((c) => {
+    companiesById[c.id] = c.name;
+  });
+
   return (
     <div style={{ minHeight: "100vh" }}>
       <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
       <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
-        <AllCompaniesView companies={companies} />
+        <AccountsBoard
+          companyIds={companies.map((c) => c.id)}
+          companiesById={companiesById}
+          companyName="All companies"
+        />
       </div>
     </div>
   );
