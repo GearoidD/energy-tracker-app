@@ -860,7 +860,7 @@ function quoteRequestMailto(acc, supplierEmail, companyName) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups, companyName) {
+function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups, companyName, readingSummaries) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const teal = [47, 167, 154];
@@ -940,6 +940,99 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
       y
     );
     y += 10;
+  }
+
+  // ---- Spend trend chart (last 6 months, from real bill history) ----
+  const monthBuckets = {}; // "2026-03" -> total cost
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthBuckets[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`] = 0;
+  }
+  Object.values(readingSummaries || {})
+    .flat()
+    .forEach((r) => {
+      if (!r.reading_date) return;
+      const key = r.reading_date.slice(0, 7);
+      if (key in monthBuckets && r.total_cost) {
+        monthBuckets[key] += parseFloat(r.total_cost);
+      }
+    });
+  const monthKeys = Object.keys(monthBuckets);
+  const monthValues = monthKeys.map((k) => monthBuckets[k]);
+  const hasChartData = monthValues.some((v) => v > 0);
+
+  if (hasChartData) {
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("Spend trend — last 6 months", 14, y);
+    y += 8;
+
+    const chartX = 14;
+    const chartW = pageWidth - 28;
+    const chartH = 42;
+    const maxVal = Math.max(...monthValues, 1);
+
+    doc.setDrawColor(225, 225, 220);
+    doc.setLineWidth(0.2);
+    doc.line(chartX, y, chartX, y + chartH);
+    doc.line(chartX, y + chartH, chartX + chartW, y + chartH);
+
+    const points = monthKeys.map((k, i) => ({
+      x: chartX + (i / (monthKeys.length - 1)) * chartW,
+      yVal: y + chartH - (monthBuckets[k] / maxVal) * (chartH - 6),
+      val: monthBuckets[k],
+      label: new Date(k + "-01").toLocaleDateString("en-IE", { month: "short", year: "2-digit" }),
+    }));
+
+    doc.setDrawColor(...teal);
+    doc.setLineWidth(0.8);
+    for (let i = 0; i < points.length - 1; i++) {
+      doc.line(points[i].x, points[i].yVal, points[i + 1].x, points[i + 1].yVal);
+    }
+    points.forEach((p) => {
+      doc.setFillColor(...teal);
+      doc.circle(p.x, p.yVal, 1.1, "F");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...dark);
+      doc.text(fmtMoney(p.val) || "€0", p.x, p.yVal - 3, { align: "center" });
+      doc.setTextColor(...muted);
+      doc.text(p.label, p.x, y + chartH + 6, { align: "center" });
+    });
+
+    y += chartH + 16;
+  }
+
+  // ---- Spend by account, ranked ----
+  const spendByAccount = enrichedAccounts
+    .filter((a) => a.cost)
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 12);
+
+  if (spendByAccount.length > 0) {
+    if (y > 220) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("Spend by account, ranked", 14, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Account", "Est. annual spend"]],
+      body: spendByAccount.map((a) => [a.name, fmtMoney(a.cost)]),
+      theme: "plain",
+      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
+      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
+      alternateRowStyles: { fillColor: lightBg },
+      columnStyles: { 1: { halign: "right" } },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 14;
   }
 
   // ---- Upcoming renewals ----
@@ -1076,6 +1169,189 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   }
 
   doc.save(`wattpryce-portfolio-summary-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const teal = [47, 167, 154];
+  const dark = [14, 26, 29];
+  const muted = [143, 166, 163];
+  const amber = [232, 163, 61];
+  const green = [76, 154, 106];
+  const lightBg = [250, 250, 248];
+
+  // ---- Header band ----
+  doc.setFillColor(...dark);
+  doc.rect(0, 0, pageWidth, 38, "F");
+  doc.setFillColor(...teal);
+  doc.rect(0, 38, pageWidth, 1.2, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont(undefined, "bold");
+  doc.text("Watt", 14, 17);
+  const wattWidth = doc.getTextWidth("Watt");
+  doc.setTextColor(...teal);
+  doc.text("pryce", 14 + wattWidth, 17);
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont(undefined, "normal");
+  doc.text("Savings & Activity Report", 14, 26);
+  doc.setTextColor(...muted);
+  doc.setFontSize(8.5);
+  doc.text(
+    `${companyName || "All companies"}  ·  Generated ${new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}`,
+    14,
+    33
+  );
+
+  let y = 52;
+
+  // ---- KPI cards ----
+  const renewedCount = enrichedAccounts.filter((a) => a.renewal_status === "renewed").length;
+  const inProgressCount = enrichedAccounts.filter((a) => a.renewal_status === "quote_requested" || a.renewal_status === "switching").length;
+  const verifiedSavings = enrichedAccounts.reduce((sum, a) => {
+    if (a.comparison && (a.comparison.source === "verified" || a.comparison.source === "quoted") && a.saving && a.saving > 0) {
+      return sum + a.saving;
+    }
+    return sum;
+  }, 0);
+
+  const cardW = (pageWidth - 28 - 3 * 6) / 4;
+  const cardH = 26;
+  const cards = [
+    { label: "Verified savings identified", value: verifiedSavings > 0 ? fmtMoney(verifiedSavings) : "—", accent: green },
+    { label: "All potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—", accent: teal },
+    { label: "Renewals in progress", value: String(inProgressCount), accent: amber },
+    { label: "Accounts renewed", value: String(renewedCount), accent: green },
+  ];
+  cards.forEach((card, i) => {
+    const x = 14 + i * (cardW + 6);
+    doc.setFillColor(...lightBg);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "F");
+    doc.setDrawColor(225, 225, 220);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "S");
+    doc.setFillColor(...card.accent);
+    doc.rect(x, y, 1.2, cardH, "F");
+    doc.setTextColor(...dark);
+    doc.setFontSize(14);
+    doc.setFont(undefined, "bold");
+    doc.text(card.value, x + 6, y + 13);
+    doc.setFontSize(7);
+    doc.setFont(undefined, "normal");
+    doc.setTextColor(...muted);
+    doc.text(card.label, x + 6, y + 20, { maxWidth: cardW - 10 });
+  });
+  y += cardH + 10;
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(...muted);
+  doc.text(
+    "\"Verified\" savings come from a quoted rate or a Wattpryce-confirmed market rate. \"All potential\" also includes automated estimates.",
+    14,
+    y
+  );
+  y += 12;
+
+  // ---- Top savings opportunities ----
+  const opportunities = enrichedAccounts
+    .filter((a) => a.saving && a.saving > 20 && a.comparison)
+    .sort((a, b) => b.saving - a.saving)
+    .slice(0, 15);
+
+  if (opportunities.length > 0) {
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("Biggest savings opportunities", 14, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Account", "Current rate", "Market rate", "Est. saving/yr", "Source"]],
+      body: opportunities.map((a) => [
+        a.name,
+        `${a.rate}c/kWh`,
+        `${a.comparison.rate}c/kWh`,
+        fmtMoney(a.saving),
+        a.comparison.source === "verified" ? "Verified" : a.comparison.source === "quoted" ? "Quoted" : "Estimated",
+      ]),
+      theme: "plain",
+      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
+      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
+      alternateRowStyles: { fillColor: lightBg },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  // ---- Renewals in progress ----
+  const inProgress = enrichedAccounts.filter((a) => a.renewal_status === "quote_requested" || a.renewal_status === "switching");
+  if (inProgress.length > 0) {
+    if (y > 220) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("Renewals currently in progress", 14, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Account", "Location", "Status"]],
+      body: inProgress.map((a) => [a.name, a.location || "—", a.renewal_status === "quote_requested" ? "Quote requested" : "Switching"]),
+      theme: "plain",
+      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
+      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
+      alternateRowStyles: { fillColor: lightBg },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  // ---- Recently renewed ----
+  const renewed = enrichedAccounts.filter((a) => a.renewal_status === "renewed");
+  if (renewed.length > 0) {
+    if (y > 220) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFontSize(11.5);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(...dark);
+    doc.text("Recently renewed", 14, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Account", "Provider", "Rate", "New contract end"]],
+      body: renewed.map((a) => [a.name, a.provider || "—", a.rate ? `${a.rate}c/kWh` : "—", a.contract_end || "—"]),
+      theme: "plain",
+      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
+      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
+      alternateRowStyles: { fillColor: lightBg },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  // ---- Footer ----
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setDrawColor(230, 230, 225);
+    doc.setLineWidth(0.2);
+    doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...muted);
+    doc.text("Generated by Wattpryce — wattpryce.com", 14, pageHeight - 10);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 30, pageHeight - 10);
+  }
+
+  doc.save(`wattpryce-savings-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export default function AccountsBoard({ companyId, companyName, lockedLocation, companyIds, companiesById }) {
@@ -1950,7 +2226,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               >
                 {[
                   { icon: BarChart3, label: "Overview", onClick: () => setShowOverview(true) },
-                  { icon: FileText, label: "Download report (PDF)", onClick: () => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName) },
+                  { icon: FileText, label: "Download report (PDF)", onClick: () => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries) },
+                  { icon: TrendingDown, label: "Download savings report (PDF)", onClick: () => generateSavingsReport(enrichedAll, summaryStats, companyName) },
                   ...(combinedMode ? [] : [{ icon: Upload, label: "Import accounts", onClick: () => setShowImport(true) }]),
                   { icon: Download, label: "Export CSV", onClick: () => exportAccountsCSV(accounts) },
                   ...(combinedMode ? [] : [{ icon: LineChartIcon, label: "Market rates", onClick: () => setShowBenchmarks(true) }]),
