@@ -2433,18 +2433,28 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             </span>
             <span style={{ position: "relative" }}>
               <button
-                onClick={() => summaryStats.hasAnyCost && setSpendBreakdownOpen((v) => !v)}
-                style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--muted)", cursor: summaryStats.hasAnyCost ? "pointer" : "default", textDecoration: summaryStats.hasAnyCost ? "underline dotted" : "none" }}
+                onClick={() => (summaryStats.hasAnyCost || summaryStats.partialBillCount > 0) && setSpendBreakdownOpen((v) => !v)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  font: "inherit",
+                  color: "var(--muted)",
+                  cursor: summaryStats.hasAnyCost || summaryStats.partialBillCount > 0 ? "pointer" : "default",
+                  textDecoration: summaryStats.hasAnyCost || summaryStats.partialBillCount > 0 ? "underline dotted" : "none",
+                }}
               >
                 {summaryStats.hasAnyCost ? (
                   <>
                     <strong style={{ color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</strong> est. annual spend
                   </>
+                ) : summaryStats.partialBillCount > 0 ? (
+                  "Needs more data"
                 ) : (
                   "No bill data yet"
                 )}
               </button>
-              {spendBreakdownOpen && summaryStats.hasAnyCost && (
+              {spendBreakdownOpen && (summaryStats.hasAnyCost || summaryStats.partialBillCount > 0) && (
                 <>
                   <div onClick={() => setSpendBreakdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 24 }} />
                   <div
