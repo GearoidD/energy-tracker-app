@@ -282,15 +282,9 @@ function marketComparisonFor(acc, benchmarks, masterRates = []) {
 function estimatedAnnualSpend(acc, readings) {
   const rated = (readings || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
 
-  if (rated.length === 0) {
-    // No bill history yet — fall back to whatever was entered directly on the account,
-    // rather than showing €0 next to a non-zero savings figure, which is actively misleading.
-    const rate = parseFloat(acc.rate);
-    const usage = parseFloat(acc.usage);
-    const standing = parseFloat(acc.standing_charge) || 0;
-    if (isNaN(rate) || isNaN(usage)) return null;
-    return (rate / 100) * usage + (standing / 100) * 365;
-  }
+  // Fewer than 5 real bills isn't a reliable enough basis to extrapolate a full year's spend -
+  // especially with seasonal usage swings. Show nothing rather than a misleading number.
+  if (rated.length < 5) return null;
 
   const sorted = [...rated].sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
   const first = new Date(sorted[0].reading_date);
@@ -2011,13 +2005,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     const hasAnyCost = enrichedAll.some((a) => a.cost !== null && a.cost !== undefined);
 
     let realBillCount = 0;
-    let fallbackCount = 0;
+    let partialBillCount = 0;
     let noCostCount = 0;
     enrichedAll.forEach((a) => {
       const rated = (readingSummaries[a.id] || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
-      if (a.cost === null || a.cost === undefined) noCostCount++;
-      else if (rated.length > 0) realBillCount++;
-      else fallbackCount++;
+      if (a.cost !== null && a.cost !== undefined) realBillCount++;
+      else if (rated.length > 0) partialBillCount++;
+      else noCostCount++;
     });
 
     return {
@@ -2032,7 +2026,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       hasAnyComparison,
       hasAnyCost,
       realBillCount,
-      fallbackCount,
+      partialBillCount,
       noCostCount,
     };
   }, [enrichedAll, readingSummaries]);
@@ -2461,17 +2455,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>HOW THIS IS CALCULATED</p>
                     {summaryStats.realBillCount > 0 && (
                       <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
-                        <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — from real uploaded bill history
+                        <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — 5+ real bills on file, included in the estimate
                       </div>
                     )}
-                    {summaryStats.fallbackCount > 0 && (
+                    {summaryStats.partialBillCount > 0 && (
                       <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
-                        <strong>{summaryStats.fallbackCount}</strong> account{summaryStats.fallbackCount === 1 ? "" : "s"} — estimated from the rate and usage entered directly, no bill uploaded yet
+                        <strong>{summaryStats.partialBillCount}</strong> account{summaryStats.partialBillCount === 1 ? "" : "s"} — has bill history, but fewer than 5 bills isn't enough to reliably estimate a full year yet
                       </div>
                     )}
                     {summaryStats.noCostCount > 0 && (
                       <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                        <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — not included, missing rate or usage
+                        <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — no bills uploaded yet
                       </div>
                     )}
                   </div>
