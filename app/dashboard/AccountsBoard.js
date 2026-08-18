@@ -854,6 +854,39 @@ function quoteRequestMailto(acc, supplierEmail, companyName) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
+function drawWoodpeckerPDF(doc, cx, cy, scale = 1) {
+  const teal = [47, 167, 154];
+  const tealDim = [31, 110, 104];
+  const amber = [232, 163, 61];
+  const dark = [14, 26, 29];
+
+  // Body
+  doc.setFillColor(...teal);
+  doc.ellipse(cx, cy, 6.5 * scale, 5 * scale, "F");
+  // Tail
+  doc.setFillColor(...tealDim);
+  doc.triangle(cx - 6 * scale, cy + 1 * scale, cx - 11 * scale, cy + 4 * scale, cx - 6.5 * scale, cy + 3.5 * scale, "F");
+  // Wing
+  doc.triangle(cx + 3 * scale, cy + 2 * scale, cx + 7 * scale, cy + 4.5 * scale, cx + 2.5 * scale, cy + 4 * scale, "F");
+  // Head
+  doc.setFillColor(...teal);
+  doc.circle(cx + 5.5 * scale, cy - 3 * scale, 3.8 * scale, "F");
+  // Crest
+  doc.setFillColor(...amber);
+  doc.triangle(cx + 3.5 * scale, cy - 6 * scale, cx + 4.5 * scale, cy - 9.5 * scale, cx + 5.3 * scale, cy - 6.3 * scale, "F");
+  doc.triangle(cx + 5 * scale, cy - 6.3 * scale, cx + 6 * scale, cy - 10 * scale, cx + 6.7 * scale, cy - 6.5 * scale, "F");
+  doc.triangle(cx + 6.3 * scale, cy - 6.4 * scale, cx + 7.2 * scale, cy - 9.3 * scale, cx + 8 * scale, cy - 6 * scale, "F");
+  // Beak
+  doc.triangle(cx + 9 * scale, cy - 3.3 * scale, cx + 13 * scale, cy - 3 * scale, cx + 9 * scale, cy - 2 * scale, "F");
+  // Eye
+  doc.setFillColor(...dark);
+  doc.circle(cx + 6.8 * scale, cy - 3.6 * scale, 0.5 * scale, "F");
+  // Feet
+  doc.setFillColor(...amber);
+  doc.ellipse(cx + 0.5 * scale, cy + 5 * scale, 1 * scale, 0.4 * scale, "F");
+  doc.ellipse(cx - 1.5 * scale, cy + 5.1 * scale, 1 * scale, 0.4 * scale, "F");
+}
+
 function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups, companyName, readingSummaries) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -871,6 +904,8 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   doc.rect(0, 0, pageWidth, 38, "F");
   doc.setFillColor(...teal);
   doc.rect(0, 38, pageWidth, 1.2, "F");
+
+  drawWoodpeckerPDF(doc, pageWidth - 22, 19, 1.3);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
@@ -897,11 +932,12 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   // ---- KPI cards ----
   const cardW = (pageWidth - 28 - 3 * 6) / 4;
   const cardH = 26;
+  const spendValue = summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : summaryStats.partialBillCount > 0 ? "Needs more data" : "—";
   const cards = [
-    { label: "Total accounts", value: String(summaryStats.total), accent: teal },
-    { label: "Need attention", value: String(summaryStats.needAttention), accent: summaryStats.needAttention > 0 ? amber : green },
-    { label: "Est. annual spend", value: summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "—", accent: teal },
-    { label: "Potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—", accent: green },
+    { label: "Total accounts", value: String(summaryStats.total), accent: teal, small: false },
+    { label: "Need attention", value: String(summaryStats.needAttention), accent: summaryStats.needAttention > 0 ? amber : green, small: false },
+    { label: "Est. annual spend", value: spendValue, accent: teal, small: !summaryStats.hasAnyCost },
+    { label: "Potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—", accent: green, small: false },
   ];
   cards.forEach((card, i) => {
     const x = 14 + i * (cardW + 6);
@@ -914,16 +950,34 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     doc.rect(x, y, 1.2, cardH, "F");
 
     doc.setTextColor(...dark);
-    doc.setFontSize(15);
+    doc.setFontSize(card.small ? 10 : 15);
     doc.setFont(undefined, "bold");
-    doc.text(card.value, x + 6, y + 13);
+    doc.text(card.value, x + 6, y + 13, { maxWidth: cardW - 10 });
     doc.setFontSize(7.5);
     doc.setFont(undefined, "normal");
     doc.setTextColor(...muted);
     doc.text(card.label, x + 6, y + 20);
   });
 
-  y += cardH + 14;
+  y += cardH + 6;
+
+  if (summaryStats.partialBillCount > 0) {
+    doc.setFontSize(7.5);
+    doc.setTextColor(...muted);
+    doc.setFont(undefined, "italic");
+    doc.text(
+      summaryStats.hasAnyCost
+        ? `${summaryStats.partialBillCount} more account${summaryStats.partialBillCount === 1 ? "" : "s"} have some bill history but aren't included above yet — each needs 5+ bills for a reliable estimate.`
+        : `${summaryStats.partialBillCount} account${summaryStats.partialBillCount === 1 ? " has" : "s have"} some bill history, but need at least 5 bills before a reliable annual estimate is shown.`,
+      14,
+      y,
+      { maxWidth: pageWidth - 28 }
+    );
+    doc.setFont(undefined, "normal");
+    y += 8;
+  }
+
+  y += 8;
 
   if (summaryStats.needAttention > 0) {
     doc.setFontSize(8.5);
@@ -1180,6 +1234,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   doc.rect(0, 0, pageWidth, 38, "F");
   doc.setFillColor(...teal);
   doc.rect(0, 38, pageWidth, 1.2, "F");
+  drawWoodpeckerPDF(doc, pageWidth - 22, 19, 1.3);
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont(undefined, "bold");
