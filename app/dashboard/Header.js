@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2 } from "lucide-react";
+import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2, Shield } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import CompanySetup from "./CompanySetup";
@@ -295,6 +295,9 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <Link href="/admin" style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--muted)", fontSize: 12, textDecoration: "none" }}>
+          <Shield size={13} /> Admin
+        </Link>
         <Link href="/help" style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--muted)", fontSize: 12, textDecoration: "none" }}>
           <HelpCircle size={13} /> Help
         </Link>
