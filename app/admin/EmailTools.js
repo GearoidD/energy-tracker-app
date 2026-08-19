@@ -4,8 +4,10 @@ import { useState } from "react";
 import { Mail } from "lucide-react";
 
 const EMAIL_TYPES = [
+  { key: "test", label: "Send test email to myself" },
   { key: "reminders", label: "Send renewal reminders now" },
   { key: "missing-bills", label: "Send missing-bill nudges now" },
+  { key: "report-reminder", label: "Send monthly report reminder now" },
   { key: "scan-rates", label: "Run weekly rate scan now" },
 ];
 

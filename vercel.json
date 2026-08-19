@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/scan-rates",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/missing-bill-nudges",
+      "schedule": "0 8 * * 3"
+    },
+    {
+      "path": "/api/cron/report-reminder",
+      "schedule": "0 8 1 * *"
     }
   ]
 }
