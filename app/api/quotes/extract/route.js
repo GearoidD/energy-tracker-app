@@ -87,7 +87,6 @@ ${quoteText}`;
       source: "user_verified",
       submitted_by: user.id,
       submitted_by_company: profile?.active_company_id || null,
-      created_at: new Date().toISOString(),
     }));
 
     const { error: insertError } = await admin.from("master_rates").insert(rows);
