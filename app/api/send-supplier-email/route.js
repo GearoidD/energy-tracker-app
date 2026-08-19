@@ -53,7 +53,7 @@ export async function POST(request) {
 
   try {
     await resend.emails.send({
-      from: "Wattpryce <onboarding@resend.dev>",
+      from: "Wattpryce <renewals@wattpryce.com>",
       to: cleanTo ? [cleanTo] : undefined,
       bcc: cleanBcc.length > 0 ? cleanBcc : undefined,
       replyTo: user.email,

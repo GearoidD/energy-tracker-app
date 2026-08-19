@@ -74,7 +74,7 @@ export async function GET(request) {
 
     try {
       await resend.emails.send({
-        from: "Wattpryce <onboarding@resend.dev>",
+        from: "Wattpryce <renewals@wattpryce.com>",
         to: emails,
         subject: `Wattpryce: ${accountsForCompany.length} account(s) need your attention`,
         html: `
