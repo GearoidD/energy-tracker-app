@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Zap, Building2, Users, Zap as ZapIcon } from "lucide-react";
 import DeleteCompanyButton from "./DeleteCompanyButton";
+import EmailTools from "./EmailTools";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,8 @@ export default async function AdminOverviewPage() {
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Bills/readings uploaded</div>
           </div>
         </div>
+
+        <EmailTools />
 
         <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 14 }}>COMPANIES</p>
 
