@@ -76,8 +76,28 @@ ${quoteText}`;
     }
 
     const admin = createAdminClient();
+
+    // master_rates links to suppliers via supplier_id, not a plain text name -
+    // find an existing supplier by name (case-insensitive), or create one if it doesn't exist yet.
+    const supplierIdCache = {};
+    for (const r of extracted) {
+      const name = r.provider?.trim();
+      if (!name || supplierIdCache[name.toLowerCase()]) continue;
+
+      const { data: existing } = await admin.from("suppliers").select("id").ilike("name", name).maybeSingle();
+      if (existing) {
+        supplierIdCache[name.toLowerCase()] = existing.id;
+      } else {
+        const { data: created, error: createError } = await admin.from("suppliers").insert({ name }).select("id").maybeSingle();
+        if (createError) {
+          return NextResponse.json({ error: `Couldn't create supplier "${name}": ${createError.message}` }, { status: 500 });
+        }
+        supplierIdCache[name.toLowerCase()] = created.id;
+      }
+    }
+
     const rows = extracted.map((r) => ({
-      provider: r.provider || null,
+      supplier_id: r.provider?.trim() ? supplierIdCache[r.provider.trim().toLowerCase()] : null,
       fuel_type: r.fuel_type || null,
       tariff_tier: r.tariff_band || null,
       rate: r.unit_rate_cents ?? null,
