@@ -103,6 +103,7 @@ ${quoteText}`;
       rate: r.unit_rate_cents ?? null,
       standing_charge: r.standing_charge_cents ?? null,
       valid_until: r.valid_until || null,
+      source: "user_verified",
       submitted_by: user.id,
       submitted_by_company: profile?.active_company_id || null,
     }));
