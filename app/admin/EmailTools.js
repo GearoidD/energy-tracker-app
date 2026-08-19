@@ -11,6 +11,22 @@ const EMAIL_TYPES = [
   { key: "scan-rates", label: "Run weekly rate scan now" },
 ];
 
+function formatResult(key, data) {
+  if (key === "test") {
+    return `✓ Test email sent to ${data.to}.`;
+  }
+  if (key === "scan-rates") {
+    return "✓ Rate scan complete — check the review queue on Rates & suppliers for anything new.";
+  }
+  if (typeof data?.sent === "number") {
+    if (data.sent === 0) {
+      return "✓ Ran successfully — nothing was due to send right now.";
+    }
+    return `✓ Sent to ${data.sent} compan${data.sent === 1 ? "y" : "ies"}.`;
+  }
+  return "✓ Done.";
+}
+
 export default function EmailTools() {
   const [loadingKey, setLoadingKey] = useState(null);
   const [results, setResults] = useState({});
@@ -68,9 +84,7 @@ export default function EmailTools() {
               <div style={{ marginTop: 8, fontSize: 12, color: "var(--red)" }}>Failed: {results[t.key].error}</div>
             )}
             {results[t.key]?.success && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "var(--green)" }}>
-                Done — {JSON.stringify(results[t.key].data)}
-              </div>
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--green)" }}>{formatResult(t.key, results[t.key].data)}</div>
             )}
           </div>
         ))}
