@@ -445,6 +445,8 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
           notes: "",
           mic_kva: "",
           spc_kwh: "",
+          bill_delivery_method: "",
+          portal_login_email: "",
         }
   );
   const [formError, setFormError] = useState(null);
@@ -505,6 +507,24 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
           <Field label="Provider">
             <input style={inputStyle} value={form.provider || ""} onChange={set("provider")} placeholder="e.g. Energia" />
           </Field>
+          <Field label="How do bills arrive?" hint="So the team knows where to look for the next one.">
+            <select style={inputStyle} value={form.bill_delivery_method || ""} onChange={set("bill_delivery_method")}>
+              <option value="">Not sure</option>
+              <option value="portal">Online portal</option>
+              <option value="email">Email</option>
+              <option value="post">Post</option>
+            </select>
+          </Field>
+          {form.bill_delivery_method === "portal" && (
+            <Field label="Portal login email" hint="Just the email used to log in — never store the password here.">
+              <input
+                style={inputStyle}
+                value={form.portal_login_email || ""}
+                onChange={set("portal_login_email")}
+                placeholder="e.g. accounts@yourcompany.ie"
+              />
+            </Field>
+          )}
           <Field label="Contract end date">
             <input type="date" style={inputStyle} value={form.contract_end || ""} onChange={set("contract_end")} />
           </Field>
@@ -1867,6 +1887,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       mic_kva: form.mic_kva || null,
       dg_group: form.dg_group || null,
       spc_kwh: form.spc_kwh || null,
+      bill_delivery_method: form.bill_delivery_method || null,
+      portal_login_email: form.bill_delivery_method === "portal" ? form.portal_login_email || null : null,
       updated_at: new Date().toISOString(),
       // Editing keeps the account's own existing company - never overwrite it.
       // Only a brand-new account needs a company assigned, and that's only possible
@@ -2977,6 +2999,24 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     {a.location && !groupByLocation && (
                       <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0 }}>📍 {a.location}</span>
                     )}
+                    {a.bill_delivery_method && (
+                      <span
+                        title={a.bill_delivery_method === "portal" && a.portal_login_email ? `Portal login: ${a.portal_login_email}` : undefined}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: "var(--muted)",
+                          border: "1px solid var(--border-light)",
+                          borderRadius: 4,
+                          padding: "1px 6px",
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {a.bill_delivery_method}
+                      </span>
+                    )}
                     {showAccountNumbers && (a.account_number || a.supplier_account_number) && (
                       <span style={{ fontSize: 10.5, color: "var(--muted)", whiteSpace: "nowrap", flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" }}>
                         {a.account_number ? `${a.fuel_type === "gas" ? "GPRN" : "MPRN"} ${a.account_number}` : ""}
@@ -3124,6 +3164,15 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         </span>
                       )}
                     </div>
+
+                    {a.bill_delivery_method && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
+                        Bills arrive via: <strong style={{ color: "var(--text)", textTransform: "capitalize" }}>{a.bill_delivery_method}</strong>
+                        {a.bill_delivery_method === "portal" && a.portal_login_email && (
+                          <span>— login: <strong style={{ color: "var(--text)" }}>{a.portal_login_email}</strong></span>
+                        )}
+                      </div>
+                    )}
 
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
                       <span style={{ fontSize: 12, color: "var(--muted)" }}>Renewal status:</span>
