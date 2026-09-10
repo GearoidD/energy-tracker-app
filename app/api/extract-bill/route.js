@@ -1,103 +1,666 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// This runs on the server only — the API key never reaches the browser.
+// Runs on the server only.
+// ANTHROPIC_API_KEY is never exposed to the browser.
+
 export async function POST(request) {
   try {
+    // ---------------------------------------------------------
+    // AUTH
+    // ---------------------------------------------------------
+
     const supabase = createClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
     if (!user) {
-      return NextResponse.json({ error: "Not logged in" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Not logged in" },
+        { status: 401 }
+      );
     }
+
+    // ---------------------------------------------------------
+    // READ REQUEST
+    // ---------------------------------------------------------
 
     const body = await request.json();
-    const pages = body.pages || (body.base64 ? [{ base64: body.base64, mediaType: body.mediaType }] : []);
+
+    /*
+     * Supported formats:
+     *
+     * NEW:
+     * {
+     *   front: {
+     *     base64: "...",
+     *     mediaType: "image/jpeg"
+     *   },
+     *   back: {
+     *     base64: "...",
+     *     mediaType: "image/jpeg"
+     *   }
+     * }
+     *
+     * OLD:
+     * {
+     *   base64: "...",
+     *   mediaType: "image/jpeg"
+     * }
+     *
+     * ALSO:
+     * {
+     *   pages: [...]
+     * }
+     */
+
+    let pages = [];
+
+    // ---------------------------------------------------------
+    // NEW FRONT / BACK FORMAT
+    // ---------------------------------------------------------
+
+    if (body.front?.base64) {
+      pages.push({
+        base64: body.front.base64,
+        mediaType:
+          body.front.mediaType || "image/jpeg",
+        side: "front",
+      });
+    }
+
+    if (body.back?.base64) {
+      pages.push({
+        base64: body.back.base64,
+        mediaType:
+          body.back.mediaType || "image/jpeg",
+        side: "back",
+      });
+    }
+
+    // ---------------------------------------------------------
+    // EXISTING PAGES FORMAT
+    // ---------------------------------------------------------
+
+    if (
+      pages.length === 0 &&
+      Array.isArray(body.pages)
+    ) {
+      pages = body.pages
+        .filter(
+          (page) =>
+            page &&
+            page.base64
+        )
+        .map((page) => ({
+          base64: page.base64,
+          mediaType:
+            page.mediaType || "image/jpeg",
+        }));
+    }
+
+    // ---------------------------------------------------------
+    // EXISTING SINGLE FILE FORMAT
+    // ---------------------------------------------------------
+
+    if (
+      pages.length === 0 &&
+      body.base64
+    ) {
+      pages = [
+        {
+          base64: body.base64,
+          mediaType:
+            body.mediaType || "image/jpeg",
+        },
+      ];
+    }
+
+    // ---------------------------------------------------------
+    // VALIDATION
+    // ---------------------------------------------------------
 
     if (pages.length === 0) {
-      return NextResponse.json({ error: "Missing file data" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "Missing bill image. Please upload the front of the bill.",
+        },
+        { status: 400 }
+      );
     }
 
-    const contentBlocks = pages.map(({ base64, mediaType }) => {
-      const isPdf = mediaType === "application/pdf";
-      return isPdf
-        ? { type: "document", source: { type: "base64", media_type: mediaType, data: base64 } }
-        : { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } };
-    });
+    if (pages.length > 2) {
+      return NextResponse.json(
+        {
+          error:
+            "A bill can contain a maximum of two photos.",
+        },
+        { status: 400 }
+      );
+    }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 800,
-        messages: [
+    // ---------------------------------------------------------
+    // VALIDATE IMAGES
+    // ---------------------------------------------------------
+
+    const allowedImageTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
+
+    for (const page of pages) {
+      if (!page.base64) {
+        return NextResponse.json(
           {
-            role: "user",
-            content: [
-              ...contentBlocks,
-              {
-                type: "text",
-                text: `This is an energy bill (electricity or gas)${pages.length > 1 ? ", possibly spanning multiple pages/photos of the same bill (e.g. front and back) — combine information across all of them" : ""}. Read it and return ONLY a JSON object, no other text, no markdown fences, with these exact keys:
-{
-  "reading_date": "YYYY-MM-DD or null, the billing period end date",
-  "usage": number or null, the energy used in kWh for this billing period,
-  "rate": number or null, the unit rate charged in cents per kWh (convert if shown in a different unit). If the bill shows separate day/night/peak rates rather than one flat rate, put the day rate here,
-  "standing_charge": number or null, the daily standing charge in cents,
-  "total_cost": number or null, the total amount due/charged for this billing period in euro, exactly as shown on the bill (this is the real total, including all charges, taxes, and credits — do not calculate it yourself from rate and usage),
-  "provider": "string or null, the supplier name",
-  "supply_address": "string or null, the physical supply address / site address the bill is for (not the billing/postal address if they differ) — this is usually near the MPRN/GPRN or account details section",
-  "account_number": "string or null, the MPRN (electricity) or GPRN (gas) shown on the bill — this is the meter point reference number, not the supplier's customer/account number",
-  "supplier_account_number": "string or null, the supplier's own customer/account number if shown (distinct from the MPRN/GPRN) — this is what the supplier uses in their own correspondence and portal, and what appears on renewal letters etc.",
-  "fuel_type": "electricity or gas — read this from the bill itself, don't guess",
-  "contract_end": "YYYY-MM-DD or null — only if the bill explicitly states a contract end/renewal/expiry date, not the billing period date",
-  "mic_kva": number or null — only for electricity bills, the Maximum Import Capacity in kVA if shown,
-  "dg_group": "string or null — only for electricity bills, the Distribution Group (DG Group, e.g. DG1, DG5, DG8) if shown — this is a network tariff classification, distinct from MIC",
-  "spc_kwh": number or null — only for gas bills, the Supply Point Capacity in kWh if shown,
-  "rate_note": "string or null — if the bill shows more than one rate (e.g. day/night/peak, or a tiered rate), briefly describe them here so the user knows the single 'rate' field above is a simplification. Otherwise null",
-  "confidence": "high, medium, or low — how confident you are these numbers are read correctly"
-}
-If a field isn't visible on the bill, use null for it. Do not guess or estimate a number that isn't shown.`,
-              },
-            ],
+            error:
+              "One of the uploaded bill images is empty.",
           },
-        ],
-      }),
-    });
+          { status: 400 }
+        );
+      }
 
-    const data = await response.json();
+      if (
+        page.mediaType !== "application/pdf" &&
+        !allowedImageTypes.includes(
+          page.mediaType
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Unsupported image type. Please use JPG, PNG or WebP.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // ---------------------------------------------------------
+    // BUILD CLAUDE CONTENT
+    // ---------------------------------------------------------
+
+    const contentBlocks = [];
+
+    for (const page of pages) {
+      const isPdf =
+        page.mediaType ===
+        "application/pdf";
+
+      if (isPdf) {
+        contentBlocks.push({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: page.mediaType,
+            data: page.base64,
+          },
+        });
+      } else {
+        contentBlocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: page.mediaType,
+            data: page.base64,
+          },
+        });
+      }
+    }
+
+    // ---------------------------------------------------------
+    // EXTRACTION INSTRUCTIONS
+    // ---------------------------------------------------------
+
+    const hasFrontAndBack =
+      pages.length === 2;
+
+    const extractionPrompt = `
+You are an expert energy-bill data extraction system.
+
+The uploaded image${hasFrontAndBack ? "s are the FRONT and BACK of the SAME energy bill" : " is an energy bill"}.
+
+${hasFrontAndBack
+  ? `
+IMPORTANT:
+- Treat both images as ONE bill.
+- Do NOT treat them as separate bills.
+- Information on either side may be required.
+- If a value appears on the back, use it.
+- If the front and back contain different information, combine it.
+- Never overwrite a clearly visible value with a guess.
+`
+  : ""
+}
+
+Your job is to accurately extract the bill information.
+
+ACCURACY IS MORE IMPORTANT THAN COMPLETENESS.
+
+Never guess a number.
+If a field is not clearly visible, return null.
+
+Pay particular attention to:
+- Billing period end date
+- kWh usage
+- Unit rates
+- Standing charge
+- Total bill amount
+- Provider
+- Supply address
+- MPRN/GPRN
+- Supplier account number
+- Contract end/renewal date
+- MIC
+- DG Group
+- Gas Supply Point Capacity
+
+Return ONLY valid JSON.
+
+Do not use markdown.
+Do not include explanations.
+Do not include comments.
+
+Use exactly this structure:
+
+{
+  "reading_date": "YYYY-MM-DD or null",
+  "usage": number or null,
+  "rate": number or null,
+  "standing_charge": number or null,
+  "total_cost": number or null,
+  "provider": "string or null",
+  "supply_address": "string or null",
+  "account_number": "string or null",
+  "supplier_account_number": "string or null",
+  "fuel_type": "electricity or gas or null",
+  "contract_end": "YYYY-MM-DD or null",
+  "mic_kva": number or null,
+  "dg_group": "string or null",
+  "spc_kwh": number or null,
+  "rate_note": "string or null",
+  "confidence": "high, medium, or low"
+}
+
+FIELD RULES:
+
+reading_date:
+The BILLING PERIOD END DATE.
+Do not use the invoice date unless it is also clearly the billing period end date.
+
+usage:
+The actual energy consumption for this billing period in kWh.
+Do not calculate it from meter readings unless the bill explicitly gives the usage.
+
+rate:
+The unit energy rate in cents per kWh.
+If multiple rates exist, use the DAY rate here and explain the other rates in rate_note.
+
+standing_charge:
+The daily standing charge in cents per day.
+
+total_cost:
+The actual total amount due or charged for the billing period in euro.
+Use the amount shown on the bill.
+Do NOT calculate this value from usage and rate.
+
+provider:
+The energy supplier.
+
+supply_address:
+The physical address where the energy is supplied.
+Do not use the billing/postal address if different.
+
+account_number:
+For electricity, this should be the MPRN.
+For gas, this should be the GPRN.
+Do NOT put the supplier's customer/account number here.
+
+supplier_account_number:
+The supplier's own customer/account number if shown.
+
+fuel_type:
+Read this from the bill.
+Return either "electricity" or "gas".
+Do not guess.
+
+contract_end:
+Only return a date if the bill explicitly shows a contract expiry, renewal or end date.
+Do not mistake the billing period date for the contract end date.
+
+mic_kva:
+For electricity only.
+Return the Maximum Import Capacity in kVA if explicitly shown.
+
+dg_group:
+For electricity only.
+Return the Distribution Group such as DG1, DG5 or DG8 if explicitly shown.
+
+spc_kwh:
+For gas only.
+Return the Supply Point Capacity in kWh if explicitly shown.
+
+rate_note:
+If there are multiple rates, briefly describe them.
+For example:
+"Day 24.5c/kWh, Night 15.2c/kWh"
+Otherwise return null.
+
+confidence:
+Use:
+- "high" when the relevant information is clearly visible
+- "medium" when some information is slightly unclear
+- "low" when important information is difficult to read
+
+Again:
+NEVER invent or estimate a value.
+Return null when it cannot be read confidently.
+`;
+
+    // ---------------------------------------------------------
+    // CALL ANTHROPIC
+    // ---------------------------------------------------------
+
+    const response = await fetch(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          "x-api-key":
+            process.env.ANTHROPIC_API_KEY,
+
+          "anthropic-version":
+            "2023-06-01",
+        },
+
+        body: JSON.stringify({
+          model: "claude-sonnet-5",
+
+          /*
+           * 800 is plenty for the JSON response.
+           * Keeping this low helps response speed.
+           */
+          max_tokens: 800,
+
+          /*
+           * Slightly lower temperature gives
+           * more deterministic extraction.
+           */
+          temperature: 0,
+
+          messages: [
+            {
+              role: "user",
+
+              content: [
+                ...contentBlocks,
+
+                {
+                  type: "text",
+                  text: extractionPrompt,
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    // ---------------------------------------------------------
+    // HANDLE ANTHROPIC RESPONSE
+    // ---------------------------------------------------------
+
+    const data =
+      await response.json();
 
     if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message || "Claude API error" }, { status: 500 });
+      console.error(
+        "Anthropic API error:",
+        data
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            data.error?.message ||
+            "Claude API error",
+        },
+        { status: 500 }
+      );
     }
 
-    const textBlock = data.content?.find((c) => c.type === "text");
-    if (!textBlock) {
-      return NextResponse.json({ error: "Couldn't read this bill — try retaking the photo with better lighting and less glare, or make sure the whole page is in frame." }, { status: 500 });
+    // ---------------------------------------------------------
+    // GET TEXT RESPONSE
+    // ---------------------------------------------------------
+
+    const textBlock =
+      data.content?.find(
+        (content) =>
+          content.type === "text"
+      );
+
+    if (!textBlock?.text) {
+      return NextResponse.json(
+        {
+          error:
+            "Couldn't read this bill. Try taking the photo again with better lighting and make sure the entire bill is visible.",
+        },
+        { status: 500 }
+      );
     }
 
-    let cleaned = textBlock.text.replace(/```json|```/g, "").trim();
-    // If Claude added any stray text before/after the JSON despite instructions,
-    // salvage just the object itself rather than failing the whole extraction.
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+    // ---------------------------------------------------------
+    // CLEAN JSON
+    // ---------------------------------------------------------
+
+    let cleaned =
+      textBlock.text.trim();
+
+    /*
+     * Remove accidental markdown fences.
+     */
+    cleaned = cleaned.replace(
+      /^```json\s*/i,
+      ""
+    );
+
+    cleaned = cleaned.replace(
+      /^```\s*/i,
+      ""
+    );
+
+    cleaned = cleaned.replace(
+      /\s*```$/i,
+      ""
+    );
+
+    cleaned = cleaned.trim();
+
+    /*
+     * If Claude accidentally adds text around
+     * the JSON, salvage the JSON object.
+     */
+    const firstBrace =
+      cleaned.indexOf("{");
+
+    const lastBrace =
+      cleaned.lastIndexOf("}");
+
+    if (
+      firstBrace !== -1 &&
+      lastBrace !== -1 &&
+      lastBrace > firstBrace
+    ) {
+      cleaned = cleaned.slice(
+        firstBrace,
+        lastBrace + 1
+      );
     }
+
+    // ---------------------------------------------------------
+    // PARSE JSON
+    // ---------------------------------------------------------
+
     let extracted;
+
     try {
-      extracted = JSON.parse(cleaned);
-    } catch (e) {
-      return NextResponse.json({ error: "Couldn't read this bill clearly enough — try retaking the photo with better lighting, holding the camera steady, and keeping the whole page in frame." }, { status: 500 });
+      extracted =
+        JSON.parse(cleaned);
+    } catch (parseError) {
+      console.error(
+        "Failed to parse Claude JSON:",
+        cleaned
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Couldn't read this bill clearly enough. Please retake the photo with better lighting, less glare, and the entire page in frame.",
+        },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ extracted });
+    // ---------------------------------------------------------
+    // NORMALISE RESPONSE
+    // ---------------------------------------------------------
+
+    /*
+     * Make sure the frontend always receives
+     * the same fields, even if Claude omitted one.
+     */
+
+    const normalised = {
+      reading_date:
+        extracted.reading_date ??
+        null,
+
+      usage:
+        extracted.usage ??
+        null,
+
+      rate:
+        extracted.rate ??
+        null,
+
+      standing_charge:
+        extracted.standing_charge ??
+        null,
+
+      total_cost:
+        extracted.total_cost ??
+        null,
+
+      provider:
+        extracted.provider ??
+        null,
+
+      supply_address:
+        extracted.supply_address ??
+        null,
+
+      account_number:
+        extracted.account_number ??
+        null,
+
+      supplier_account_number:
+        extracted.supplier_account_number ??
+        null,
+
+      fuel_type:
+        extracted.fuel_type ??
+        null,
+
+      contract_end:
+        extracted.contract_end ??
+        null,
+
+      mic_kva:
+        extracted.mic_kva ??
+        null,
+
+      dg_group:
+        extracted.dg_group ??
+        null,
+
+      spc_kwh:
+        extracted.spc_kwh ??
+        null,
+
+      rate_note:
+        extracted.rate_note ??
+        null,
+
+      confidence:
+        extracted.confidence ||
+        "medium",
+    };
+
+    // ---------------------------------------------------------
+    // BASIC DATA VALIDATION
+    // ---------------------------------------------------------
+
+    /*
+     * Prevent obviously invalid fuel types
+     * from reaching your database.
+     */
+
+    if (
+      normalised.fuel_type !==
+        "electricity" &&
+      normalised.fuel_type !==
+        "gas" &&
+      normalised.fuel_type !== null
+    ) {
+      normalised.fuel_type =
+        null;
+    }
+
+    /*
+     * Prevent invalid confidence values.
+     */
+
+    if (
+      ![
+        "high",
+        "medium",
+        "low",
+      ].includes(
+        normalised.confidence
+      )
+    ) {
+      normalised.confidence =
+        "medium";
+    }
+
+    // ---------------------------------------------------------
+    // RETURN
+    // ---------------------------------------------------------
+
+    return NextResponse.json({
+      extracted: normalised,
+    });
   } catch (err) {
-    return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 });
+    console.error(
+      "Bill extraction error:",
+      err
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          err?.message ||
+          "Something went wrong while reading the bill.",
+      },
+      { status: 500 }
+    );
   }
 }
