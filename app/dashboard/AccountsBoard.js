@@ -2344,7 +2344,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       ) : (
         <>
           {/* Clean portfolio overview: important decisions first, detail second. */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 18 }}>
             {[
               {
                 label: "Accounts",
@@ -2362,7 +2362,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {
                 label: "Potential savings",
                 value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—",
-                sub: summaryStats.hasAnyComparison ? "per year" : "No comparisons yet",
+                sub: summaryStats.hasAnyComparison
+                  ? (() => {
+                      const elec = enrichedAll.filter((a) => (a.fuel_type || "electricity") !== "gas").reduce((sum, a) => sum + (a.saving && a.saving > 20 ? a.saving : 0), 0);
+                      const gas = enrichedAll.filter((a) => a.fuel_type === "gas").reduce((sum, a) => sum + (a.saving && a.saving > 20 ? a.saving : 0), 0);
+                      return elec > 0 && gas > 0 ? `${fmtMoney(elec)} elec · ${fmtMoney(gas)} gas` : "per year";
+                    })()
+                  : "No comparisons yet",
                 accent: "var(--green)",
               },
               {
@@ -2396,7 +2402,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(300px, 0.85fr)", gap: 14, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginBottom: 20 }}>
             {/* Needs attention */}
             <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 17px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
@@ -2474,7 +2480,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                       <button key={a.id} onClick={() => jumpToAccount(a)} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderTop: "1px solid var(--border)", padding: "9px 0", cursor: "pointer", color: "var(--text)" }}>
                         <span style={{ minWidth: 0 }}>
                           <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
-                          <span style={{ display: "block", fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>{a.provider || "Supplier not set"}{a.location ? ` · ${a.location}` : ""}</span>
+                          <span style={{ display: "block", fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>{a.provider || "Supplier not set"}{a.location ? ` · ${a.location}` : ""}{a.cost != null ? ` · ${fmtMoney(a.cost)}/yr` : ""}</span>
                         </span>
                         <span style={{ color: a.daysLeft <= 30 ? "var(--red)" : "var(--amber)", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>{a.daysLeft === 0 ? "Today" : `${a.daysLeft}d`}</span>
                       </button>
@@ -2509,6 +2515,34 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               )}
             </div>
           )}
+
+          {/* Portfolio health — a compact quality check, not another KPI. */}
+          {accounts.length > 0 && (() => {
+            const healthScore = Math.round(
+              enrichedAll.reduce((sum, a) => {
+                let score = 100;
+                if (a.confidence?.missingBill) score -= 20;
+                if ((a.confidence?.score ?? 100) < 50) score -= 15;
+                else if ((a.confidence?.score ?? 100) < 80) score -= 5;
+                if (a.status === "overdue") score -= 20;
+                else if (a.status === "soon") score -= 5;
+                if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) score -= 10;
+                return sum + Math.max(0, score);
+              }, 0) / accounts.length
+            );
+            const healthColor = healthScore >= 85 ? "var(--green)" : healthScore >= 65 ? "var(--amber)" : "var(--red)";
+            const healthLabel = healthScore >= 85 ? "Healthy portfolio" : healthScore >= 65 ? "Some accounts need review" : "Action required across portfolio";
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, padding: "9px 12px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8 }} title="Portfolio health is based on bill freshness, data completeness, renewal timing and rate-change alerts.">
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>Portfolio health</span>
+                <div style={{ flex: 1, height: 6, background: "var(--border-light)", borderRadius: 99, overflow: "hidden", maxWidth: 260 }}>
+                  <div style={{ width: `${healthScore}%`, height: "100%", background: healthColor, borderRadius: 99, transition: "width 0.2s ease" }} />
+                </div>
+                <strong style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, color: healthColor }}>{healthScore}%</strong>
+                <span style={{ fontSize: 11.5, color: "var(--muted)" }}>{healthLabel}</span>
+              </div>
+            );
+          })()}
         </>
       )}
 
