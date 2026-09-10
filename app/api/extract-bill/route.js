@@ -381,22 +381,11 @@ Return null when it cannot be read confidently.
             "2023-06-01",
         },
 
-        body: JSON.stringify({
-          model: "claude-sonnet-5",
+       body: JSON.stringify({
+  model: "claude-sonnet-5",
+  max_tokens: 800,
 
-          /*
-           * 800 is plenty for the JSON response.
-           * Keeping this low helps response speed.
-           */
-          max_tokens: 800,
-
-          /*
-           * Slightly lower temperature gives
-           * more deterministic extraction.
-           */
-          temperature: 0,
-
-          messages: [
+  messages: [
             {
               role: "user",
 
