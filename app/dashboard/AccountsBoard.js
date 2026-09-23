@@ -1,3 +1,5 @@
+// Wattpryce Accounts dashboard
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -7,6 +9,7 @@ import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Penci
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
 import autoTable from "jspdf-autotable";
 import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
@@ -65,9 +68,10 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-IE");
 }
 
-function exportAccountsCSV(accounts) {
+function exportAccountsExcel(accounts) {
   const headers = [
     "Site name",
+    "Location",
     "Provider",
     "MPRN/GPRN",
     "Supplier account number",
@@ -80,41 +84,48 @@ function exportAccountsCSV(accounts) {
     "Notes",
   ];
 
-  const escapeCell = (val) => {
-    const s = val === null || val === undefined ? "" : String(val);
-    return s.includes(",") || s.includes('"') || s.includes("\n")
-      ? `"${s.replace(/"/g, '""')}"`
-      : s;
-  };
+  const rows = accounts.map((a) => [
+    a.name || "",
+    a.location || "",
+    a.provider || "",
+    a.account_number || "",
+    a.supplier_account_number || "",
+    a.fuel_type || "",
+    a.contract_end || "",
+    a.usage != null ? Number(a.usage) : "",
+    a.rate != null ? Number(a.rate) : "",
+    a.standing_charge != null ? Number(a.standing_charge) : "",
+    a.market_rate != null ? Number(a.market_rate) : "",
+    a.notes || "",
+  ]);
 
-  const rows = accounts.map((a) =>
-    [
-      a.name,
-      a.provider,
-      a.account_number,
-      a.supplier_account_number,
-      a.fuel_type,
-      a.contract_end,
-      a.usage,
-      a.rate,
-      a.standing_charge,
-      a.market_rate,
-      a.notes,
-    ]
-      .map(escapeCell)
-      .join(",")
-  );
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
-  const csv = [headers.join(","), ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `wattpryce-accounts-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Filter dropdowns on every column header, active the moment the file opens
+  const lastCol = XLSX.utils.encode_col(headers.length - 1);
+  ws["!autofilter"] = { ref: `A1:${lastCol}${rows.length + 1}` };
+
+  // Sensible column widths so nothing's cut off on first open
+  ws["!cols"] = [
+    { wch: 26 }, // Site name
+    { wch: 16 }, // Location
+    { wch: 16 }, // Provider
+    { wch: 14 }, // MPRN/GPRN
+    { wch: 18 }, // Supplier account number
+    { wch: 11 }, // Fuel type
+    { wch: 14 }, // Contract end date
+    { wch: 15 }, // Annual usage
+    { wch: 14 }, // Current rate
+    { wch: 16 }, // Standing charge
+    { wch: 18 }, // Market/quoted rate
+    { wch: 30 }, // Notes
+  ];
+
+  ws["!freeze"] = { xSplit: 0, ySplit: 1 }; // keep the header row visible while scrolling
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Accounts");
+  XLSX.writeFile(wb, `wattpryce-accounts-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 const MISSING_BILL_DAYS = 45;
@@ -2301,7 +2312,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   { icon: Mail, label: "Feed in a quote", onClick: () => router.push("/dashboard/add-quote") },
                   { icon: TrendingDown, label: "Download savings report (PDF)", onClick: () => generateSavingsReport(enrichedAll, summaryStats, companyName) },
                   ...(combinedMode ? [] : [{ icon: Upload, label: "Import accounts", onClick: () => setShowImport(true) }]),
-                  { icon: Download, label: "Export CSV", onClick: () => exportAccountsCSV(accounts) },
+                  { icon: Download, label: "Export Excel", onClick: () => exportAccountsExcel(accounts) },
                   ...(combinedMode ? [] : [{ icon: LineChartIcon, label: "Market rates", onClick: () => setShowBenchmarks(true) }]),
                   { icon: SlidersHorizontal, label: showAccountNumbers ? "Hide account numbers" : "Show account numbers", onClick: () => setShowAccountNumbers((v) => !v) },
                 ].map((item) => (
@@ -2343,206 +2354,229 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         </div>
       ) : (
         <>
-          {/* Clean portfolio overview: important decisions first, detail second. */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 18 }}>
-            {[
-              {
-                label: "Accounts",
-                value: summaryStats.total,
-                sub: "in portfolio",
-                accent: "var(--teal)",
-              },
-              {
-                label: "Need attention",
-                value: summaryStats.needAttention,
-                sub: summaryStats.criticalCount > 0 ? `${summaryStats.criticalCount} critical` : summaryStats.needAttention > 0 ? "Review required" : "Everything looks good",
-                accent: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--green)",
-                onClick: summaryStats.needAttention > 0 ? () => { setFilterStatus("__needs_attention__"); setGroupByLocation(false); } : undefined,
-              },
-              {
-                label: "Potential savings",
-                value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—",
-                sub: summaryStats.hasAnyComparison
-                  ? (() => {
-                      const elec = enrichedAll.filter((a) => (a.fuel_type || "electricity") !== "gas").reduce((sum, a) => sum + (a.saving && a.saving > 20 ? a.saving : 0), 0);
-                      const gas = enrichedAll.filter((a) => a.fuel_type === "gas").reduce((sum, a) => sum + (a.saving && a.saving > 20 ? a.saving : 0), 0);
-                      return elec > 0 && gas > 0 ? `${fmtMoney(elec)} elec · ${fmtMoney(gas)} gas` : "per year";
-                    })()
-                  : "No comparisons yet",
-                accent: "var(--green)",
-              },
-              {
-                label: "Renewals",
-                value: summaryStats.renewingSoon90,
-                sub: "next 90 days",
-                accent: summaryStats.renewingSoon90 > 0 ? "var(--amber)" : "var(--green)",
-                onClick: summaryStats.renewingSoon90 > 0 ? () => { setFilterStatus("Renewing soon"); setGroupByLocation(false); } : undefined,
-              },
-            ].map((card) => (
-              <button
-                key={card.label}
-                onClick={card.onClick}
-                disabled={!card.onClick}
-                style={{
-                  textAlign: "left",
-                  background: "var(--panel)",
-                  border: "1px solid var(--border)",
-                  borderTop: `3px solid ${card.accent}`,
-                  borderRadius: 10,
-                  padding: "14px 15px 13px",
-                  minWidth: 0,
-                  cursor: card.onClick ? "pointer" : "default",
-                  color: "var(--text)",
-                }}
-              >
-                <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, letterSpacing: 0.35, textTransform: "uppercase" }}>{card.label}</div>
-                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 25, fontWeight: 700, marginTop: 7, lineHeight: 1.05 }}>{card.value}</div>
-                <div style={{ fontSize: 11.5, color: card.accent, marginTop: 6 }}>{card.sub}</div>
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginBottom: 20 }}>
-            {/* Needs attention */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 17px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>Needs attention</div>
-                  <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 3 }}>
-                    {summaryStats.needAttention === 0 ? "No accounts currently require action." : `${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? "" : "s"} need review.`}
-                  </div>
-                </div>
-                {summaryStats.needAttention > 0 && (
+          {/* HERO — the dominant element on the page: what needs attention, why, where, what to do next */}
+          <div style={{ border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 14, padding: "20px 22px 18px", marginBottom: 16, background: "var(--panel)" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 4 }}>
+              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 44, fontWeight: 700, lineHeight: 1, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
+                {summaryStats.needAttention}
+              </span>
+              <span style={{ fontSize: 18, color: "var(--text)" }}>
+                account{summaryStats.needAttention === 1 ? "" : "s"} need{summaryStats.needAttention === 1 ? "s" : ""} attention
+              </span>
+            </div>
+            {summaryStats.needAttention > 0 && (
+              <div style={{ display: "flex", gap: 16, fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
+                {summaryStats.criticalCount > 0 && (
                   <button
-                    onClick={() => { setFilterStatus("__needs_attention__"); setGroupByLocation(false); }}
-                    style={{ background: "none", border: "none", color: "var(--teal)", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}
+                    onClick={() => { setFilterStatus("Action needed"); setGroupByLocation(false); }}
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--red)", cursor: "pointer" }}
                   >
-                    View all →
+                    {summaryStats.criticalCount} critical
+                  </button>
+                )}
+                {summaryStats.reviewCount > 0 && (
+                  <button
+                    onClick={() => { setFilterStatus("__needs_review_only__"); setGroupByLocation(false); }}
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--amber)", cursor: "pointer" }}
+                  >
+                    {summaryStats.reviewCount} to review
                   </button>
                 )}
               </div>
+            )}
 
-              {attentionGroups.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {attentionGroups.slice(0, 5).map((group) => {
+            {attentionGroups.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 4 }}>
+                  WHY — {attentionItems.length} issue{attentionItems.length === 1 ? "" : "s"} across {summaryStats.needAttention} account{summaryStats.needAttention === 1 ? "" : "s"}
+                  {attentionItems.length !== summaryStats.needAttention ? " (some accounts have more than one issue)" : ""}
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {attentionGroups.map((group) => {
                     const key = `${group.color}::${group.groupLabel}`;
                     const isExpanded = expandedAttentionGroups.has(key);
                     return (
                       <div key={key}>
                         <button
-                          onClick={() => group.items.length === 1 ? jumpToAccount(group.items[0].account) : setExpandedAttentionGroups((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(key)) next.delete(key); else next.add(key);
-                            return next;
-                          })}
-                          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "var(--bg)", border: "1px solid var(--border)", borderLeft: `3px solid ${group.color}`, borderRadius: 7, padding: "9px 11px", color: "var(--text)", cursor: "pointer" }}
+                          onClick={() =>
+                            group.items.length === 1
+                              ? jumpToAccount(group.items[0].account)
+                              : setExpandedAttentionGroups((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(key)) next.delete(key);
+                                  else next.add(key);
+                                  return next;
+                                })
+                          }
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            background: "var(--bg)",
+                            border: "1px solid var(--border)",
+                            borderLeft: `3px solid ${group.color}`,
+                            borderRadius: 8,
+                            padding: "10px 14px",
+                            cursor: "pointer",
+                            textAlign: "left",
+                            width: "100%",
+                          }}
                         >
-                          <strong style={{ fontSize: 13, minWidth: 20 }}>{group.items.length}</strong>
-                          <span style={{ fontSize: 12.5 }}>{group.groupLabel}</span>
-                          <span style={{ marginLeft: "auto", color: group.color, fontSize: 11.5, fontWeight: 700 }}>{group.items.length === 1 ? "Open →" : isExpanded ? "Hide" : "Open →"}</span>
+                          <strong style={{ color: "var(--text)", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{group.items.length}</strong>
+                          <span style={{ fontSize: 13, color: "var(--text)" }}>{group.groupLabel}</span>
+                          <span style={{ marginLeft: "auto", color: group.color, fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
+                            {group.items.length === 1 ? "Review →" : isExpanded ? "Hide" : "Review →"}
+                          </span>
                         </button>
                         {isExpanded && group.items.length > 1 && (
-                          <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, margin: "5px 0 0 17px", paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
-                            {group.items.slice(0, 5).map((item) => (
-                              <button key={item.id} onClick={() => jumpToAccount(item.account)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 11.5, color: "var(--muted)" }}>
-                                {item.account.name}{item.detail ? ` · ${item.detail}` : ""}
+                          <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6, marginLeft: 16, paddingLeft: 10, borderLeft: "1px solid var(--border)" }}>
+                            {group.items.slice(0, 6).map((item) => (
+                              <button
+                                key={item.id}
+                                onClick={() => jumpToAccount(item.account)}
+                                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontSize: 12, color: "var(--muted)" }}
+                              >
+                                {item.account.name}
+                                {item.detail ? ` (${item.detail})` : ""}
                               </button>
                             ))}
-                            {group.items.length > 5 && <span style={{ fontSize: 11, color: "var(--muted)" }}>+ {group.items.length - 5} more</span>}
+                            {group.items.length > 6 && (
+                              <span style={{ fontSize: 11.5, color: "var(--muted)", opacity: 0.75 }}>
+                                + {group.items.length - 6} more — use search or Filters below
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
                     );
                   })}
-                  {attentionGroups.length > 5 && <div style={{ fontSize: 11.5, color: "var(--muted)", paddingTop: 3 }}>+ {attentionGroups.length - 5} other issue types — use Filters below to see everything.</div>}
                 </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 12px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 7, color: "var(--green)", fontSize: 12.5 }}>
-                  <span style={{ fontSize: 16 }}>✓</span> No urgent account issues detected.
-                </div>
-              )}
-            </div>
-
-            {/* Upcoming renewals */}
-            <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 17px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>Upcoming renewals</div>
-                  <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 3 }}>Next 90 days</div>
-                </div>
-                {summaryStats.renewingSoon90 > 0 && <button onClick={() => { setFilterStatus("Renewing soon"); setGroupByLocation(false); }} style={{ background: "none", border: "none", color: "var(--teal)", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>View all →</button>}
               </div>
-              {(() => {
-                const renewals = enrichedAll.filter((a) => a.daysLeft !== null && a.daysLeft >= 0 && a.daysLeft <= 90).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5);
-                return renewals.length > 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    {renewals.map((a) => (
-                      <button key={a.id} onClick={() => jumpToAccount(a)} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderTop: "1px solid var(--border)", padding: "9px 0", cursor: "pointer", color: "var(--text)" }}>
-                        <span style={{ minWidth: 0 }}>
-                          <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
-                          <span style={{ display: "block", fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>{a.provider || "Supplier not set"}{a.location ? ` · ${a.location}` : ""}{a.cost != null ? ` · ${fmtMoney(a.cost)}/yr` : ""}</span>
-                        </span>
-                        <span style={{ color: a.daysLeft <= 30 ? "var(--red)" : "var(--amber)", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>{a.daysLeft === 0 ? "Today" : `${a.daysLeft}d`}</span>
+            )}
+
+            {(() => {
+              const locAttention = [...new Set(accounts.map((a) => a.location).filter(Boolean))]
+                .map((loc) => {
+                  const locAccts = enrichedAll.filter((a) => a.location === loc);
+                  const count = locAccts.filter((a) => {
+                    const c = overallStatusFor(a).color;
+                    return c === "var(--red)" || c === "var(--amber)";
+                  }).length;
+                  return { loc, count, total: locAccts.length };
+                })
+                .sort((a, b) => b.count - a.count || a.loc.localeCompare(b.loc, undefined, { numeric: true }));
+              if (locAttention.length === 0) return null;
+              return (
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>WHERE</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                    {locAttention.map(({ loc, count, total }) => (
+                      <button
+                        key={loc}
+                        onClick={() => router.push(`/dashboard/locations/${encodeURIComponent(loc)}`)}
+                        style={{
+                          background: "var(--bg)",
+                          border: `1px solid ${count > 0 ? (count / total >= 0.5 ? "var(--red)" : "var(--amber)") : "var(--border)"}`,
+                          borderRadius: 999,
+                          padding: "7px 14px",
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          color: count > 0 ? (count / total >= 0.5 ? "var(--red)" : "var(--amber)") : "var(--green)",
+                        }}
+                      >
+                        {loc} — {count > 0 ? `${count}/${total} need attention` : `${total} accounts · 0 requiring action`}
                       </button>
                     ))}
                   </div>
-                ) : (
-                  <div style={{ padding: "15px 0 5px", fontSize: 12, color: "var(--muted)" }}>No renewals due in the next 90 days.</div>
-                );
-              })()}
-            </div>
+                </div>
+              );
+            })()}
+
+            <button
+              onClick={() => router.push(summaryStats.criticalCount > 0 ? "/dashboard/attention?filter=critical" : "/dashboard/attention")}
+              disabled={summaryStats.needAttention === 0}
+              style={{
+                background: summaryStats.needAttention > 0 ? "var(--teal)" : "var(--border)",
+                color: "#06201d",
+                border: "none",
+                borderRadius: 8,
+                padding: "11px 20px",
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor: summaryStats.needAttention > 0 ? "pointer" : "default",
+              }}
+            >
+              {summaryStats.criticalCount > 0
+                ? `Review ${summaryStats.criticalCount} critical account${summaryStats.criticalCount === 1 ? "" : "s"} →`
+                : summaryStats.needAttention > 0
+                ? "Review accounts →"
+                : "Nothing needs attention right now"}
+            </button>
           </div>
 
-          {summaryStats.hasAnyCost && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, fontSize: 11.5, color: "var(--muted)" }}>
-              <span><strong style={{ color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</strong> estimated annual spend</span>
-              <span style={{ color: "var(--border-light)" }}>•</span>
+          {/* Supporting stats — deliberately smaller than the hero above */}
+          <div style={{ display: "flex", gap: 24, marginBottom: 24, flexWrap: "wrap", fontSize: 12.5, color: "var(--muted)" }}>
+            <span>
+              <strong style={{ color: "var(--text)" }}>{accounts.length}</strong> total accounts
+            </span>
+            <span style={{ position: "relative" }}>
               <button
-                onClick={() => setSpendBreakdownOpen((v) => !v)}
-                style={{ background: "none", border: "none", padding: 0, color: "var(--muted)", cursor: "pointer", textDecoration: "underline dotted", fontSize: 11.5 }}
+                onClick={() => (summaryStats.hasAnyCost || summaryStats.partialBillCount > 0) && setSpendBreakdownOpen((v) => !v)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  font: "inherit",
+                  color: "var(--muted)",
+                  cursor: summaryStats.hasAnyCost || summaryStats.partialBillCount > 0 ? "pointer" : "default",
+                  textDecoration: summaryStats.hasAnyCost || summaryStats.partialBillCount > 0 ? "underline dotted" : "none",
+                }}
               >
-                How is this calculated?
+                {summaryStats.hasAnyCost ? (
+                  <>
+                    <strong style={{ color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</strong> est. annual spend
+                  </>
+                ) : summaryStats.partialBillCount > 0 ? (
+                  "Needs more data"
+                ) : (
+                  "No bill data yet"
+                )}
               </button>
-              {spendBreakdownOpen && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 24 }} onClick={() => setSpendBreakdownOpen(false)}>
-                  <div onClick={(e) => e.stopPropagation()} className="wp-soft-in" style={{ position: "absolute", left: 22, top: 150, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 10, padding: 14, width: 260, textAlign: "left", boxShadow: "0 12px 30px rgba(0,0,0,0.25)" }}>
+              {spendBreakdownOpen && (summaryStats.hasAnyCost || summaryStats.partialBillCount > 0) && (
+                <>
+                  <div onClick={() => setSpendBreakdownOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 24 }} />
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="wp-soft-in"
+                    style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 10, padding: 14, zIndex: 25, width: 260, textAlign: "left" }}
+                  >
                     <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>HOW THIS IS CALCULATED</p>
-                    {summaryStats.realBillCount > 0 && <div style={{ fontSize: 12, color: "var(--text)", marginBottom: 6 }}><strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} included using 5+ real bills.</div>}
-                    {summaryStats.partialBillCount > 0 && <div style={{ fontSize: 12, color: "var(--text)", marginBottom: 6 }}><strong>{summaryStats.partialBillCount}</strong> account{summaryStats.partialBillCount === 1 ? "" : "s"} have bill history but not enough bills for the estimate.</div>}
-                    {summaryStats.noCostCount > 0 && <div style={{ fontSize: 12, color: "var(--muted)" }}><strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} have no bill data.</div>}
+                    {summaryStats.realBillCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                        <strong>{summaryStats.realBillCount}</strong> account{summaryStats.realBillCount === 1 ? "" : "s"} — 5+ real bills on file, included in the estimate
+                      </div>
+                    )}
+                    {summaryStats.partialBillCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--text)", marginBottom: 6 }}>
+                        <strong>{summaryStats.partialBillCount}</strong> account{summaryStats.partialBillCount === 1 ? "" : "s"} — has bill history, but fewer than 5 bills isn't enough to reliably estimate a full year yet
+                      </div>
+                    )}
+                    {summaryStats.noCostCount > 0 && (
+                      <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                        <strong>{summaryStats.noCostCount}</strong> account{summaryStats.noCostCount === 1 ? "" : "s"} — no bills uploaded yet
+                      </div>
+                    )}
                   </div>
-                </div>
+                </>
               )}
-            </div>
-          )}
-
-          {/* Portfolio health — a compact quality check, not another KPI. */}
-          {accounts.length > 0 && (() => {
-            const healthScore = Math.round(
-              enrichedAll.reduce((sum, a) => {
-                let score = 100;
-                if (a.confidence?.missingBill) score -= 20;
-                if ((a.confidence?.score ?? 100) < 50) score -= 15;
-                else if ((a.confidence?.score ?? 100) < 80) score -= 5;
-                if (a.status === "overdue") score -= 20;
-                else if (a.status === "soon") score -= 5;
-                if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) score -= 10;
-                return sum + Math.max(0, score);
-              }, 0) / accounts.length
-            );
-            const healthColor = healthScore >= 85 ? "var(--green)" : healthScore >= 65 ? "var(--amber)" : "var(--red)";
-            const healthLabel = healthScore >= 85 ? "Healthy portfolio" : healthScore >= 65 ? "Some accounts need review" : "Action required across portfolio";
-            return (
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, padding: "9px 12px", background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8 }} title="Portfolio health is based on bill freshness, data completeness, renewal timing and rate-change alerts.">
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.4 }}>Portfolio health</span>
-                <div style={{ flex: 1, height: 6, background: "var(--border-light)", borderRadius: 99, overflow: "hidden", maxWidth: 260 }}>
-                  <div style={{ width: `${healthScore}%`, height: "100%", background: healthColor, borderRadius: 99, transition: "width 0.2s ease" }} />
-                </div>
-                <strong style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, color: healthColor }}>{healthScore}%</strong>
-                <span style={{ fontSize: 11.5, color: "var(--muted)" }}>{healthLabel}</span>
-              </div>
-            );
-          })()}
+            </span>
+            {summaryStats.hasAnyComparison && (
+              <span>
+                <strong style={{ color: "var(--green)" }}>{fmtMoney(summaryStats.potentialSavings)}</strong> potential savings/yr
+              </span>
+            )}
+          </div>
         </>
       )}
 
