@@ -2208,6 +2208,35 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     return c;
   }, [accounts]);
 
+  const utilitySpend = useMemo(() => {
+    const groups = { electricity: 0, gas: 0 };
+    enrichedAll.forEach((account) => {
+      const fuel = account.fuel_type === "gas" ? "gas" : "electricity";
+      if (account.cost != null) groups[fuel] += account.cost;
+    });
+    return groups;
+  }, [enrichedAll]);
+
+  const billUsageTrend = useMemo(() => {
+    const months = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date();
+      date.setDate(1);
+      date.setMonth(date.getMonth() - (5 - index));
+      return { key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`, label: date.toLocaleDateString("en-IE", { month: "short" }), usage: 0 };
+    });
+    const monthMap = Object.fromEntries(months.map((month) => [month.key, month]));
+    Object.values(readingSummaries).flat().forEach((reading) => {
+      if (!reading.reading_date || reading.usage == null) return;
+      const date = new Date(`${reading.reading_date}T00:00:00`);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      if (monthMap[key]) monthMap[key].usage += Number(reading.usage) || 0;
+    });
+    return months;
+  }, [readingSummaries]);
+
+  const comparisonCount = enrichedAll.filter((account) => account.comparison).length;
+  const spendTotal = utilitySpend.electricity + utilitySpend.gas;
+
   if (loading) {
     return <div style={{ color: "var(--muted)", padding: 40 }}>Loading accounts…</div>;
   }
@@ -2345,6 +2374,28 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           </div>
         </div>
       </div>
+
+      {section === "overview" && !lockedLocation && (
+        <section className="gn-overview" aria-label="Portfolio overview">
+          <div className="gn-kpis">
+            <article className="gn-kpi"><span>Annual utility spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></article>
+            <article className="gn-kpi gn-kpi-highlight"><span>Potential savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Across compared rates" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></article>
+            <article className="gn-kpi"><span>Active contracts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></article>
+            <article className="gn-kpi"><span>Rate opportunities</span><strong>{comparisonCount}</strong><small>Accounts with market comparisons</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></article>
+          </div>
+          <div className="gn-insight-grid">
+            <article className="gn-card">
+              <div className="gn-card-heading"><div><h2>Spend by utility</h2><p>Based on available account estimates</p></div><span className="gn-card-menu">Annual</span></div>
+              {spendTotal > 0 ? <div className="gn-donut-row"><div className="gn-donut" style={{ "--electric-share": `${Math.round((utilitySpend.electricity / spendTotal) * 100)}%` }}><b>{fmtMoney(spendTotal)}</b></div><div className="gn-legend"><span><i className="gn-dot electric"/> Electricity <b>{Math.round((utilitySpend.electricity / spendTotal) * 100)}%</b></span><span><i className="gn-dot gas"/> Gas <b>{Math.round((utilitySpend.gas / spendTotal) * 100)}%</b></span></div></div> : <div className="gn-empty-chart">Add bill readings and account usage to build your spend breakdown.</div>}
+            </article>
+            <article className="gn-card">
+              <div className="gn-card-heading"><div><h2>Recorded usage</h2><p>Monthly usage from uploaded bills · kWh</p></div><span className="gn-card-menu">6 months</span></div>
+              {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString()} kWh`}><div className="gn-bar-track"><i style={{ height: `${Math.max(5, (month.usage / max) * 100)}%` }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
+            </article>
+          </div>
+          <div className="gn-overview-foot"><span><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need a review` : "Your portfolio is up to date"}</span><Link href="/dashboard?section=accounts">View all accounts <span aria-hidden="true">→</span></Link></div>
+        </section>
+      )}
 
       {lockedLocation ? (
         <div style={{ marginBottom: 22 }}>
