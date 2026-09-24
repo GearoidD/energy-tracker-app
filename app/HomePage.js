@@ -2,251 +2,78 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  Zap,
-  Upload,
-  ShieldCheck,
-  TrendingDown,
-  Users,
-  ArrowRight,
-  Flame,
-} from "lucide-react";
+import { Activity, ArrowDownRight, ArrowRight, BarChart3, Building2, Check, ChevronDown, CircleDollarSign, FileText, Flame, Leaf, Menu, ShieldCheck, Users, Zap } from "lucide-react";
 
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');`;
+function IrelandScene() {
+  return <svg className="home-ireland-scene" viewBox="0 0 900 430" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#bde8f2"/><stop offset=".58" stopColor="#f8e9d1"/><stop offset="1" stopColor="#e4c29a"/></linearGradient>
+      <linearGradient id="hill" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#3d7564"/><stop offset="1" stopColor="#183f36"/></linearGradient>
+    </defs>
+    <rect width="900" height="430" fill="url(#sky)"/>
+    <circle cx="695" cy="93" r="38" fill="#fff4dc" opacity=".8"/>
+    <path d="M0 250Q180 195 350 238T680 215T900 233V430H0Z" fill="#6b9a80" opacity=".65"/>
+    <path d="M0 280Q130 230 290 269T590 245T900 264V430H0Z" fill="url(#hill)"/>
+    <g fill="#f6f0e5" stroke="#21453d" strokeWidth="4">
+      <path d="M30 265h78v95H30zM122 246h80v114h-80zM222 267h80v93h-80zM320 236h91v124h-91zM432 255h73v105h-73zM527 230h83v130h-83zM628 256h79v104h-79zM724 236h86v124h-86zM826 260h74v100h-74z"/>
+    </g>
+    <g fill="#a4583e"><path d="m21 267 48-43 49 43zM112 248l50-44 51 44zM212 270l50-42 50 42zM310 239l56-47 56 47zM422 257l46-39 47 39zM517 232l52-46 52 46zM618 258l49-41 50 41zM714 238l53-45 53 45zM816 263l46-39 47 39z"/></g>
+    <path d="M674 226V72l13-32 13 32v154M667 78h39M680 106h16M680 137h16M680 168h16" fill="#23433d" stroke="#23433d" strokeWidth="6"/>
+    <g fill="#f8dcae"><rect x="47" y="289" width="10" height="15"/><rect x="80" y="289" width="10" height="15"/><rect x="144" y="273" width="11" height="17"/><rect x="177" y="273" width="11" height="17"/><rect x="342" y="262" width="12" height="17"/><rect x="380" y="262" width="12" height="17"/><rect x="551" y="258" width="12" height="17"/><rect x="588" y="258" width="12" height="17"/></g>
+    <path d="M0 361q180-25 360 0t540-4v73H0z" fill="#123d31" opacity=".45"/>
+  </svg>;
+}
 
-import { HeroCard } from "./AuthHero";
+function PortalPreview() {
+  return <div className="home-preview-wrap">
+    <div className="home-preview-caption"><span className="home-preview-live"/> SAMPLE CLIENT PORTAL</div>
+    <div className="home-preview">
+      <aside className="home-preview-side"><b><Zap size={15}/> Gnó<span>Rate</span></b>{[[BarChart3,"Dashboard"],[Building2,"Accounts"],[Zap,"Rates"],[Activity,"Usage"],[CircleDollarSign,"Savings"],[FileText,"Reports"]].map(([Icon,label],i)=><span key={label} className={i===0?"selected":""}><Icon size={12}/>{label}</span>)}<small>Illustrative preview</small></aside>
+      <div className="home-preview-main"><div className="home-preview-top"><div><small>YOUR PORTFOLIO</small><h3>Dashboard</h3></div><span>Last 12 months <ChevronDown size={12}/></span></div>
+        <div className="home-preview-metrics">{[["Annual spend","€482,320"],["Potential savings","€64,800"],["Active accounts","12"],["Rate opportunities","5"]].map(([label,value],i)=><div key={label}><small>{label}</small><b className={i===1?"positive":""}>{value}</b><em>{i===1?<><ArrowDownRight size={11}/> Opportunity</>:i===2?"2 renewing soon":"Portfolio view"}</em></div>)}</div>
+        <div className="home-preview-charts"><div className="home-preview-chart"><b>Spend by utility</b><div className="home-donut"><span>€482k</span></div><small><i/> Electricity <i className="gas-dot"/> Gas</small></div><div className="home-preview-chart"><b>Monthly usage</b><div className="home-bars">{[30,44,38,58,49,69,54,82,63,76,58,91].map((h,i)=><i key={i} style={{height:`${h}%`}}/>)}</div><small>Recorded account usage</small></div></div>
+      </div>
+    </div>
+  </div>;
+}
 
-const sectionStyle = { maxWidth: 1080, margin: "0 auto", padding: "0 24px" };
+const featureCards = [
+  { icon: BarChart3, title: "Compare rates", text: "See current account rates beside available market opportunities." },
+  { icon: FileText, title: "Manage contracts", text: "Keep suppliers, bills and contract end dates together." },
+  { icon: Activity, title: "Track usage", text: "Bring readings into one clear view across your locations." },
+  { icon: CircleDollarSign, title: "Identify savings", text: "Find accounts where the available comparisons suggest a better option." },
+];
 
 export default function HomePage() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  return <main className="gn-home">
+    <header className="home-nav"><div className="home-nav-inner">
+      <Link href="/" className="home-brand"><span><Zap size={20}/></span><b>Gnó<span>Rate</span></b></Link>
+      <nav className="home-nav-links"><a href="#platform">Product</a><a href="#solutions">Solutions</a><a href="#utilities">Utilities</a><a href="#how-it-works">Resources</a><a href="#about">About</a></nav>
+      <div className="home-nav-actions"><Link className="home-login" href="/login">Client login</Link><Link className="home-button small" href="/signup">Get started <ArrowRight size={14}/></Link></div>
+      <button className="home-mobile-toggle" aria-label="Toggle navigation" onClick={()=>setMobileOpen(v=>!v)}><Menu size={21}/></button>
+    </div>{mobileOpen&&<nav className="home-mobile-menu"><a href="#platform" onClick={()=>setMobileOpen(false)}>Product</a><a href="#solutions" onClick={()=>setMobileOpen(false)}>Solutions</a><a href="#utilities" onClick={()=>setMobileOpen(false)}>Utilities</a><a href="#how-it-works" onClick={()=>setMobileOpen(false)}>How it works</a><Link href="/login">Client login</Link><Link href="/signup">Get started →</Link></nav>}</header>
 
-  const features = [
-    {
-      icon: Upload,
-      title: "Upload a bill, done",
-      body: "Snap a photo or drop in a PDF. It reads the rate, usage, MPRN/GPRN, and contract date for you — no typing.",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Know what to trust",
-      body: "Every account carries a data confidence score, so a stale or shaky reading never hides behind a green light.",
-    },
-    {
-      icon: TrendingDown,
-      title: "Market rate, tariff-aware",
-      body: "Pulls a live comparison that actually accounts for MIC, and Irish gas tariff bands like SBU/MBU/FVT — not a flat guess.",
-    },
-    {
-      icon: Users,
-      title: "Built for a team",
-      body: "Invite teammates with a link, set who's admin, and everyone sees the same renewal picture.",
-    },
-  ];
+    <section className="home-hero" id="platform"><div className="home-hero-scene"><IrelandScene/></div><div className="home-hero-wash"/><div className="home-wrap home-hero-inner">
+      <div className="home-hero-copy"><div className="home-eyebrow"><span/> COMMERCIAL UTILITY INTELLIGENCE</div><h1>Irish by name.<br/><em>Built for business.</em></h1><p>GnóRate helps Irish businesses track, compare and manage electricity and gas contracts — all in one intelligent platform.</p><div className="home-hero-actions"><Link className="home-button" href="/signup">Get started <ArrowRight size={16}/></Link><a className="home-button secondary" href="#how-it-works">See how it works <span className="play-icon">▶</span></a></div>
+        <div className="home-proof-points"><span><Check size={14}/> Business accounts</span><span><Check size={14}/> Irish tariff aware</span><span><Check size={14}/> Team ready</span></div>
+      </div><PortalPreview/>
+    </div><div className="home-hero-curve"/></section>
 
-  const steps = [
-    { n: "01", title: "Add your accounts", body: "Enter them once, or upload a bill and let it create the account for you." },
-    { n: "02", title: "It watches the dates", body: "Every account is scored and sorted — the ones that need attention rise to the top automatically." },
-    { n: "03", title: "Act with a real number", body: "See your current rate against the market before you renew, not after." },
-  ];
+    <section className="home-capabilities" aria-label="GnóRate capabilities"><div className="home-wrap home-capability-grid">{featureCards.map(({icon:Icon,title,text})=><article key={title}><span><Icon size={22}/></span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></section>
 
-  return (
-    <div style={{ background: "#ffffff", minHeight: "100vh", color: "#16342b", fontFamily: "DM Sans, sans-serif" }}>
-      <style dangerouslySetInnerHTML={{ __html: FONT_IMPORT }} />
-      <style dangerouslySetInnerHTML={{ __html: `
-        .wp-nav-link { color: #71847b; text-decoration: none; font-size: 14px; transition: color 0.15s ease; }
-        .wp-nav-link:hover { color: #16342b; }
-        .wp-cta { transition: transform 0.15s ease, opacity 0.15s ease; }
-        .wp-cta:hover { opacity: 0.9; }
-        .wp-feature-card { transition: border-color 0.2s ease, transform 0.2s ease; }
-        .wp-feature-card:hover { border-color: #08784e55; transform: translateY(-2px); }
-        @media (max-width: 720px) {
-          .wp-hero-grid { grid-template-columns: 1fr !important; }
-          .wp-hero-card-wrap { justify-content: flex-start !important; margin-top: 32px; }
-          .wp-desktop-nav { display: none !important; }
-          .wp-mobile-toggle { display: flex !important; }
-        }
-      ` }} />
+    <section className="home-proof-band" id="about"><div className="home-wrap proof-inner"><div className="proof-map" aria-hidden="true"><svg viewBox="0 0 170 205"><path d="M88 7 68 17l-2 17-17 9-4 20-16 14 5 20-14 18 10 15-4 18 17 13 6 20 23 13 22-10 9-18 19-7 7-19 14-14-5-19 9-16-9-19 4-17-14-14-1-21-17-10-4-17-15-5Z" fill="#087d61" stroke="#1cc69b" strokeWidth="2"/><path d="m37 77 67-31m-78 62 90-57m-75 89 81-66m-62 88 70-68M55 45l7 98m20-122 8 135m22-114-3 108m20-84-12 60" stroke="#36b897" strokeWidth="1" opacity=".55"/></svg></div><div className="proof-copy"><div className="home-eyebrow light"><span/> ROOTED IN IRELAND. BUILT FOR BUSINESS.</div><h2>Smarter utility decisions<br/>for <em>Irish businesses.</em></h2><p>Bring energy accounts, contract dates and rate comparisons into one shared workspace.</p><div className="proof-metrics"><div><Users size={25}/><b>One view</b><span>Across your business accounts</span></div><div><Zap size={25}/><b>Electricity + gas</b><span>Commercial utility tracking</span></div><div><ShieldCheck size={25}/><b>More control</b><span>Confident renewal planning</span></div><div><TrendingDownIcon/><b>Find opportunities</b><span>From available comparisons</span></div></div></div></div></section>
 
-      {/* Nav */}
-      <header style={{ borderBottom: "1px solid #dce6df", position: "sticky", top: 0, background: "#ffffffcc", backdropFilter: "blur(8px)", zIndex: 20 }}>
-        <div style={{ ...sectionStyle, display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: 10, color: "#fff", background: "linear-gradient(145deg,#159566,#08784e)", boxShadow: "0 4px 10px #08784e25" }}><Zap size={19} /></span>
-            <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 16 }}>
-              <span style={{ color: "#08784e" }}>GnóRate</span>
-            </span>
-          </div>
-          <nav className="wp-desktop-nav" style={{ display: "flex", alignItems: "center", gap: 28 }}>
-            <a href="#how-it-works" className="wp-nav-link">How it works</a>
-            <a href="#features" className="wp-nav-link">Features</a>
-            <Link href="/login" className="wp-nav-link">Client login</Link>
-            <Link
-              href="/signup"
-              className="wp-cta"
-              style={{ background: "#08784e", color: "#ffffff", fontWeight: 600, fontSize: 13.5, padding: "9px 16px", borderRadius: 7, textDecoration: "none" }}
-            >
-              Get started
-            </Link>
-          </nav>
-          <button
-            className="wp-mobile-toggle"
-            onClick={() => setMobileOpen((v) => !v)}
-            style={{ display: "none", background: "none", border: "1px solid #dce6df", borderRadius: 6, padding: 8, color: "#16342b", cursor: "pointer" }}
-          >
-            <div style={{ width: 16, height: 1.5, background: "currentColor", marginBottom: 4 }} />
-            <div style={{ width: 16, height: 1.5, background: "currentColor" }} />
-          </button>
-        </div>
-        {mobileOpen && (
-          <div style={{ borderTop: "1px solid #dce6df", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-            <a href="#how-it-works" className="wp-nav-link" onClick={() => setMobileOpen(false)}>How it works</a>
-            <a href="#features" className="wp-nav-link" onClick={() => setMobileOpen(false)}>Features</a>
-            <Link href="/login" className="wp-nav-link">Client login</Link>
-            <Link href="/signup" style={{ color: "#08784e", fontWeight: 600, fontSize: 14 }}>Get started →</Link>
-          </div>
-        )}
-      </header>
+    <section className="home-visibility" id="utilities"><div className="home-wrap visibility-grid"><div><div className="home-eyebrow"><span/> ONE PLATFORM. CLEARER OVERSIGHT.</div><h2>Complete visibility across your <em>utility contracts.</em></h2><p>Centralise electricity and gas accounts, compare rates, monitor usage and keep upcoming renewals in view.</p><div className="utility-list"><div><Zap size={19}/> Electricity</div><div><Flame size={19}/> Gas</div></div><Link className="text-link" href="/signup">Explore the client portal <ArrowRight size={15}/></Link></div><div className="visibility-art"><div className="office-building"><i/><i/><i/><i/><i/><i/><i/><i/><i/></div><div className="floating-note"><span><Zap size={15}/></span><b>Better visibility.<br/>Stronger decisions.</b><small>Keep rates, usage and renewals close at hand.</small></div></div></div></section>
 
-      {/* Hero */}
-      <section style={{ maxWidth: "none", margin: 0, padding: "88px max(calc((100% - 1080px)/2 + 24px), 24px) 96px", color: "#fff", background: "radial-gradient(ellipse at 78% 18%,#247954 0,transparent 33%),linear-gradient(115deg,#103b2d 0%,#124b35 62%,#0b382a 100%)", position: "relative", overflow: "hidden" }}>
-        <div className="wp-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 48, alignItems: "center" }}>
-          <div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, color: "#d7eee0", border: "1px solid #ffffff32", borderRadius: 20, padding: "7px 12px", marginBottom: 22, background: "#ffffff0d" }}>
-              <Zap size={12} color="#73d5a5" /> Built for Irish business energy
-            </div>
-            <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: "clamp(38px, 5.5vw, 62px)", fontWeight: 800, lineHeight: 1.04, letterSpacing: "-1.8px", margin: "0 0 20px", maxWidth: 620 }}>
-              Make every energy contract work harder.
-            </h1>
-            <p style={{ fontSize: 16, lineHeight: 1.7, color: "#d0e2d7", maxWidth: 490, margin: "0 0 30px" }}>
-              One clear view of your sites, bills, usage and renewal dates. GnóRate helps your team find better options before a contract rolls over.
-            </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-              <Link
-                href="/signup"
-                className="wp-cta"
-                style={{ background: "#57ca8c", color: "#103b2d", fontWeight: 800, fontSize: 14, padding: "14px 20px", borderRadius: 8, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 8px 22px #061f1533" }}
-              >
-                Get started free <ArrowRight size={16} />
-              </Link>
-              <Link href="/login" className="wp-nav-link" style={{ fontSize: 14, color: "#e2f1e7", fontWeight: 600 }}>
-                Log in
-              </Link>
-            </div>
-            <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 34, color: "#b5d2c1", fontSize: 10.5, fontWeight: 600 }}>
-              <span>Electricity &amp; gas</span><span>Multi-site portfolios</span><span>Built around Irish tariffs</span>
-            </div>
-          </div>
-          <div className="wp-hero-card-wrap" style={{ display: "flex", justifyContent: "flex-end" }}>
-            <div style={{ width: 390, maxWidth: "100%", padding: 15, border: "1px solid #ffffff26", borderRadius: 17, background: "#ffffff0d", boxShadow: "0 32px 80px #061f1540", backdropFilter: "blur(10px)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 4px 13px", color: "#d7eee0", fontSize: 9, fontWeight: 800, letterSpacing: 1.1 }}><span>CLIENT PORTAL PREVIEW</span><span style={{ width: 7, height: 7, borderRadius: 8, background: "#65d69c" }} /></div>
-              <HeroCard />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginTop: 10 }}>
-                {[ ["ACCOUNTS TRACKED", "12 sites"], ["NEXT RENEWAL", "62 days"] ].map(([label, value]) => <div key={label} style={{ padding: "11px 12px", border: "1px solid #ffffff20", borderRadius: 8, background: "#ffffff0c" }}><div style={{ color: "#b5d2c1", fontSize: 8, letterSpacing: .8, marginBottom: 5 }}>{label}</div><strong style={{ color: "#fff", font: "700 12px Manrope,sans-serif" }}>{value}</strong></div>)}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+    <section className="home-sustainability" id="solutions"><div className="home-wrap sustainability-grid"><div className="coast-art"><div className="coast-sun"/><div className="coast-cliff cliff-a"/><div className="coast-cliff cliff-b"/><div className="coast-stats"><Leaf size={21}/><b>Better choices, backed by data</b><small>See account trends and opportunities in one place.</small></div></div><div className="sustainability-copy"><div className="home-eyebrow"><span/> A MORE INFORMED APPROACH</div><h2>Lower costs today.<br/><em>Better decisions tomorrow.</em></h2><p>Use clear account data to plan renewals, review rates and make informed utility decisions for your business.</p><ul><li><Check size={17}/> Identify rate opportunities</li><li><Check size={17}/> Keep renewals on your radar</li><li><Check size={17}/> Review usage across accounts</li><li><Check size={17}/> Make decisions with better data</li></ul></div></div></section>
 
-      {/* How it works */}
-      <section id="how-it-works" style={{ ...sectionStyle, padding: "72px 24px", borderTop: "1px solid #dce6df" }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: "#08784e", letterSpacing: 1, marginBottom: 10 }}>HOW IT WORKS</p>
-        <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 700, margin: "0 0 44px", maxWidth: 520 }}>
-          Three steps, then it runs itself.
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 32 }}>
-          {steps.map((s) => (
-            <div key={s.n}>
-              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: "#71847b", marginBottom: 10 }}>{s.n}</div>
-              <h3 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 8px" }}>{s.title}</h3>
-              <p style={{ fontSize: 14, color: "#71847b", lineHeight: 1.6, margin: 0 }}>{s.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <section className="home-how" id="how-it-works"><div className="home-wrap"><div className="home-eyebrow center"><span/> HOW IT WORKS</div><h2>Simple, powerful, effective.</h2><div className="home-steps">{[["01","Connect your accounts","Add utility accounts or import details from a bill."],["02","See your data","Review suppliers, usage, costs and renewal dates."],["03","Compare and plan","Find opportunities and prepare before renewal."],["04","Stay in control","Keep your team aligned from one workspace."]].map(([n,title,text])=><article key={n}><span>{n}</span><h3>{title}</h3><p>{text}</p></article>)}</div></div></section>
 
-      {/* Features */}
-      <section id="features" style={{ ...sectionStyle, padding: "72px 24px", borderTop: "1px solid #dce6df" }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: "#08784e", letterSpacing: 1, marginBottom: 10 }}>FEATURES</p>
-        <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 700, margin: "0 0 44px", maxWidth: 520 }}>
-          Everything a renewal actually needs.
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
-          {features.map((f) => (
-            <div
-              key={f.title}
-              className="wp-feature-card"
-              style={{ background: "#ffffff", border: "1px solid #dce6df", borderRadius: 12, padding: "24px 22px" }}
-            >
-              <f.icon size={20} color="#08784e" style={{ marginBottom: 14 }} />
-              <h3 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 15.5, fontWeight: 600, margin: "0 0 8px" }}>{f.title}</h3>
-              <p style={{ fontSize: 13.5, color: "#71847b", lineHeight: 1.6, margin: 0 }}>{f.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <section className="home-final-cta"><div className="home-wrap final-cta-inner"><div><div className="home-eyebrow light"><span/> READY TO TAKE CONTROL?</div><h2>Make your next renewal<br/>a more informed one.</h2><p>Bring your utility contracts into one clear view with GnóRate.</p></div><div className="final-cta-actions"><Link className="home-button" href="/signup">Get started <ArrowRight size={16}/></Link><Link href="/login">Already have an account? Client login</Link></div></div><i className="cta-ring ring-one"/><i className="cta-ring ring-two"/></section>
 
-      {/* Ireland-specific */}
-      <section style={{ ...sectionStyle, padding: "72px 24px", borderTop: "1px solid #dce6df" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "center" }} className="wp-hero-grid">
-          <div>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#b87412", letterSpacing: 1, marginBottom: 10 }}>IRISH ENERGY, PROPERLY</p>
-            <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 26, fontWeight: 700, margin: "0 0 16px" }}>
-              MIC. SBU. MBU. It actually knows the difference.
-            </h2>
-            <p style={{ fontSize: 14.5, color: "#71847b", lineHeight: 1.7, margin: 0 }}>
-              Irish business energy isn't priced like a household bill. GnóRate reads your Maximum Import Capacity and Supply Point Capacity, classifies your gas tariff automatically, and searches for a market rate that reflects the tier you're actually on — not a generic average.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {["MIC-aware electricity pricing", "SBU / MBU / FVT gas classification", "MPRN & GPRN auto-matching"].map((t) => (
-              <div key={t} style={{ background: "#ffffff", border: "1px solid #dce6df", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#16342b", display: "flex", alignItems: "center", gap: 8 }}>
-                <Flame size={13} color="#b87412" /> {t}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section style={{ ...sectionStyle, padding: "80px 24px 96px", borderTop: "1px solid #dce6df", textAlign: "center" }}>
-        <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 30, fontWeight: 700, margin: "0 0 16px" }}>
-          Stop finding out too late.
-        </h2>
-        <p style={{ fontSize: 15, color: "#71847b", margin: "0 0 32px" }}>Free to start. Add your first account in under a minute.</p>
-        <Link
-          href="/signup"
-          className="wp-cta"
-          style={{ background: "#08784e", color: "#ffffff", fontWeight: 600, fontSize: 15, padding: "13px 26px", borderRadius: 8, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8 }}
-        >
-          Get started free <ArrowRight size={16} />
-        </Link>
-      </section>
-
-      {/* Footer */}
-      <footer style={{ borderTop: "1px solid #dce6df" }}>
-        <div style={{ ...sectionStyle, padding: "24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Zap size={15} color="#08784e" />
-            <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 13 }}>
-              <span style={{ color: "#08784e" }}>GnóRate</span>
-            </span>
-          </div>
-          <span style={{ fontSize: 12, color: "#71847b" }}>Know before your contract renews.</span>
-          <div style={{ display: "flex", gap: 16 }}>
-            <Link href="/help" style={{ fontSize: 12, color: "#71847b", textDecoration: "none" }}>
-              Help
-            </Link>
-            <Link href="/legal/terms" style={{ fontSize: 12, color: "#71847b", textDecoration: "none" }}>
-              Terms
-            </Link>
-            <Link href="/legal/privacy-policy" style={{ fontSize: 12, color: "#71847b", textDecoration: "none" }}>
-              Privacy Policy
-            </Link>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
+    <footer className="home-footer"><div className="home-wrap"><div className="footer-main"><div className="footer-brand"><Link href="/" className="home-brand"><span><Zap size={19}/></span><b>Gnó<span>Rate</span></b></Link><p>Commercial utility intelligence for smarter business decisions.</p><small>Born in Ireland. Built for business.</small></div><div><b>Product</b><a href="#platform">Overview</a><a href="#utilities">Utilities</a><a href="#how-it-works">How it works</a></div><div><b>Resources</b><Link href="/help">Help centre</Link><Link href="/legal/terms">Terms</Link><Link href="/legal/privacy-policy">Privacy</Link></div><div><b>Account</b><Link href="/login">Client login</Link><Link href="/signup">Get started</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} GnóRate. All rights reserved.</span><span>Ireland · Commercial energy</span></div></div></footer>
+  </main>;
 }
+
+function TrendingDownIcon(){return <ArrowDownRight size={25}/>;}
