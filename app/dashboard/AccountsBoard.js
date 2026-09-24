@@ -884,78 +884,89 @@ function quoteRequestMailto(acc, supplierEmail, companyName) {
   return `mailto:${supplierEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function drawWoodpeckerPDF(doc, cx, cy, scale = 1) {
-  const teal = [47, 167, 154];
-  const tealDim = [31, 110, 104];
-  const amber = [232, 163, 61];
-  const dark = [14, 26, 29];
+const GNORATE_REPORT = {
+  deep: [0, 61, 50],
+  green: [11, 149, 105],
+  bright: [30, 190, 134],
+  ink: [20, 36, 58],
+  muted: [96, 113, 135],
+  amber: [202, 133, 24],
+  red: [183, 63, 52],
+  pale: [243, 248, 249],
+  border: [222, 233, 230],
+  white: [255, 255, 255],
+};
 
-  // Body
-  doc.setFillColor(...teal);
-  doc.ellipse(cx, cy, 6.5 * scale, 5 * scale, "F");
-  // Tail
-  doc.setFillColor(...tealDim);
-  doc.triangle(cx - 6 * scale, cy + 1 * scale, cx - 11 * scale, cy + 4 * scale, cx - 6.5 * scale, cy + 3.5 * scale, "F");
-  // Wing
-  doc.triangle(cx + 3 * scale, cy + 2 * scale, cx + 7 * scale, cy + 4.5 * scale, cx + 2.5 * scale, cy + 4 * scale, "F");
-  // Head
-  doc.setFillColor(...teal);
-  doc.circle(cx + 5.5 * scale, cy - 3 * scale, 3.8 * scale, "F");
-  // Crest
-  doc.setFillColor(...amber);
-  doc.triangle(cx + 3.5 * scale, cy - 6 * scale, cx + 4.5 * scale, cy - 9.5 * scale, cx + 5.3 * scale, cy - 6.3 * scale, "F");
-  doc.triangle(cx + 5 * scale, cy - 6.3 * scale, cx + 6 * scale, cy - 10 * scale, cx + 6.7 * scale, cy - 6.5 * scale, "F");
-  doc.triangle(cx + 6.3 * scale, cy - 6.4 * scale, cx + 7.2 * scale, cy - 9.3 * scale, cx + 8 * scale, cy - 6 * scale, "F");
-  // Beak
-  doc.triangle(cx + 9 * scale, cy - 3.3 * scale, cx + 13 * scale, cy - 3 * scale, cx + 9 * scale, cy - 2 * scale, "F");
-  // Eye
-  doc.setFillColor(...dark);
-  doc.circle(cx + 6.8 * scale, cy - 3.6 * scale, 0.5 * scale, "F");
-  // Feet
-  doc.setFillColor(...amber);
-  doc.ellipse(cx + 0.5 * scale, cy + 5 * scale, 1 * scale, 0.4 * scale, "F");
-  doc.ellipse(cx - 1.5 * scale, cy + 5.1 * scale, 1 * scale, 0.4 * scale, "F");
-}
-
-function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups, companyName, readingSummaries) {
-  const doc = new jsPDF();
+function drawGnReportHeader(doc, title, companyName) {
   const pageWidth = doc.internal.pageSize.getWidth();
-  const teal = [47, 167, 154];
-  const dark = [14, 26, 29];
-  const panel = [20, 42, 46];
-  const muted = [143, 166, 163];
-  const amber = [232, 163, 61];
-  const red = [217, 87, 59];
-  const green = [76, 154, 106];
-  const lightBg = [250, 250, 248];
-
-  // ---- Header band ----
-  doc.setFillColor(...dark);
-  doc.rect(0, 0, pageWidth, 38, "F");
-  doc.setFillColor(...teal);
+  const c = GNORATE_REPORT;
+  doc.setFillColor(...c.deep);
+  doc.rect(0, 0, pageWidth, 39, "F");
+  doc.setFillColor(...c.green);
   doc.rect(0, 38, pageWidth, 1.2, "F");
 
-  drawWoodpeckerPDF(doc, pageWidth - 22, 19, 1.3);
+  doc.setFillColor(...c.green);
+  doc.roundedRect(14, 7.5, 9, 9, 2, 2, "F");
+  doc.setTextColor(...c.white);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("G", 17, 14);
+  doc.setFontSize(18);
+  doc.text("Gnó", 27, 16);
+  const brandWidth = doc.getTextWidth("Gnó");
+  doc.setTextColor(...c.bright);
+  doc.text("Rate", 27 + brandWidth, 16);
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.setFont(undefined, "bold");
-  doc.text("Watt", 14, 17);
-  const wattWidth = doc.getTextWidth("Watt");
-  doc.setTextColor(...teal);
-  doc.text("pryce", 14 + wattWidth, 17);
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
-  doc.setFont(undefined, "normal");
-  doc.text("Portfolio Renewal Summary", 14, 26);
-  doc.setTextColor(...muted);
-  doc.setFontSize(8.5);
+  doc.setTextColor(...c.white);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text(title, 14, 25);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(190, 216, 205);
   doc.text(
     `${companyName || "All companies"}  ·  Generated ${new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}`,
     14,
     33
   );
+}
+
+function gnReportTableStyles() {
+  const c = GNORATE_REPORT;
+  return {
+    theme: "grid",
+    headStyles: { fillColor: c.deep, textColor: c.white, font: "helvetica", fontSize: 8, fontStyle: "bold", cellPadding: 3.2, lineColor: c.deep },
+    bodyStyles: { font: "helvetica", fontSize: 8, textColor: c.ink, cellPadding: 3.2, lineColor: c.border, lineWidth: 0.15 },
+    alternateRowStyles: { fillColor: c.pale },
+  };
+}
+
+function drawGnReportFooters(doc) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setDrawColor(...GNORATE_REPORT.border);
+    doc.setLineWidth(0.25);
+    doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
+    doc.setFillColor(...GNORATE_REPORT.green);
+    doc.rect(14, pageHeight - 16.3, 22, 0.6, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GNORATE_REPORT.muted);
+    doc.text("GnóRate  ·  Commercial utility intelligence", 14, pageHeight - 10);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 14, pageHeight - 10, { align: "right" });
+  }
+}
+
+function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups, companyName, readingSummaries) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const { green, ink: dark, muted, amber, red, pale: lightBg } = GNORATE_REPORT;
+  const teal = green;
+
+  drawGnReportHeader(doc, "Portfolio overview", companyName);
 
   let y = 52;
 
@@ -973,7 +984,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     const x = 14 + i * (cardW + 6);
     doc.setFillColor(...lightBg);
     doc.roundedRect(x, y, cardW, cardH, 2, 2, "F");
-    doc.setDrawColor(225, 225, 220);
+    doc.setDrawColor(...GNORATE_REPORT.border);
     doc.setLineWidth(0.3);
     doc.roundedRect(x, y, cardW, cardH, 2, 2, "S");
     doc.setFillColor(...card.accent);
@@ -1052,7 +1063,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     const chartH = 42;
     const maxVal = Math.max(...monthValues, 1);
 
-    doc.setDrawColor(225, 225, 220);
+    doc.setDrawColor(...GNORATE_REPORT.border);
     doc.setLineWidth(0.2);
     doc.line(chartX, y, chartX, y + chartH);
     doc.line(chartX, y + chartH, chartX + chartW, y + chartH);
@@ -1103,10 +1114,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
       startY: y,
       head: [["Account", "Est. annual spend"]],
       body: spendByAccount.map((a) => [a.name, fmtMoney(a.cost)]),
-      theme: "plain",
-      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
-      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
-      alternateRowStyles: { fillColor: lightBg },
+      ...gnReportTableStyles(),
       columnStyles: { 1: { halign: "right" } },
       margin: { left: 14, right: 14 },
     });
@@ -1139,10 +1147,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
         a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d overdue` : `${a.daysLeft}d`,
         a.rate || "—",
       ]),
-      theme: "plain",
-      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
-      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
-      alternateRowStyles: { fillColor: lightBg },
+      ...gnReportTableStyles(),
       willDrawCell: (data) => {
         if (data.section === "body" && data.column.index === 3) {
           const raw = data.cell.raw;
@@ -1172,10 +1177,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
       startY: y,
       head: [["", "Issue", "Accounts"]],
       body: attentionGroups.map((g) => ["", g.groupLabel, String(g.items.length)]),
-      theme: "plain",
-      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
-      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
-      alternateRowStyles: { fillColor: lightBg },
+      ...gnReportTableStyles(),
       columnStyles: { 0: { cellWidth: 6 } },
       didParseCell: (data) => {
         if (data.section === "body" && data.column.index === 0) {
@@ -1224,27 +1226,12 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
       startY: y,
       head: [["Location", "Accounts", "Need attention", "Est. annual spend"]],
       body: locationRows.map(([loc, d]) => [loc, String(d.total), d.attention > 0 ? String(d.attention) : "—", d.spend > 0 ? fmtMoney(d.spend) : "Needs more data"]),
-      theme: "plain",
-      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
-      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
-      alternateRowStyles: { fillColor: lightBg },
+      ...gnReportTableStyles(),
       margin: { left: 14, right: 14 },
     });
   }
 
-  // ---- Footer on every page ----
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    const pageHeight = doc.internal.pageSize.getHeight();
-    doc.setDrawColor(230, 230, 225);
-    doc.setLineWidth(0.2);
-    doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
-    doc.setFontSize(7.5);
-    doc.setTextColor(...muted);
-    doc.text("Generated by GnóRate · Client portal", 14, pageHeight - 10);
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 30, pageHeight - 10);
-  }
+  drawGnReportFooters(doc);
 
   doc.save(`gnorate-portfolio-summary-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
@@ -1252,37 +1239,10 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
 function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  const teal = [47, 167, 154];
-  const dark = [14, 26, 29];
-  const muted = [143, 166, 163];
-  const amber = [232, 163, 61];
-  const green = [76, 154, 106];
-  const lightBg = [250, 250, 248];
+  const { green, ink: dark, muted, amber, pale: lightBg } = GNORATE_REPORT;
+  const teal = green;
 
-  // ---- Header band ----
-  doc.setFillColor(...dark);
-  doc.rect(0, 0, pageWidth, 38, "F");
-  doc.setFillColor(...teal);
-  doc.rect(0, 38, pageWidth, 1.2, "F");
-  drawWoodpeckerPDF(doc, pageWidth - 22, 19, 1.3);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.setFont(undefined, "bold");
-  doc.text("Watt", 14, 17);
-  const wattWidth = doc.getTextWidth("Watt");
-  doc.setTextColor(...teal);
-  doc.text("pryce", 14 + wattWidth, 17);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
-  doc.setFont(undefined, "normal");
-  doc.text("Savings & Activity Report", 14, 26);
-  doc.setTextColor(...muted);
-  doc.setFontSize(8.5);
-  doc.text(
-    `${companyName || "All companies"}  ·  Generated ${new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}`,
-    14,
-    33
-  );
+  drawGnReportHeader(doc, "Savings & renewal opportunities", companyName);
 
   let y = 52;
 
@@ -1356,10 +1316,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
         fmtMoney(a.saving),
         a.comparison.source === "verified" ? "Verified" : a.comparison.source === "quoted" ? "Quoted" : "Estimated",
       ]),
-      theme: "plain",
-      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
-      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
-      alternateRowStyles: { fillColor: lightBg },
+      ...gnReportTableStyles(),
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 14;
@@ -1382,10 +1339,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
       startY: y,
       head: [["Account", "Location", "Status"]],
       body: inProgress.map((a) => [a.name, a.location || "—", a.renewal_status === "quote_requested" ? "Quote requested" : "Switching"]),
-      theme: "plain",
-      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
-      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
-      alternateRowStyles: { fillColor: lightBg },
+      ...gnReportTableStyles(),
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 14;
@@ -1408,27 +1362,12 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
       startY: y,
       head: [["Account", "Provider", "Rate", "New contract end"]],
       body: renewed.map((a) => [a.name, a.provider || "—", a.rate ? `${a.rate}c/kWh` : "—", a.contract_end || "—"]),
-      theme: "plain",
-      headStyles: { fillColor: dark, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: "bold", cellPadding: 3 },
-      bodyStyles: { fontSize: 8.5, textColor: dark, cellPadding: 3 },
-      alternateRowStyles: { fillColor: lightBg },
+      ...gnReportTableStyles(),
       margin: { left: 14, right: 14 },
     });
   }
 
-  // ---- Footer ----
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    const pageHeight = doc.internal.pageSize.getHeight();
-    doc.setDrawColor(230, 230, 225);
-    doc.setLineWidth(0.2);
-    doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
-    doc.setFontSize(7.5);
-    doc.setTextColor(...muted);
-    doc.text("Generated by GnóRate · Client portal", 14, pageHeight - 10);
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 30, pageHeight - 10);
-  }
+  drawGnReportFooters(doc);
 
   doc.save(`gnorate-savings-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
