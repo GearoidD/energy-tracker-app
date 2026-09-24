@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronLeft, Mail, Zap, Flame } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import WoodpeckerMascot from "@/app/WoodpeckerMascot";
 
 const MISSING_BILL_DAYS = 45;
 const RATE_JUMP_THRESHOLD = 5;
@@ -197,7 +196,6 @@ function AttentionQueueInner({ companyId, companyName }) {
       </Link>
 
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <WoodpeckerMascot size={48} />
         <div>
           <h1 style={{ fontFamily: "'Lora', serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>{criticalOnly ? "Critical accounts" : "Attention queue"}</h1>
           <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 14 }}>

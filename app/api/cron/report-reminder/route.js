@@ -25,9 +25,9 @@ export async function GET(request) {
 
     try {
       await resend.emails.send({
-        from: "Wattpryce <renewals@wattpryce.com>",
+        from: "GnoRate <renewals@gnorate.com>",
         to: emails,
-        subject: `Your ${new Date().toLocaleDateString("en-IE", { month: "long" })} Wattpryce summary is ready`,
+        subject: `Your ${new Date().toLocaleDateString("en-IE", { month: "long" })} GnoRate summary is ready`,
         html: `
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe6; padding: 24px 0;">
             <tr><td align="center">
@@ -39,7 +39,7 @@ export async function GET(request) {
                   <p style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 14px; color: #1f2124; margin: 0 0 12px;">
                     Your monthly portfolio summary is ready to view — renewals coming up, spend trends, and anything that needs attention.
                   </p>
-                  <a href="https://wattpryce.com/dashboard" style="display: inline-block; background-color: #2fa79a; color: #06201d; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 18px; border-radius: 6px;">
+                  <a href="https://gnorate.com/dashboard" style="display: inline-block; background-color: #2fa79a; color: #06201d; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 18px; border-radius: 6px;">
                     View your dashboard →
                   </a>
                   <p style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 12px; color: #6b6d70; margin: 16px 0 0;">
@@ -48,14 +48,14 @@ export async function GET(request) {
                 </td></tr>
                 <tr><td style="background-color: #faf9f6; padding: 18px 28px; border-top: 1px solid #e5e3dd;">
                   <p style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; color: #8fa6a3; margin: 0;">
-                    Wattpryce · <a href="https://wattpryce.com" style="color: #8fa6a3;">wattpryce.com</a>
+                    GnoRate · <a href="https://gnorate.com" style="color: #8fa6a3;">gnorate.com</a>
                   </p>
                 </td></tr>
               </table>
             </td></tr>
           </table>
         `,
-        text: `Your monthly Wattpryce summary is ready — log in to view it: https://wattpryce.com/dashboard`,
+        text: `Your monthly GnoRate summary is ready — log in to view it: https://gnorate.com/dashboard`,
       });
       emailsSent++;
     } catch (e) {

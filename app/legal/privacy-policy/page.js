@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
         <p style={{ ...p, fontSize: 13, marginBottom: 30 }}>Last updated: July 2026</p>
 
         <p style={p}>
-          This is a plain-language account of what data Wattpryce collects and why. It is not a substitute for
+          This is a plain-language account of what data GnoRate collects and why. It is not a substitute for
           professional legal advice, and should be reviewed by a solicitor before being relied on for a commercial
           deployment, particularly around GDPR compliance.
         </p>
@@ -34,7 +34,7 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <h2 style={h2}>Third parties involved</h2>
-        <p style={p}>A few external services are used to run Wattpryce:</p>
+        <p style={p}>A few external services are used to run GnoRate:</p>
         <ul style={{ paddingLeft: 20 }}>
           <li style={li}><strong style={{ color: "var(--text)" }}>Supabase</strong> — stores your account data and handles login</li>
           <li style={li}><strong style={{ color: "var(--text)" }}>Anthropic (Claude)</strong> — reads uploaded bills and performs market rate lookups</li>
@@ -45,7 +45,7 @@ export default function PrivacyPolicyPage() {
         <h2 style={h2}>Who can see your data</h2>
         <p style={p}>
           Only people you or another admin have invited to your company can see your accounts. Data isn't shared
-          across different companies using Wattpryce.
+          across different companies using GnoRate.
         </p>
 
         <h2 style={h2}>Your rights</h2>

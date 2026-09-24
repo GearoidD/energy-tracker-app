@@ -131,7 +131,7 @@ export default function MasterRatesBoard() {
           Master rates
         </h1>
         <p style={{ color: "var(--muted)", fontSize: 13.5, marginBottom: 12 }}>
-          These feed into every customer's market comparison automatically — labeled "Wattpryce verified" — ahead of the AI
+          These feed into every customer's market comparison automatically — labeled "GnoRate verified" — ahead of the AI
           estimate. Keep the date current; a stale rate is worse than an honest AI estimate.
         </p>
 

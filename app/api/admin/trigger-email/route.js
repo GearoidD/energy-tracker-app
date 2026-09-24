@@ -31,9 +31,9 @@ export async function POST(request) {
     const resend = new Resend(process.env.RESEND_API_KEY);
     try {
       await resend.emails.send({
-        from: "Wattpryce <renewals@wattpryce.com>",
+        from: "GnoRate <renewals@gnorate.com>",
         to: [user.email],
-        subject: "Wattpryce test email",
+        subject: "GnoRate test email",
         html: `
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe6; padding: 24px 0;">
             <tr><td align="center">
@@ -49,7 +49,7 @@ export async function POST(request) {
             </td></tr>
           </table>
         `,
-        text: `This is a test email from Wattpryce's admin panel, confirming delivery is working. Sent ${new Date().toLocaleString("en-IE")}.`,
+        text: `This is a test email from GnoRate's admin panel, confirming delivery is working. Sent ${new Date().toLocaleString("en-IE")}.`,
       });
       return NextResponse.json({ sent: true, to: user.email });
     } catch (e) {
@@ -63,7 +63,7 @@ export async function POST(request) {
   }
 
   try {
-    const res = await fetch(`https://wattpryce.com/api/cron/${cronPath}`, {
+    const res = await fetch(`https://gnorate.com/api/cron/${cronPath}`, {
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
     });
     const data = await res.json();

@@ -22,7 +22,7 @@ export default function HelpPage() {
           </Link>
         </div>
 
-        <h1 style={h1}>Using Wattpryce</h1>
+        <h1 style={h1}>Using GnoRate</h1>
         <p style={{ ...p, fontSize: 15 }}>
           A guide to tracking your energy accounts, reading bills automatically, and knowing whether to renew or switch —
           before you roll onto a worse rate.
@@ -30,7 +30,7 @@ export default function HelpPage() {
 
         <h2 style={{ ...h2, marginTop: 30, paddingTop: 0, borderTop: "none" }}>Getting started</h2>
         <p style={p}>
-          <strong style={strong}>Signing up:</strong> go to <Link href="/signup" style={{ color: "var(--teal)" }}>wattpryce.com/signup</Link>, enter your
+          <strong style={strong}>Signing up:</strong> go to <Link href="/signup" style={{ color: "var(--teal)" }}>gnorate.com/signup</Link>, enter your
           email and a password. If a teammate invited you via a link, clicking it will automatically add you to their
           company once you sign up or log in — no extra steps needed.
         </p>
@@ -98,7 +98,7 @@ export default function HelpPage() {
         <h2 style={h2}>Getting a market rate comparison</h2>
         <p style={p}>Every comparison is labeled honestly, so you know how much to trust it:</p>
         <ul style={{ paddingLeft: 20, marginBottom: 12 }}>
-          <li style={li}><strong style={{ color: "var(--teal)" }}>Wattpryce verified</strong> — manually confirmed and kept current.</li>
+          <li style={li}><strong style={{ color: "var(--teal)" }}>GnoRate verified</strong> — manually confirmed and kept current.</li>
           <li style={li}><strong style={{ color: "var(--amber)" }}>Estimated</strong> — a broader AI benchmark, less precise.</li>
           <li style={li}><strong style={strong}>Quoted</strong> — a rate you've entered yourself, e.g. from a real supplier quote.</li>
         </ul>

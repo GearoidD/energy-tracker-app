@@ -13,14 +13,14 @@ export default function TermsPage() {
         <p style={{ ...p, fontSize: 13, marginBottom: 30 }}>Last updated: July 2026</p>
 
         <p style={p}>
-          This is a plain-language summary of the terms for using Wattpryce, a tool for tracking energy contract
+          This is a plain-language summary of the terms for using GnoRate, a tool for tracking energy contract
           renewals and comparing rates for businesses in Ireland. It is not a substitute for professional legal
           advice, and you should have it reviewed by a solicitor before relying on it for a commercial deployment.
         </p>
 
-        <h2 style={h2}>What Wattpryce is</h2>
+        <h2 style={h2}>What GnoRate is</h2>
         <p style={p}>
-          Wattpryce lets you track electricity and gas accounts, upload bills for automatic data extraction, and see
+          GnoRate lets you track electricity and gas accounts, upload bills for automatic data extraction, and see
           market rate comparisons. Market rate information is provided for guidance only — it may be an AI-generated
           estimate, a manually verified figure, or a live quote, and is clearly labeled as such. It does not constitute
           financial or professional advice, and you should confirm any rate directly with a supplier before making a
@@ -36,7 +36,7 @@ export default function TermsPage() {
 
         <h2 style={h2}>Acceptable use</h2>
         <p style={p}>
-          Don't use Wattpryce to upload content you don't have the right to use, to attempt to access other companies'
+          Don't use GnoRate to upload content you don't have the right to use, to attempt to access other companies'
           data, or to misuse the AI features (bill reading, market rate lookups) in a way that could disrupt the
           service for others.
         </p>
@@ -51,7 +51,7 @@ export default function TermsPage() {
 
         <h2 style={h2}>Service availability</h2>
         <p style={p}>
-          Wattpryce is provided "as is," without warranty of any kind. We aim to keep the service running reliably but
+          GnoRate is provided "as is," without warranty of any kind. We aim to keep the service running reliably but
           don't guarantee uninterrupted availability.
         </p>
 

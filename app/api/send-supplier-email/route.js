@@ -53,7 +53,7 @@ export async function POST(request) {
 
   try {
     await resend.emails.send({
-      from: "Wattpryce <renewals@wattpryce.com>",
+      from: "GnoRate <renewals@gnorate.com>",
       to: cleanTo ? [cleanTo] : undefined,
       bcc: cleanBcc.length > 0 ? cleanBcc : undefined,
       replyTo: user.email,
@@ -67,7 +67,7 @@ export async function POST(request) {
   // Log this as a note on every affected account, so it shows up in that
   // account's history and the company-wide activity feed automatically.
   if (accountIds && accountIds.length > 0) {
-    const noteText = logNote || `Quote request emailed${supplierName ? ` to ${supplierName}` : ""} — sent via Wattpryce.`;
+    const noteText = logNote || `Quote request emailed${supplierName ? ` to ${supplierName}` : ""} — sent via GnoRate.`;
     const noteRows = accountIds.map((accountId) => ({
       account_id: accountId,
       company_id: companyId,
