@@ -940,10 +940,10 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont(undefined, "bold");
-  doc.text("Watt", 14, 17);
-  const wattWidth = doc.getTextWidth("Watt");
+  doc.text("Gno", 14, 17);
+  const wattWidth = doc.getTextWidth("Gno");
   doc.setTextColor(...teal);
-  doc.text("pryce", 14 + wattWidth, 17);
+  doc.text("Rate", 14 + wattWidth, 17);
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
@@ -1268,10 +1268,10 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont(undefined, "bold");
-  doc.text("Watt", 14, 17);
-  const wattWidth = doc.getTextWidth("Watt");
+  doc.text("Gno", 14, 17);
+  const wattWidth = doc.getTextWidth("Gno");
   doc.setTextColor(...teal);
-  doc.text("pryce", 14 + wattWidth, 17);
+  doc.text("Rate", 14 + wattWidth, 17);
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont(undefined, "normal");
