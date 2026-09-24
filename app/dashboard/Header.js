@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2, Shield } from "lucide-react";
+import { LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2, Shield } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import CompanySetup from "./CompanySetup";
@@ -122,13 +122,6 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", rowGap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Zap size={18} color="var(--teal)" />
-          <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 15 }}>
-            <span style={{ color: "var(--teal)" }}>GnóRate</span>
-          </span>
-        </div>
-
         <button
           onClick={() => setShowTeam(true)}
           style={{
