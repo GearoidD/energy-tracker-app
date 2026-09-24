@@ -3,17 +3,17 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LockKeyhole, ShieldCheck, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { authStyles as s } from "../authStyles";
-import { HeroCard } from "../AuthHero";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/dashboard";
+  const requestedNext = searchParams.get("next") || "/dashboard";
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,73 +32,51 @@ function LoginForm() {
     router.refresh();
   };
 
-  return (
-    <div style={s.page}>
-      <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-        @media (max-width: 900px) { .wp-auth-left { display: none !important; } }
-      ` }} />
-
-      <div className="wp-auth-left" style={s.leftPanel}>
-        <div style={{ maxWidth: 440 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 28 }}>
-            <Zap size={20} color="var(--teal)" />
-            <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)" }}>
-              <span style={{ color: "var(--teal)" }}>GnóRate</span>
-            </span>
+  return <main className="gn-auth-page">
+    <header className="gn-auth-nav">
+      <Link href="/" className="gn-auth-brand"><span><Zap size={20}/></span><b>Gnó<span>Rate</span></b></Link>
+      <Link className="gn-auth-nav-home" href="/"><ArrowLeft size={14}/> Back to home</Link>
+    </header>
+    <div className="gn-auth-layout">
+      <section className="gn-auth-story">
+        <div className="gn-auth-story-art" aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div>
+        <div className="gn-auth-story-content">
+          <span className="gn-auth-eyebrow"><i/> CLIENT PORTAL</span>
+          <h1>Your energy portfolio,<br/><em>all in view.</em></h1>
+          <p>Pick up where your team left off. Review contracts, usage, renewals and rate opportunities from one secure workspace.</p>
+          <div className="gn-auth-story-points"><span><Check size={14}/> Built for Irish business accounts</span><span><Check size={14}/> Shared with your team</span><span><Check size={14}/> Your account data in one place</span></div>
+          <div className="gn-auth-preview">
+            <div className="gn-auth-preview-head"><span><Zap size={13}/> PORTFOLIO SNAPSHOT</span><i>Illustrative view</i></div>
+            <div className="gn-auth-preview-grid"><div><small>ACTIVE ACCOUNTS</small><b>Accounts</b></div><div><small>CONTRACTS</small><b>Renewals</b></div><div><small>MARKET DATA</small><b>Rate options</b></div></div>
+            <div className="gn-auth-preview-bars"><span/><span/><span/><span/><span/><span/><span/><span/><span/><span/><span/></div>
+            <div className="gn-auth-preview-foot"><span><i/> Workspace overview</span><span>GnóRate client portal</span></div>
           </div>
-          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 30, fontWeight: 700, color: "var(--text)", lineHeight: 1.15, margin: "0 0 16px" }}>
-            Know before your contract renews.
-          </h2>
-          <p style={{ fontSize: 14.5, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 36px", maxWidth: 380 }}>
-            Every account tracked, every bill read automatically, and a market rate comparison the moment you need one.
-          </p>
-          <HeroCard />
         </div>
-      </div>
-
-      <div style={s.rightPanel}>
-        <div style={s.card}>
-          <div style={s.brand}>
-            <Zap size={20} color="var(--teal)" />
-            <span style={s.brandText}>
-              <span style={{ color: "var(--teal)" }}>GnóRate</span>
-            </span>
-          </div>
-          <h1 style={s.h1}>Log in</h1>
-          <p style={s.tagline}>Welcome back.</p>
-          <form onSubmit={handleSubmit} style={s.form}>
-            <label style={s.label}>
-              Email
-              <input style={s.input} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            <label style={s.label}>
-              Password
-              <input style={s.input} type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-            </label>
-            <div style={{ marginTop: -10, marginBottom: -4 }}>
-              <Link href="/forgot-password" style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                Forgot password?
-              </Link>
-            </div>
-            {error && <div style={s.error}>{error}</div>}
-            <button style={s.button} type="submit" disabled={loading}>
-              {loading ? "Logging in…" : "Log in"}
-            </button>
+        <div className="gn-auth-story-foot"><ShieldCheck size={14}/> Secure access to your company workspace</div>
+      </section>
+      <section className="gn-auth-main">
+        <div className="gn-auth-card">
+          <div className="gn-auth-card-mark"><LockKeyhole size={19}/></div>
+          <div className="gn-auth-kicker">WELCOME BACK</div>
+          <h2>Log in to GnóRate</h2>
+          <p className="gn-auth-intro">Access your company’s utility workspace.</p>
+          <form onSubmit={handleSubmit} className="gn-login-form">
+            <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@company.ie"/></label>
+            <label>Password<div className="gn-password-field"><input type={showPassword?"text":"password"} autoComplete="current-password" required value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Enter your password"/><button type="button" aria-label={showPassword?"Hide password":"Show password"} onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></label>
+            <div className="gn-login-forgot"><Link href="/forgot-password">Forgot password?</Link></div>
+            {error&&<div role="alert" className="gn-login-error">{error}</div>}
+            <button className="gn-login-submit" type="submit" disabled={loading}>{loading?"Signing you in…":<>Continue to dashboard <ArrowRight size={16}/></>}</button>
           </form>
-          <p style={s.footNote}>
-            No account yet? <Link href={`/signup${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}>Create one</Link>
-          </p>
+          <div className="gn-auth-separator"><span>SECURE CLIENT ACCESS</span></div>
+          <div className="gn-auth-secure-note"><ShieldCheck size={16}/><span>Your login is protected and connected to your company workspace.</span></div>
+          <p className="gn-auth-signup">New to GnóRate? <Link href={`/signup${next!=="/dashboard"?`?next=${encodeURIComponent(next)}`:""}`}>Create an account <ArrowRight size={13}/></Link></p>
         </div>
-      </div>
+        <div className="gn-auth-bottom"><Link href="/help">Need help?</Link><span>·</span><Link href="/legal/privacy-policy">Privacy</Link><span>·</span><Link href="/legal/terms">Terms</Link></div>
+      </section>
     </div>
-  );
+  </main>;
 }
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
-  );
+  return <Suspense fallback={<main className="gn-auth-loading"><span className="gn-auth-brand"><b>Gnó<span>Rate</span></b></span></main>}><LoginForm/></Suspense>;
 }
