@@ -119,7 +119,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Zap size={18} color="var(--teal)" />
           <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15 }}>
-            Watt<span style={{ color: "var(--teal)" }}>pryce</span>
+            <span style={{ color: "var(--teal)" }}>GnóRate</span>
           </span>
         </div>
 

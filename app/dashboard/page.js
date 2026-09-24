@@ -3,10 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import CompanySetup from "./CompanySetup";
 import AccountsBoard from "./AccountsBoard";
 import Header from "./Header";
+import PortalShell from "./PortalShell";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }) {
   const supabase = createClient();
 
   const {
@@ -27,14 +28,7 @@ export default async function DashboardPage() {
     .map((m) => ({ ...m.companies, role: m.role }));
 
   if (companies.length === 0) {
-    return (
-      <div style={{ minHeight: "100vh" }}>
-        <Header email={user.email} userId={user.id} companies={[]} activeCompanyId={null} />
-        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
-          <CompanySetup />
-        </div>
-      </div>
-    );
+    return <PortalShell header={<Header email={user.email} userId={user.id} companies={[]} activeCompanyId={null} />}><CompanySetup /></PortalShell>;
   }
 
   let profile = profileData;
@@ -53,12 +47,9 @@ export default async function DashboardPage() {
       ? profile.active_company_id
       : companies[0].id;
 
-  return (
-    <div style={{ minHeight: "100vh" }}>
-      <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
-        <AccountsBoard companyId={activeCompanyId} companyName={companies.find((c) => c.id === activeCompanyId)?.name || ""} />
-      </div>
-    </div>
-  );
+  const companyName = companies.find((c) => c.id === activeCompanyId)?.name || "";
+  const section = searchParams?.section || "overview";
+  return <PortalShell companyName={companyName} header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
+    <AccountsBoard companyId={activeCompanyId} companyName={companyName} section={section} />
+  </PortalShell>;
 }

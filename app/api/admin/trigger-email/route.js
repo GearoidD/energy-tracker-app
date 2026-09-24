@@ -31,15 +31,15 @@ export async function POST(request) {
     const resend = new Resend(process.env.RESEND_API_KEY);
     try {
       await resend.emails.send({
-        from: "GnoRate <renewals@gnorate.com>",
+        from: "GnóRate <renewals@wattpryce.com>",
         to: [user.email],
-        subject: "GnoRate test email",
+        subject: "GnóRate test email",
         html: `
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe6; padding: 24px 0;">
             <tr><td align="center">
               <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; max-width: 480px;">
                 <tr><td style="background-color: #0e1a1d; padding: 24px 28px;">
-                  <span style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; color: #ffffff;">Watt<span style="color: #2fa79a;">pryce</span></span>
+                  <span style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; color: #ffffff;"><span style="color: #2fa79a;">GnóRate</span></span>
                 </td></tr>
                 <tr><td style="padding: 24px 28px;">
                   <p style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 14px; color: #1f2124; margin: 0 0 8px;">This is a test email.</p>
@@ -49,7 +49,7 @@ export async function POST(request) {
             </td></tr>
           </table>
         `,
-        text: `This is a test email from GnoRate's admin panel, confirming delivery is working. Sent ${new Date().toLocaleString("en-IE")}.`,
+        text: `This is a test email from GnóRate's admin panel, confirming delivery is working. Sent ${new Date().toLocaleString("en-IE")}.`,
       });
       return NextResponse.json({ sent: true, to: user.email });
     } catch (e) {
@@ -63,7 +63,7 @@ export async function POST(request) {
   }
 
   try {
-    const res = await fetch(`https://gnorate.com/api/cron/${cronPath}`, {
+    const res = await fetch(`https://wattpryce.com/api/cron/${cronPath}`, {
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
     });
     const data = await res.json();

@@ -1,20 +1,20 @@
 import "./globals.css";
 
 export const metadata = {
-  metadataBase: new URL("https://gnorate.com"),
-  title: "GnoRate",
+  metadataBase: new URL("https://gnorate.ie"),
+  title: "GnóRate",
   description: "Know before your contract renews.",
   openGraph: {
-    title: "GnoRate",
+    title: "GnóRate",
     description: "Track every energy contract, read bills automatically, and know whether to renew or switch — before it's too late.",
-    url: "https://gnorate.com",
-    siteName: "GnoRate",
+    url: "https://gnorate.ie",
+    siteName: "GnóRate",
     locale: "en_IE",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "GnoRate",
+    title: "GnóRate",
     description: "Know before your contract renews.",
   },
 };

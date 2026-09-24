@@ -27,7 +27,7 @@ export default async function AdminRatesPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <Zap size={20} color="var(--teal)" />
           <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)" }}>
-            Watt<span style={{ color: "var(--teal)" }}>pryce</span> — Platform
+            <span style={{ color: "var(--teal)" }}>GnóRate</span> — Platform
           </span>
         </div>
         <div style={{ display: "flex", gap: 20, fontSize: 13 }}>

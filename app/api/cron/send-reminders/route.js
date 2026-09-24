@@ -38,7 +38,7 @@ function buildEmailHtml(accountsForCompany) {
               </tr>
               <tr>
                 <td>
-                  <a href="https://gnorate.com/dashboard?renew=${a.id}" style="display: inline-block; background-color: #2fa79a; color: #06201d; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 600; text-decoration: none; padding: 8px 14px; border-radius: 6px;">
+                  <a href="https://wattpryce.com/dashboard?renew=${a.id}" style="display: inline-block; background-color: #2fa79a; color: #06201d; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 600; text-decoration: none; padding: 8px 14px; border-radius: 6px;">
                     Just renewed? Update it here
                   </a>
                 </td>
@@ -60,7 +60,7 @@ function buildEmailHtml(accountsForCompany) {
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; color: #ffffff;">
-                      Watt<span style="color: #2fa79a;">pryce</span>
+                      <span style="color: #2fa79a;">GnóRate</span>
                     </td>
                   </tr>
                 </table>
@@ -89,16 +89,16 @@ function buildEmailHtml(accountsForCompany) {
             </tr>
             <tr>
               <td style="padding: 20px 28px;">
-                <a href="https://gnorate.com/dashboard" style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 13px; color: #2fa79a; text-decoration: none; font-weight: 600;">
-                  Log in to GnoRate to review everything →
+                <a href="https://wattpryce.com/dashboard" style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 13px; color: #2fa79a; text-decoration: none; font-weight: 600;">
+                  Log in to GnóRate to review everything →
                 </a>
               </td>
             </tr>
             <tr>
               <td style="background-color: #faf9f6; padding: 18px 28px; border-top: 1px solid #e5e3dd;">
                 <p style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; color: #8fa6a3; margin: 0;">
-                  You're receiving this because your team tracks energy accounts with GnoRate.<br />
-                  GnoRate · <a href="https://gnorate.com" style="color: #8fa6a3;">gnorate.com</a>
+                  You're receiving this because your team tracks energy accounts with GnóRate.<br />
+                  GnóRate · <a href="https://wattpryce.com" style="color: #8fa6a3;">wattpryce.com</a>
                 </p>
               </td>
             </tr>
@@ -112,16 +112,16 @@ function buildEmailHtml(accountsForCompany) {
 function buildEmailText(accountsForCompany) {
   const lines = accountsForCompany.map(
     (a) =>
-      `- ${a.name}${a.provider ? ` (${a.provider})` : ""} — ${urgencyLine(a.daysLeft)}\n  Just renewed? Update it here: https://gnorate.com/dashboard?renew=${a.id}`
+      `- ${a.name}${a.provider ? ` (${a.provider})` : ""} — ${urgencyLine(a.daysLeft)}\n  Just renewed? Update it here: https://wattpryce.com/dashboard?renew=${a.id}`
   );
   return [
-    "GnoRate — here's what's coming up on your energy accounts:",
+    "GnóRate — here's what's coming up on your energy accounts:",
     "",
     ...lines,
     "",
-    "Log in to review everything: https://gnorate.com/dashboard",
+    "Log in to review everything: https://wattpryce.com/dashboard",
     "",
-    "You're receiving this because your team tracks energy accounts with GnoRate.",
+    "You're receiving this because your team tracks energy accounts with GnóRate.",
   ].join("\n");
 }
 
@@ -176,9 +176,9 @@ export async function GET(request) {
 
     try {
       await resend.emails.send({
-        from: "GnoRate <renewals@gnorate.com>",
+        from: "GnóRate <renewals@wattpryce.com>",
         to: emails,
-        subject: `GnoRate: ${accountsForCompany.length} account(s) need your attention`,
+        subject: `GnóRate: ${accountsForCompany.length} account(s) need your attention`,
         html: buildEmailHtml(accountsForCompany),
         text: buildEmailText(accountsForCompany),
       });

@@ -20,7 +20,7 @@ export default async function AddQuotePage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
           <Zap size={20} color="var(--teal)" />
           <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16 }}>
-            Watt<span style={{ color: "var(--teal)" }}>pryce</span>
+            <span style={{ color: "var(--teal)" }}>GnóRate</span>
           </span>
         </div>
 

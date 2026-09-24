@@ -64,7 +64,7 @@ export default async function AdminOverviewPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <Zap size={20} color="var(--teal)" />
           <span style={{ fontFamily: "'Lora', serif", fontWeight: 600, fontSize: 16 }}>
-            Watt<span style={{ color: "var(--teal)" }}>pryce</span> — Platform
+            <span style={{ color: "var(--teal)" }}>GnóRate</span> — Platform
           </span>
         </div>
 

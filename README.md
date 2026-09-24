@@ -1,4 +1,4 @@
-# Wattpryce — starter app
+# GnóRate — starter app
 
 *Know before your contract renews.*
 

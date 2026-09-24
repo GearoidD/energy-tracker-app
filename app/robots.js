@@ -5,6 +5,6 @@ export default function robots() {
       allow: "/",
       disallow: ["/dashboard", "/admin", "/invite", "/reset-password"],
     },
-    sitemap: "https://gnorate.com/sitemap.xml",
+    sitemap: "https://wattpryce.com/sitemap.xml",
   };
 }
