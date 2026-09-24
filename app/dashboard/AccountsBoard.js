@@ -2391,6 +2391,23 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
 
       {section === "overview" && !lockedLocation && (
         <section className="gn-overview" aria-label="Portfolio overview">
+          <div className="gn-welcome-panel">
+            <div className="gn-welcome-copy">
+              <span className="gn-welcome-eyebrow"><i /> LIVE PORTFOLIO</span>
+              <h2>A clearer view of your energy costs.</h2>
+              <p>Track every site, spot renewal dates early and see where better rates could reduce spend.</p>
+              <div className="gn-welcome-actions">
+                <button onClick={() => setUploadingFor("new")}><Upload size={15}/> Upload a bill</button>
+                <Link href="/dashboard?section=rates">Explore rate opportunities <span aria-hidden="true">→</span></Link>
+              </div>
+            </div>
+            <div className="gn-welcome-insight">
+              <span>Portfolio health</span>
+              <strong>{summaryStats.needAttention ? `${summaryStats.needAttention} items to review` : "All caught up"}</strong>
+              <small>{summaryStats.needAttention ? "Open your review queue to see the next steps" : "We’ll highlight renewals and data gaps here"}</small>
+            </div>
+            <div className="gn-welcome-orb" aria-hidden="true" />
+          </div>
           <div className="gn-kpis">
             <article className="gn-kpi"><span>Estimated annual spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></article>
             <article className="gn-kpi gn-kpi-highlight"><span>Potential savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Estimated per year against current comparisons" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></article>

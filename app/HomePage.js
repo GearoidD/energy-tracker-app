@@ -71,8 +71,8 @@ export default function HomePage() {
       {/* Nav */}
       <header style={{ borderBottom: "1px solid #dce6df", position: "sticky", top: 0, background: "#ffffffcc", backdropFilter: "blur(8px)", zIndex: 20 }}>
         <div style={{ ...sectionStyle, display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Zap size={20} color="#08784e" />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: 10, color: "#fff", background: "linear-gradient(145deg,#159566,#08784e)", boxShadow: "0 4px 10px #08784e25" }}><Zap size={19} /></span>
             <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 16 }}>
               <span style={{ color: "#08784e" }}>GnóRate</span>
             </span>
@@ -80,7 +80,7 @@ export default function HomePage() {
           <nav className="wp-desktop-nav" style={{ display: "flex", alignItems: "center", gap: 28 }}>
             <a href="#how-it-works" className="wp-nav-link">How it works</a>
             <a href="#features" className="wp-nav-link">Features</a>
-            <Link href="/login" className="wp-nav-link">Log in</Link>
+            <Link href="/login" className="wp-nav-link">Client login</Link>
             <Link
               href="/signup"
               className="wp-cta"
@@ -102,40 +102,49 @@ export default function HomePage() {
           <div style={{ borderTop: "1px solid #dce6df", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
             <a href="#how-it-works" className="wp-nav-link" onClick={() => setMobileOpen(false)}>How it works</a>
             <a href="#features" className="wp-nav-link" onClick={() => setMobileOpen(false)}>Features</a>
-            <Link href="/login" className="wp-nav-link">Log in</Link>
+            <Link href="/login" className="wp-nav-link">Client login</Link>
             <Link href="/signup" style={{ color: "#08784e", fontWeight: 600, fontSize: 14 }}>Get started →</Link>
           </div>
         )}
       </header>
 
       {/* Hero */}
-      <section style={{ ...sectionStyle, padding: "88px 24px 96px" }}>
+      <section style={{ maxWidth: "none", margin: 0, padding: "88px max(calc((100% - 1080px)/2 + 24px), 24px) 96px", color: "#fff", background: "radial-gradient(ellipse at 78% 18%,#247954 0,transparent 33%),linear-gradient(115deg,#103b2d 0%,#124b35 62%,#0b382a 100%)", position: "relative", overflow: "hidden" }}>
         <div className="wp-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 48, alignItems: "center" }}>
           <div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#71847b", border: "1px solid #dce6df", borderRadius: 20, padding: "5px 12px", marginBottom: 22 }}>
-              <Zap size={11} color="#08784e" /> Built for Irish SMB energy accounts
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, color: "#d7eee0", border: "1px solid #ffffff32", borderRadius: 20, padding: "7px 12px", marginBottom: 22, background: "#ffffff0d" }}>
+              <Zap size={12} color="#73d5a5" /> Built for Irish business energy
             </div>
-            <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.5px", margin: "0 0 20px" }}>
-              Know before your contract renews.
+            <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: "clamp(38px, 5.5vw, 62px)", fontWeight: 800, lineHeight: 1.04, letterSpacing: "-1.8px", margin: "0 0 20px", maxWidth: 620 }}>
+              Make every energy contract work harder.
             </h1>
-            <p style={{ fontSize: 17, lineHeight: 1.6, color: "#71847b", maxWidth: 460, margin: "0 0 32px" }}>
-              GnóRate tracks every electricity and gas account, reads your bills automatically, and tells you whether renewing or switching is the right call — before you roll onto a worse rate.
+            <p style={{ fontSize: 16, lineHeight: 1.7, color: "#d0e2d7", maxWidth: 490, margin: "0 0 30px" }}>
+              One clear view of your sites, bills, usage and renewal dates. GnóRate helps your team find better options before a contract rolls over.
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
               <Link
                 href="/signup"
                 className="wp-cta"
-                style={{ background: "#08784e", color: "#ffffff", fontWeight: 600, fontSize: 15, padding: "13px 22px", borderRadius: 8, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8 }}
+                style={{ background: "#57ca8c", color: "#103b2d", fontWeight: 800, fontSize: 14, padding: "14px 20px", borderRadius: 8, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 8px 22px #061f1533" }}
               >
                 Get started free <ArrowRight size={16} />
               </Link>
-              <Link href="/login" className="wp-nav-link" style={{ fontSize: 15 }}>
+              <Link href="/login" className="wp-nav-link" style={{ fontSize: 14, color: "#e2f1e7", fontWeight: 600 }}>
                 Log in
               </Link>
             </div>
+            <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 34, color: "#b5d2c1", fontSize: 10.5, fontWeight: 600 }}>
+              <span>Electricity &amp; gas</span><span>Multi-site portfolios</span><span>Built around Irish tariffs</span>
+            </div>
           </div>
           <div className="wp-hero-card-wrap" style={{ display: "flex", justifyContent: "flex-end" }}>
-            <HeroCard />
+            <div style={{ width: 390, maxWidth: "100%", padding: 15, border: "1px solid #ffffff26", borderRadius: 17, background: "#ffffff0d", boxShadow: "0 32px 80px #061f1540", backdropFilter: "blur(10px)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 4px 13px", color: "#d7eee0", fontSize: 9, fontWeight: 800, letterSpacing: 1.1 }}><span>CLIENT PORTAL PREVIEW</span><span style={{ width: 7, height: 7, borderRadius: 8, background: "#65d69c" }} /></div>
+              <HeroCard />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginTop: 10 }}>
+                {[ ["ACCOUNTS TRACKED", "12 sites"], ["NEXT RENEWAL", "62 days"] ].map(([label, value]) => <div key={label} style={{ padding: "11px 12px", border: "1px solid #ffffff20", borderRadius: 8, background: "#ffffff0c" }}><div style={{ color: "#b5d2c1", fontSize: 8, letterSpacing: .8, marginBottom: 5 }}>{label}</div><strong style={{ color: "#fff", font: "700 12px Manrope,sans-serif" }}>{value}</strong></div>)}
+              </div>
+            </div>
           </div>
         </div>
       </section>

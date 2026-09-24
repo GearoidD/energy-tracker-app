@@ -58,6 +58,23 @@ a {
 .portal-heading p { color:var(--muted); margin:0; font-size:13px; }
 .portal-kicker { color:var(--teal); font-size:10px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase; margin-bottom:8px; }
 .gn-overview { margin: 4px 0 26px; display:grid; gap:16px; }
+.gn-welcome-panel { position:relative; isolation:isolate; overflow:hidden; display:flex; justify-content:space-between; align-items:center; gap:28px; min-height:206px; padding:28px 32px; border:1px solid #164d39; border-radius:18px; background:radial-gradient(ellipse at 85% 25%,#1f7854 0,transparent 34%),linear-gradient(115deg,#103d2e 0%,#15553c 62%,#176345 100%); color:#fff; box-shadow:0 14px 36px #123f2d1b; }
+.gn-welcome-copy,.gn-welcome-insight { position:relative; z-index:1; }
+.gn-welcome-copy { max-width:620px; }
+.gn-welcome-eyebrow { display:flex; align-items:center; gap:8px; color:#b7e2c8; font-size:9px; font-weight:800; letter-spacing:1.5px; }
+.gn-welcome-eyebrow i { width:7px; height:7px; border-radius:50%; background:#61dda1; box-shadow:0 0 0 4px #61dda129; }
+.gn-welcome-copy h2 { margin:13px 0 8px; max-width:520px; color:#fff; font:800 clamp(23px,3vw,31px)/1.15 Manrope,sans-serif; letter-spacing:-1px; }
+.gn-welcome-copy p { max-width:495px; margin:0; color:#d0e4d8; font-size:12px; line-height:1.65; }
+.gn-welcome-actions { display:flex; align-items:center; flex-wrap:wrap; gap:18px; margin-top:21px; }
+.gn-welcome-actions button { display:flex; align-items:center; gap:8px; padding:10px 13px; border:1px solid #fff; border-radius:8px; background:#fff; color:#14533a; font-size:11px; font-weight:800; cursor:pointer; transition:transform .16s ease,box-shadow .16s ease; }
+.gn-welcome-actions button:hover { transform:translateY(-1px); box-shadow:0 5px 14px #061e1540; }
+.gn-welcome-actions a { color:#e0f2e7; font-size:10.5px; font-weight:700; text-decoration:none; }
+.gn-welcome-actions a:hover { color:#fff; }
+.gn-welcome-insight { display:grid; gap:9px; width:min(100%,238px); flex:none; padding:17px 18px; border:1px solid #ffffff25; border-radius:12px; background:#ffffff10; backdrop-filter:blur(8px); }
+.gn-welcome-insight span { color:#c0decd; font-size:9px; font-weight:700; letter-spacing:.7px; text-transform:uppercase; }
+.gn-welcome-insight strong { color:#fff; font:800 21px Manrope,sans-serif; letter-spacing:-.5px; }
+.gn-welcome-insight small { color:#d3e8db; font-size:9.5px; line-height:1.5; }
+.gn-welcome-orb { position:absolute; z-index:-1; width:210px; height:210px; top:-112px; right:20%; border:1px solid #ffffff12; border-radius:50%; box-shadow:0 0 0 26px #ffffff08,0 0 0 52px #ffffff05; }
 .gn-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
 .gn-kpi,.gn-card { position:relative; background:#fff; border:1px solid #e1e9e3; border-radius:13px; box-shadow:0 4px 16px #183d2a08; }
 .gn-kpi { min-height:132px; padding:18px 18px 15px; overflow:hidden; }
@@ -125,5 +142,6 @@ a {
 @media(max-width:850px){ .portal-layout{grid-template-columns:1fr}.portal-sidebar{padding:12px;gap:8px}.portal-brand{padding:4px 8px 12px}.portal-nav-label,.portal-sidebar-foot{display:none}.portal-nav{display:flex;overflow:auto}.portal-nav a{white-space:nowrap;padding:10px}.portal-content{padding:22px 16px 44px} }
 @media(max-width:1050px){ .gn-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media(max-width:640px){ .gn-kpis,.gn-insight-grid{grid-template-columns:1fr}.gn-kpi{min-height:119px}.gn-card{min-height:205px}.gn-donut-row{justify-content:center}.gn-overview-foot{align-items:flex-start;flex-direction:column} }
+@media(max-width:700px){ .gn-welcome-panel{align-items:stretch;flex-direction:column;gap:20px;padding:23px 21px}.gn-welcome-insight{width:100%}.gn-welcome-actions{gap:13px} }
 @media(max-width:800px){ .gn-task-grid,.gn-settings-grid{grid-template-columns:1fr 1fr} }
 @media(max-width:560px){ .gn-task-grid,.gn-settings-grid,.gn-action-grid{grid-template-columns:1fr}.gn-task-list button{grid-template-columns:9px minmax(0,1fr)}.gn-task-card:nth-child(2) .gn-task-list button{grid-template-columns:36px minmax(0,1fr)}.gn-task-list strong{grid-column:2} }
