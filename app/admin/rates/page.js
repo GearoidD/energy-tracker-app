@@ -22,11 +22,11 @@ export default async function AdminRatesPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", padding: "40px 24px" }}>
-      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap');` }} />
+      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');` }} />
       <div style={{ maxWidth: 900, margin: "0 auto 24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <Zap size={20} color="var(--teal)" />
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)" }}>
+          <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)" }}>
             <span style={{ color: "var(--teal)" }}>GnóRate</span> — Platform
           </span>
         </div>

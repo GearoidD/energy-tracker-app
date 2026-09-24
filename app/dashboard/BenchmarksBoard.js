@@ -46,7 +46,7 @@ function BenchmarkForm({ initial, onSave, onCancel }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>
             {initial ? "Edit benchmark" : "Add a market rate benchmark"}
           </h2>
           <button onClick={onCancel} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
@@ -91,7 +91,7 @@ function BenchmarkForm({ initial, onSave, onCancel }) {
               if (!form.typical_rate) return;
               onSave(form);
             }}
-            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             {initial ? "Save changes" : "Add benchmark"}
           </button>
@@ -169,7 +169,7 @@ export default function BenchmarksBoard({ companyId, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, margin: 0 }}>Market rate benchmarks</h2>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 20, fontWeight: 700, margin: 0 }}>Market rate benchmarks</h2>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
             <X size={22} />
           </button>
@@ -183,7 +183,7 @@ export default function BenchmarksBoard({ companyId, onClose }) {
             setEditing(null);
             setShowForm(true);
           }}
-          style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, marginBottom: 16 }}
+          style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, marginBottom: 16 }}
         >
           <Plus size={16} /> Add benchmark
         </button>

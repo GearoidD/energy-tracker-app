@@ -130,7 +130,7 @@ export default function AllCompaniesView({ companies }) {
 
   return (
     <div>
-      <h1 style={{ fontFamily: "'Lora', serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>All companies</h1>
+      <h1 style={{ fontFamily: "'Manrope', serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>All companies</h1>
       <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 20 }}>
         {companies.length} compan{companies.length === 1 ? "y" : "ies"} · {grandTotalAccounts} account{grandTotalAccounts === 1 ? "" : "s"} total
         {grandTotalAttention > 0 && <span style={{ color: "var(--amber)", fontWeight: 600 }}> · {grandTotalAttention} need attention</span>}
@@ -148,7 +148,7 @@ export default function AllCompaniesView({ companies }) {
                 style={{ display: "flex", alignItems: "center", gap: 16, width: "100%", background: "none", border: "none", padding: "14px 18px", cursor: "pointer", textAlign: "left" }}
               >
                 <ChevronDown size={14} color="var(--muted)" style={{ transform: isExpanded ? "none" : "rotate(-90deg)", flexShrink: 0, transition: "transform 0.15s ease" }} />
-                <strong style={{ fontFamily: "'Lora', serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{company.name}</strong>
+                <strong style={{ fontFamily: "'Manrope', serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{company.name}</strong>
                 <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{data.accounts.length} account{data.accounts.length === 1 ? "" : "s"}</span>
                 {data.attentionCount > 0 && (
                   <span style={{ fontSize: 12.5, color: "var(--amber)", fontWeight: 600 }}>{data.attentionCount} need attention</span>

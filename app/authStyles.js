@@ -21,13 +21,13 @@ export const authStyles = {
     marginBottom: 24,
   },
   brandText: {
-    fontFamily: "'Space Grotesk', sans-serif",
+    fontFamily: "'Manrope', sans-serif",
     fontWeight: 600,
     fontSize: 15,
     color: "var(--text)",
   },
   h1: {
-    fontFamily: "'Space Grotesk', sans-serif",
+    fontFamily: "'Manrope', sans-serif",
     fontSize: 22,
     fontWeight: 700,
     margin: "0 0 4px 0",
@@ -62,7 +62,7 @@ export const authStyles = {
   button: {
     background: "var(--teal)",
     border: "none",
-    color: "#06201d",
+    color: "#ffffff",
     padding: "11px 16px",
     borderRadius: 6,
     cursor: "pointer",

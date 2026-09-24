@@ -69,7 +69,7 @@ export default function EmailTools() {
                 style={{
                   background: "var(--teal)",
                   border: "none",
-                  color: "#06201d",
+                  color: "#ffffff",
                   padding: "6px 14px",
                   borderRadius: 6,
                   cursor: loadingKey === t.key ? "default" : "pointer",

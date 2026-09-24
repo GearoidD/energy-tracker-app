@@ -44,11 +44,11 @@ function SignupForm() {
       <div style={{ maxWidth: 440 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 28 }}>
           <Zap size={20} color="var(--teal)" />
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)" }}>
+          <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)" }}>
             <span style={{ color: "var(--teal)" }}>GnóRate</span>
           </span>
         </div>
-        <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 30, fontWeight: 700, color: "var(--text)", lineHeight: 1.15, margin: "0 0 16px" }}>
+        <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 30, fontWeight: 700, color: "var(--text)", lineHeight: 1.15, margin: "0 0 16px" }}>
           Know before your contract renews.
         </h2>
         <p style={{ fontSize: 14.5, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 36px", maxWidth: 380 }}>
@@ -63,7 +63,7 @@ function SignupForm() {
     return (
       <div style={s.page}>
         <style dangerouslySetInnerHTML={{ __html: `
-          @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
           @media (max-width: 900px) { .wp-auth-left { display: none !important; } }
         ` }} />
         {LeftPanel}
@@ -90,7 +90,7 @@ function SignupForm() {
   return (
     <div style={s.page}>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
         @media (max-width: 900px) { .wp-auth-left { display: none !important; } }
       ` }} />
       {LeftPanel}

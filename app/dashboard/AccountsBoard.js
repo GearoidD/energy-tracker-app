@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal, FileText } from "lucide-react";
+import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal, FileText, Building2, Users } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import jsPDF from "jspdf";
@@ -15,7 +15,6 @@ import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
 import BenchmarksBoard from "./BenchmarksBoard";
 import CompanyOverview from "./CompanyOverview";
-import WoodpeckerMascot from "@/app/WoodpeckerMascot";
 
 const HORIZON_DAYS = 120;
 
@@ -125,7 +124,7 @@ function exportAccountsExcel(accounts) {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Accounts");
-  XLSX.writeFile(wb, `wattpryce-accounts-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, `gnorate-accounts-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 const MISSING_BILL_DAYS = 45;
@@ -355,7 +354,7 @@ function RateSparkline({ readings }) {
   }));
 
   const trendUp = rates[rates.length - 1] > rates[0];
-  const color = trendUp ? "#E8A33D" : "#2FA79A";
+  const color = trendUp ? "#b87412" : "#12895d";
   const last = coords[coords.length - 1];
 
   return (
@@ -471,7 +470,7 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>
             {initial ? "Edit account" : "Add account"}
           </h2>
           <button onClick={onCancel} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
@@ -614,7 +613,7 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
               setFormError(null);
               onSave(form);
             }}
-            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             {initial ? "Save changes" : "Add account"}
           </button>
@@ -652,38 +651,38 @@ function ReadingsChart({ readings, marketRate }) {
     <div style={{ width: "100%", height: 240, marginBottom: 10 }}>
       <ResponsiveContainer>
         <LineChart data={data} margin={{ top: 6, right: 6, left: -8, bottom: 0 }}>
-          <CartesianGrid stroke="#24403F" strokeDasharray="3 3" />
-          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fill: "#8FA6A3" }} />
+          <CartesianGrid stroke="#dce6df" strokeDasharray="3 3" />
+          <XAxis dataKey="dateLabel" tick={{ fontSize: 10, fill: "#71847b" }} />
           <YAxis
             yAxisId="usage"
-            tick={{ fontSize: 10, fill: "#8FA6A3" }}
+            tick={{ fontSize: 10, fill: "#71847b" }}
             width={44}
-            label={{ value: "kWh", angle: -90, position: "insideLeft", fontSize: 10, fill: "#8FA6A3" }}
+            label={{ value: "kWh", angle: -90, position: "insideLeft", fontSize: 10, fill: "#71847b" }}
           />
           <YAxis
             yAxisId="rate"
             orientation="right"
-            tick={{ fontSize: 10, fill: "#8FA6A3" }}
+            tick={{ fontSize: 10, fill: "#71847b" }}
             width={44}
-            label={{ value: "c/kWh", angle: 90, position: "insideRight", fontSize: 10, fill: "#8FA6A3" }}
+            label={{ value: "c/kWh", angle: 90, position: "insideRight", fontSize: 10, fill: "#71847b" }}
           />
           <Tooltip
             contentStyle={{ background: "var(--panel)", border: "1px solid var(--border-light)", fontSize: 12 }}
             labelStyle={{ color: "var(--text)" }}
             formatter={(value, name) => [name === "Usage (kWh)" ? `${value} kWh` : `${value}c/kWh`, name]}
           />
-          <Legend wrapperStyle={{ fontSize: 11, color: "#8FA6A3" }} />
+          <Legend wrapperStyle={{ fontSize: 11, color: "#71847b" }} />
           {marketRate && (
             <ReferenceLine
               yAxisId="rate"
               y={marketRate}
-              stroke="#8FA6A3"
+              stroke="#71847b"
               strokeDasharray="4 4"
-              label={{ value: "Market rate", fontSize: 9, fill: "#8FA6A3", position: "insideTopRight" }}
+              label={{ value: "Market rate", fontSize: 9, fill: "#71847b", position: "insideTopRight" }}
             />
           )}
-          <Line yAxisId="usage" type="monotone" dataKey="usage" name="Usage (kWh)" stroke="#2FA79A" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-          <Line yAxisId="rate" type="monotone" dataKey="rate" name="Rate (c/kWh)" stroke="#E8A33D" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+          <Line yAxisId="usage" type="monotone" dataKey="usage" name="Usage (kWh)" stroke="#12895d" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+          <Line yAxisId="rate" type="monotone" dataKey="rate" name="Rate (c/kWh)" stroke="#b87412" strokeWidth={2} dot={{ r: 3 }} connectNulls />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -704,7 +703,7 @@ function ManualReadingForm({ onSave, onCancel }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Add a reading</h2>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Add a reading</h2>
           <button onClick={onCancel} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
             <X size={20} />
           </button>
@@ -729,7 +728,7 @@ function ManualReadingForm({ onSave, onCancel }) {
           </button>
           <button
             onClick={() => onSave(form)}
-            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             Save reading
           </button>
@@ -1243,11 +1242,11 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
     doc.setFontSize(7.5);
     doc.setTextColor(...muted);
-    doc.text("Generated by GnóRate — wattpryce.com", 14, pageHeight - 10);
+    doc.text("Generated by GnóRate · Client portal", 14, pageHeight - 10);
     doc.text(`Page ${i} of ${pageCount}`, pageWidth - 30, pageHeight - 10);
   }
 
-  doc.save(`wattpryce-portfolio-summary-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`gnorate-portfolio-summary-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
@@ -1427,24 +1426,25 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
     doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
     doc.setFontSize(7.5);
     doc.setTextColor(...muted);
-    doc.text("Generated by GnóRate — wattpryce.com", 14, pageHeight - 10);
+    doc.text("Generated by GnóRate · Client portal", 14, pageHeight - 10);
     doc.text(`Page ${i} of ${pageCount}`, pageWidth - 30, pageHeight - 10);
   }
 
-  doc.save(`wattpryce-savings-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`gnorate-savings-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export default function AccountsBoard({ companyId, companyName, lockedLocation, companyIds, companiesById, section = "overview" }) {
   const combinedMode = Array.isArray(companyIds) && companyIds.length > 0;
   const supabase = createClient();
   const searchParams = useSearchParams();
+  const currentSearchTerm = searchParams.get("search") || "";
   const router = useRouter();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(currentSearchTerm);
   const [filterFuel, setFilterFuel] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRenewal, setFilterRenewal] = useState("all");
@@ -1487,6 +1487,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const [ratePullError, setRatePullError] = useState(null);
   const [showAccountNumbers, setShowAccountNumbers] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  useEffect(() => {
+    setSearch(currentSearchTerm);
+  }, [currentSearchTerm]);
 
   const pullMarketRate = async (account) => {
     setRatePullFor(account.id);
@@ -2234,8 +2238,18 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     return months;
   }, [readingSummaries]);
 
-  const comparisonCount = enrichedAll.filter((account) => account.comparison).length;
+  const opportunityCount = enrichedAll.filter((account) => account.saving != null && account.saving > 20).length;
+  const annualUsageTotal = enriched.reduce((sum, account) => sum + (Number(account.usage) || 0), 0);
   const spendTotal = utilitySpend.electricity + utilitySpend.gas;
+  const showAccountTable = ["accounts", "rates", "usage", "renewals", "savings"].includes(section) || !!lockedLocation;
+  const dashboardRenewals = enrichedAll.filter((account) => account.daysLeft !== null && account.daysLeft <= HORIZON_DAYS).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5);
+  const dashboardActions = [...new Map(attentionItems.map((item) => [item.account.id, item])).values()].slice(0, 5);
+  const openDashboardAccount = (account) => {
+    setSearch(account.name);
+    setExpandedId(account.id);
+    jumpToAccount(account);
+    router.push(`/dashboard?section=accounts&search=${encodeURIComponent(account.name)}`);
+  };
 
   if (loading) {
     return <div style={{ color: "var(--muted)", padding: 40 }}>Loading accounts…</div>;
@@ -2276,10 +2290,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         }
       ` }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 14 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <WoodpeckerMascot size={48} />
+        <div style={{ display: lockedLocation || ["overview", "reports", "settings"].includes(section) ? "none" : "flex", alignItems: "flex-start", gap: 12 }}>
+          <span className="gn-section-mark"><Building2 size={19}/></span>
           <div>
-            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>{combinedMode ? "All companies" : ({ overview: "Portfolio overview", accounts: "Accounts", rates: "Rate opportunities", usage: "Usage", renewals: "Upcoming renewals", savings: "Savings opportunities", reports: "Reports", settings: "Workspace settings" }[section] || "Accounts")}</h1>
+            <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>{combinedMode ? "All companies" : ({ overview: "Portfolio overview", accounts: "Accounts", rates: "Rate opportunities", usage: "Usage", renewals: "Upcoming renewals", savings: "Savings opportunities", reports: "Reports", settings: "Workspace settings" }[section] || "Accounts")}</h1>
             <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
               {combinedMode ? "Every account across every company you belong to." : section === "rates" ? "Accounts with a current market comparison, connected to your Irish tariff data." : section === "usage" ? "Accounts with usage data on file. Upload a bill to keep readings up to date." : section === "renewals" ? "Contracts ending within the next 120 days, ordered by urgency." : section === "savings" ? "Accounts where current market comparisons indicate a potential saving." : "Your utility portfolio, connected to your existing account and bill data."}
             </p>
@@ -2291,7 +2305,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", position: "relative" }}>
-          {!combinedMode && (
+          {!combinedMode && ["overview", "accounts", "usage"].includes(section) && (
             <button
               onClick={() => setUploadingFor("new")}
               style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
@@ -2299,13 +2313,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               <Upload size={16} /> Upload a bill
             </button>
           )}
-          {!combinedMode && (
+          {!combinedMode && ["overview", "accounts"].includes(section) && (
             <button
               onClick={() => {
                 setEditing(null);
                 setShowForm(true);
               }}
-              style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
             >
               <Plus size={16} /> Add account
             </button>
@@ -2315,7 +2329,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               Switch to a specific company to add accounts or upload bills
             </span>
           )}
-          <div style={{ position: "relative" }}>
+          <div style={{ position: "relative", display: ["overview", "accounts"].includes(section) ? "block" : "none" }}>
             <button
               onClick={() => setShowMoreMenu((v) => !v)}
               style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--muted)", padding: "10px 12px", borderRadius: 8, display: "flex", alignItems: "center", cursor: "pointer" }}
@@ -2378,10 +2392,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       {section === "overview" && !lockedLocation && (
         <section className="gn-overview" aria-label="Portfolio overview">
           <div className="gn-kpis">
-            <article className="gn-kpi"><span>Annual utility spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></article>
-            <article className="gn-kpi gn-kpi-highlight"><span>Potential savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Across compared rates" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></article>
-            <article className="gn-kpi"><span>Active contracts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></article>
-            <article className="gn-kpi"><span>Rate opportunities</span><strong>{comparisonCount}</strong><small>Accounts with market comparisons</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></article>
+            <article className="gn-kpi"><span>Estimated annual spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></article>
+            <article className="gn-kpi gn-kpi-highlight"><span>Potential savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Estimated per year against current comparisons" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></article>
+            <article className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></article>
+            <article className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></article>
           </div>
           <div className="gn-insight-grid">
             <article className="gn-card">
@@ -2394,22 +2408,36 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             </article>
           </div>
           <div className="gn-overview-foot"><span><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need a review` : "Your portfolio is up to date"}</span><Link href="/dashboard?section=accounts">View all accounts <span aria-hidden="true">→</span></Link></div>
+          <div className="gn-task-grid">
+            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Next actions from your account data</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
+              {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
+            </article>
+            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Upcoming renewals</h2><p>Contracts due within 120 days</p></div><Link href="/dashboard?section=renewals" className="gn-card-link">All renewals →</Link></div>
+              {dashboardRenewals.length ? <div className="gn-task-list">{dashboardRenewals.map((account) => <button key={account.id} onClick={() => openDashboardAccount(account)}><span className="gn-task-date">{account.daysLeft < 0 ? `${Math.abs(account.daysLeft)}d` : `${account.daysLeft}d`}</span><span><b>{account.name}</b><small>{account.provider || "Supplier not set"} · {account.daysLeft < 0 ? "overdue" : "to contract end"}</small></span><strong>{account.daysLeft < 0 ? "Urgent" : "Review →"}</strong></button>)}</div> : <div className="gn-task-empty">No contracts are due in the next 120 days.</div>}
+            </article>
+          </div>
         </section>
       )}
+
+      {showAccountTable && section !== "accounts" && !lockedLocation && <div className="gn-section-summary"><strong>{enriched.length}</strong><span>{section === "rates" ? "accounts with a current market comparison" : section === "usage" ? `${Math.round(annualUsageTotal).toLocaleString("en-IE")} kWh estimated annual usage across accounts with data` : section === "renewals" ? "contracts overdue or ending within the next 120 days" : `${fmtMoney(enriched.reduce((sum, account) => sum + (account.saving > 20 ? account.saving : 0), 0))} estimated savings per year across positive comparisons`}</span>{section === "rates" && <button className="gn-inline-action" onClick={() => setShowBenchmarks(true)}>Market benchmarks →</button>}</div>}
+
+      {section === "reports" && <section className="gn-action-grid"><button onClick={() => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries)}><FileText size={20}/><b>Portfolio report</b><span>Download a PDF summary of accounts and attention items.</span><strong>Download PDF →</strong></button><button onClick={() => generateSavingsReport(enrichedAll, summaryStats, companyName)}><TrendingDown size={20}/><b>Savings report</b><span>Review current savings estimates and comparisons.</span><strong>Download PDF →</strong></button><button onClick={() => exportAccountsExcel(accounts)}><Download size={20}/><b>Account data</b><span>Export your account register as a spreadsheet.</span><strong>Export Excel →</strong></button><button onClick={() => setShowOverview(true)}><BarChart3 size={20}/><b>Portfolio overview</b><span>Open a detailed portfolio summary.</span><strong>Open overview →</strong></button></section>}
+
+      {section === "settings" && <section className="gn-settings-grid"><article className="gn-card"><div className="gn-settings-icon"><Building2 size={20}/></div><h2>Company workspace</h2><p>{companyName || "Set up a company workspace"}</p><span>Company data, accounts and utility records are shared with your invited team members.</span><button onClick={() => router.push("/dashboard/all-companies")}>Manage companies →</button></article><article className="gn-card"><div className="gn-settings-icon"><Users size={20}/></div><h2>Team access</h2><p>Invite colleagues and manage membership.</p><span>Team access follows the active company selected in the header.</span><button onClick={() => window.dispatchEvent(new Event("gnorate:open-team"))}>Manage team →</button></article><article className="gn-card"><div className="gn-settings-icon"><BarChart3 size={20}/></div><h2>Market benchmarks</h2><p>Review benchmark rates for your account categories.</p><span>Current comparisons use account details alongside available Irish tariff data.</span><button onClick={() => setShowBenchmarks(true)}>Open benchmarks →</button></article></section>}
 
       {lockedLocation ? (
         <div style={{ marginBottom: 22 }}>
           <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--muted)", textDecoration: "none", marginBottom: 12, width: "fit-content" }}>
             <ChevronDown size={13} style={{ transform: "rotate(90deg)" }} /> All locations
           </Link>
-          <h2 style={{ fontFamily: "'Lora', serif", fontSize: 20, fontWeight: 600, margin: 0 }}>{lockedLocation}</h2>
+          <h2 style={{ fontFamily: "'Manrope', serif", fontSize: 20, fontWeight: 600, margin: 0 }}>{lockedLocation}</h2>
         </div>
-      ) : (
+      ) : section === "accounts" ? (
         <>
           {/* HERO — the dominant element on the page: what needs attention, why, where, what to do next */}
           <div style={{ border: `1px solid ${summaryStats.needAttention > 0 ? "var(--amber)" : "var(--border)"}`, borderRadius: 14, padding: "20px 22px 18px", marginBottom: 16, background: "var(--panel)" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 4 }}>
-              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 44, fontWeight: 700, lineHeight: 1, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 44, fontWeight: 700, lineHeight: 1, color: summaryStats.needAttention > 0 ? "var(--amber)" : "var(--text)" }}>
                 {summaryStats.needAttention}
               </span>
               <span style={{ fontSize: 18, color: "var(--text)" }}>
@@ -2550,7 +2578,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               disabled={summaryStats.needAttention === 0}
               style={{
                 background: summaryStats.needAttention > 0 ? "var(--teal)" : "var(--border)",
-                color: "#06201d",
+                color: "#ffffff",
                 border: "none",
                 borderRadius: 8,
                 padding: "11px 20px",
@@ -2630,9 +2658,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             )}
           </div>
         </>
-      )}
+      ) : null}
 
-      {(() => {
+      {showAccountTable && (() => {
         const locations = [...new Set(accounts.map((a) => a.location).filter(Boolean))].sort();
         const locationFuelInfo = {};
         locations.forEach((loc) => {
@@ -2679,7 +2707,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               >
                 <SlidersHorizontal size={14} /> Filters
                 {activeFilterCount > 0 && (
-                  <span style={{ background: "var(--teal)", color: "#06201d", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>
+                  <span style={{ background: "var(--teal)", color: "#ffffff", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>
                     {activeFilterCount}
                   </span>
                 )}
@@ -2793,7 +2821,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         );
       })()}
 
-      {filterLocation !== "all" && (
+      {showAccountTable && filterLocation !== "all" && (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 16px", marginBottom: 14, display: "flex", gap: 20, fontSize: 12.5, color: "var(--muted)" }}>
           <span>
             <strong style={{ color: "var(--text)" }}>{enriched.length}</strong> account{enriched.length === 1 ? "" : "s"} at {filterLocation}
@@ -2823,7 +2851,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
 
       {error && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
-      {selectedIds.size > 0 && (
+      {showAccountTable && selectedIds.size > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{selectedIds.size} selected</span>
           <button
@@ -2862,7 +2890,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 420, maxWidth: "100%", padding: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>
+            <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>
               Email {selectedIds.size} account{selectedIds.size === 1 ? "" : "s"}
             </h2>
             {(() => {
@@ -2895,7 +2923,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         alignItems: "center",
                         gap: 6,
                         background: "var(--teal)",
-                        color: "#06201d",
+                        color: "#ffffff",
                         textDecoration: "none",
                         borderRadius: 6,
                         padding: "8px 12px",
@@ -2943,11 +2971,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         </div>
       )}
 
-      {enriched.length === 0 ? (
+      {showAccountTable && (enriched.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--muted)", border: "1px dashed var(--border)", borderRadius: 12 }}>
           <Flame size={28} color="var(--teal-dim)" style={{ marginBottom: 10 }} />
           <div style={{ fontSize: 14 }}>
-            {accounts.length === 0 ? "No accounts yet. Add your first energy account to start tracking renewals." : "No accounts match that search or filter."}
+            {accounts.length === 0 ? "No accounts yet. Add your first utility account to start tracking rates and renewals." : section === "rates" ? "No current market comparisons. Check that account usage and supplier rate data are available." : section === "usage" ? "No accounts have usage data yet. Upload a bill or add usage details to start a trend." : section === "renewals" ? "No contracts are overdue or ending within 120 days." : section === "savings" ? "No positive savings comparisons are available yet. Review current rates and account usage." : "No accounts match that search or filter."}
           </div>
         </div>
       ) : (
@@ -2990,7 +3018,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   }}
                 >
                   <ChevronDown size={14} color="var(--muted)" style={{ transform: isExpanded ? "none" : "rotate(-90deg)", flexShrink: 0, transition: "transform 0.15s ease" }} />
-                  <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>{item.location}</span>
+                  <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>{item.location}</span>
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>
                     {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"} · {fuelLabel}
                     {groupAttentionCount > 0 ? (
@@ -3042,7 +3070,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     <Zap size={13} color="var(--teal)" style={{ flexShrink: 0 }} />
                   )}
                   <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 8, overflow: "hidden" }}>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {a.name}
                     </span>
                     {combinedMode && companiesById?.[a.company_id] && (
@@ -3097,7 +3125,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                       borderRadius: 5,
                       padding: "3px 9px",
                       ...(overall.color === "var(--red)"
-                        ? { color: "#0E1A1D", background: overall.color }
+                        ? { color: "#ffffff", background: overall.color }
                         : { color: overall.color, background: "none", border: `1px solid ${overall.color}66` }),
                     }}
                   >
@@ -3452,7 +3480,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                                             alignItems: "center",
                                             gap: 6,
                                             background: "var(--teal)",
-                                            color: "#06201d",
+                                            color: "#ffffff",
                                             textDecoration: "none",
                                             borderRadius: 6,
                                             padding: "6px 10px",
@@ -3554,7 +3582,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                             </button>
                             <button
                               onClick={() => acceptPulledRate(a.id)}
-                              style={{ background: "var(--teal)", border: "none", color: "#06201d", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                              style={{ background: "var(--teal)", border: "none", color: "#ffffff", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                             >
                               Use this rate
                             </button>
@@ -3627,7 +3655,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                           />
                           <button
                             onClick={() => addNote(a.id)}
-                            style={{ background: "var(--teal)", border: "none", color: "#06201d", borderRadius: 6, padding: "0 16px", cursor: "pointer", fontWeight: 600, fontSize: 12.5, flexShrink: 0 }}
+                            style={{ background: "var(--teal)", border: "none", color: "#ffffff", borderRadius: 6, padding: "0 16px", cursor: "pointer", fontWeight: 600, fontSize: 12.5, flexShrink: 0 }}
                           >
                             Add
                           </button>
@@ -3664,9 +3692,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             );
           })}
         </div>
-      )}
+      ))}
 
-      {activityItems && activityItems.length > 0 && (
+      {showAccountTable && activityItems && activityItems.length > 0 && (
         <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
           <button
             onClick={() => setActivityExpanded((v) => !v)}
@@ -3775,7 +3803,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 420, maxWidth: "100%", padding: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>
+            <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>
               Bulk edit {selectedIds.size} account{selectedIds.size === 1 ? "" : "s"}
             </h2>
             <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>
@@ -3840,7 +3868,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               <button
                 onClick={saveBulkEdit}
                 disabled={bulkEditSaving}
-                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
               >
                 {bulkEditSaving ? "Saving…" : `Apply to ${selectedIds.size} account${selectedIds.size === 1 ? "" : "s"}`}
               </button>
@@ -3858,7 +3886,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 380, maxWidth: "100%", padding: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>Just renewed?</h2>
+            <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>Just renewed?</h2>
             <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 18 }}>
               Three quick fields — full details can wait for the next bill.
             </p>
@@ -3910,7 +3938,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               </button>
               <button
                 onClick={() => saveQuickRenew(quickRenewFor)}
-                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
               >
                 Save
               </button>

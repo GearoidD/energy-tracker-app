@@ -59,7 +59,7 @@ export default function TeamMembers({ companyId, currentUserId, isAdmin, onClose
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, margin: 0 }}>Team</h2>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 20, fontWeight: 700, margin: 0 }}>Team</h2>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
             <X size={22} />
           </button>

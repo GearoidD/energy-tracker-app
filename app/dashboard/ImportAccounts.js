@@ -119,7 +119,7 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Import accounts</h2>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>Import accounts</h2>
           {stage !== "importing" && (
             <button onClick={onCancel} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
               <X size={20} />
@@ -219,7 +219,7 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
                 style={{
                   background: validRows.length === 0 ? "var(--border)" : "var(--teal)",
                   border: "none",
-                  color: "#06201d",
+                  color: "#ffffff",
                   padding: "9px 18px",
                   borderRadius: 6,
                   cursor: validRows.length === 0 ? "not-allowed" : "pointer",
@@ -245,7 +245,7 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
             </div>
             <button
               onClick={onDone}
-              style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
             >
               Done
             </button>

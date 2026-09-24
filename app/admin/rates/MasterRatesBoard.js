@@ -127,7 +127,7 @@ export default function MasterRatesBoard() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>
+        <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>
           Master rates
         </h1>
         <p style={{ color: "var(--muted)", fontSize: 13.5, marginBottom: 12 }}>
@@ -228,7 +228,7 @@ export default function MasterRatesBoard() {
           <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={save}
-              style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
             >
               {editingId ? "Save changes" : "Add rate"}
             </button>

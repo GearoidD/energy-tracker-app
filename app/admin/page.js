@@ -58,12 +58,12 @@ export default async function AdminOverviewPage() {
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", padding: "40px 24px", fontFamily: "Inter, sans-serif" }}>
-      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');` }} />
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", padding: "40px 24px", fontFamily: "DM Sans, sans-serif" }}>
+      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');` }} />
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <Zap size={20} color="var(--teal)" />
-          <span style={{ fontFamily: "'Lora', serif", fontWeight: 600, fontSize: 16 }}>
+          <span style={{ fontFamily: "'Manrope', serif", fontWeight: 600, fontSize: 16 }}>
             <span style={{ color: "var(--teal)" }}>GnóRate</span> — Platform
           </span>
         </div>
@@ -77,7 +77,7 @@ export default async function AdminOverviewPage() {
           </Link>
         </div>
 
-        <h1 style={{ fontFamily: "'Lora', serif", fontSize: 24, fontWeight: 700, margin: "0 0 24px" }}>
+        <h1 style={{ fontFamily: "'Manrope', serif", fontSize: 24, fontWeight: 700, margin: "0 0 24px" }}>
           Platform overview
         </h1>
 

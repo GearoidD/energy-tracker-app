@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Zap, LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2, Shield } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +18,12 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
   const [showTeam, setShowTeam] = useState(false);
   const [inviteLink, setInviteLink] = useState(null);
   const [inviteError, setInviteError] = useState(null);
+
+  useEffect(() => {
+    const openTeam = () => setShowTeam(true);
+    window.addEventListener("gnorate:open-team", openTeam);
+    return () => window.removeEventListener("gnorate:open-team", openTeam);
+  }, []);
 
   const activeCompany = companies.find((c) => c.id === activeCompanyId);
 
@@ -118,7 +124,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", rowGap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Zap size={18} color="var(--teal)" />
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15 }}>
+          <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 15 }}>
             <span style={{ color: "var(--teal)" }}>GnóRate</span>
           </span>
         </div>
@@ -353,7 +359,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
             style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, padding: 24, width: 440, maxWidth: "100%" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 8px" }}>
+            <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: "0 0 8px" }}>
               Invite a teammate
             </h2>
             <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
@@ -364,7 +370,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
             {!inviteLink && (
               <button
                 onClick={createInvite}
-                style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 16px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+                style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 16px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
               >
                 Generate invite link
               </button>

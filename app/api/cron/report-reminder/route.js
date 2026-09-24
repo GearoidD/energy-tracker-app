@@ -39,7 +39,7 @@ export async function GET(request) {
                   <p style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 14px; color: #1f2124; margin: 0 0 12px;">
                     Your monthly portfolio summary is ready to view — renewals coming up, spend trends, and anything that needs attention.
                   </p>
-                  <a href="https://wattpryce.com/dashboard" style="display: inline-block; background-color: #2fa79a; color: #06201d; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 18px; border-radius: 6px;">
+                  <a href="https://wattpryce.com/dashboard" style="display: inline-block; background-color: #2fa79a; color: #ffffff; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 18px; border-radius: 6px;">
                     View your dashboard →
                   </a>
                   <p style="font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 12px; color: #6b6d70; margin: 16px 0 0;">

@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronLeft, Mail, Zap, Flame } from "lucide-react";
+import { ChevronDown, Mail, Zap, Flame } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import WoodpeckerMascot from "@/app/WoodpeckerMascot";
 
 const MISSING_BILL_DAYS = 45;
 const RATE_JUMP_THRESHOLD = 5;
@@ -192,19 +190,7 @@ function AttentionQueueInner({ companyId, companyName }) {
         @keyframes wpSoftIn { from { opacity: 0; } to { opacity: 1; } }
         .wp-soft-in { animation: wpSoftIn 0.22s ease both; }
       ` }} />
-      <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--muted)", textDecoration: "none", marginBottom: 16, width: "fit-content" }}>
-        <ChevronLeft size={14} /> All accounts
-      </Link>
-
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <WoodpeckerMascot size={48} />
-        <div>
-          <h1 style={{ fontFamily: "'Lora', serif", fontSize: 24, fontWeight: 700, margin: "0 0 6px" }}>{criticalOnly ? "Critical accounts" : "Attention queue"}</h1>
-          <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 14 }}>
-            {totalAccounts} account{totalAccounts === 1 ? "" : "s"} · {totalIssues} issue{totalIssues === 1 ? "" : "s"}
-          </p>
-        </div>
-      </div>
+      <div className="gn-section-summary"><strong>{totalAccounts}</strong><span>{criticalOnly ? "accounts in the critical queue" : `${totalIssues} issues across your portfolio`}</span></div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--text)" }}>
@@ -241,7 +227,7 @@ function AttentionQueueInner({ companyId, companyName }) {
               <div key={groupLabel}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: group.color, flexShrink: 0 }} />
-                  <h2 style={{ fontFamily: "'Lora', serif", fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text)" }}>{groupLabel}</h2>
+                  <h2 style={{ fontFamily: "'Manrope', serif", fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text)" }}>{groupLabel}</h2>
                   <span style={{ fontSize: 13, color: "var(--muted)" }}>{group.items.length} account{group.items.length === 1 ? "" : "s"}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

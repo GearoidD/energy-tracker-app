@@ -93,7 +93,7 @@ export default function RateReviewQueue() {
     <div style={{ maxWidth: 900, margin: "0 auto 40px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <Sparkles size={16} color="var(--teal)" />
-        <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700, margin: 0 }}>
+        <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 700, margin: 0 }}>
           Rate review queue
         </h2>
       </div>
@@ -149,7 +149,7 @@ export default function RateReviewQueue() {
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => confirm(item)}
-                style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--teal)", border: "none", color: "#06201d", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 12.5 }}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--teal)", border: "none", color: "#ffffff", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 12.5 }}
               >
                 <Check size={13} /> Confirm as verified
               </button>

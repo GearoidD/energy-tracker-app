@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Zap } from "lucide-react";
 
-const wrap = { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "Inter, sans-serif" };
+const wrap = { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "DM Sans, sans-serif" };
 const inner = { maxWidth: 760, margin: "0 auto", padding: "50px 24px 100px" };
-const h1 = { fontFamily: "'Space Grotesk', sans-serif", fontSize: 30, fontWeight: 700, marginBottom: 8 };
-const h2 = { fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 600, marginTop: 38, marginBottom: 12, paddingTop: 20, borderTop: "1px solid var(--border)" };
+const h1 = { fontFamily: "'Manrope', sans-serif", fontSize: 30, fontWeight: 700, marginBottom: 8 };
+const h2 = { fontFamily: "'Manrope', sans-serif", fontSize: 19, fontWeight: 600, marginTop: 38, marginBottom: 12, paddingTop: 20, borderTop: "1px solid var(--border)" };
 const p = { fontSize: 14.5, lineHeight: 1.7, color: "var(--muted)", marginBottom: 12 };
 const li = { fontSize: 14.5, lineHeight: 1.75, color: "var(--muted)", marginBottom: 8 };
 const strong = { color: "var(--text)" };
@@ -13,11 +13,11 @@ const code = { background: "var(--panel)", border: "1px solid var(--border)", bo
 export default function HelpPage() {
   return (
     <div style={wrap}>
-      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');` }} />
+      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');` }} />
       <div style={inner}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 28 }}>
           <Zap size={20} color="var(--teal)" />
-          <Link href="/" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)", textDecoration: "none" }}>
+          <Link href="/" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 16, color: "var(--text)", textDecoration: "none" }}>
             <span style={{ color: "var(--teal)" }}>GnóRate</span>
           </Link>
         </div>
@@ -30,7 +30,7 @@ export default function HelpPage() {
 
         <h2 style={{ ...h2, marginTop: 30, paddingTop: 0, borderTop: "none" }}>Getting started</h2>
         <p style={p}>
-          <strong style={strong}>Signing up:</strong> go to <Link href="/signup" style={{ color: "var(--teal)" }}>wattpryce.com/signup</Link>, enter your
+          <strong style={strong}>Signing up:</strong> go to <Link href="/signup" style={{ color: "var(--teal)" }}>GnóRate sign-up page</Link>, enter your
           email and a password. If a teammate invited you via a link, clicking it will automatically add you to their
           company once you sign up or log in — no extra steps needed.
         </p>

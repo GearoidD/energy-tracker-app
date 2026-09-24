@@ -38,7 +38,7 @@ function buildEmailHtml(accountsForCompany) {
               </tr>
               <tr>
                 <td>
-                  <a href="https://wattpryce.com/dashboard?renew=${a.id}" style="display: inline-block; background-color: #2fa79a; color: #06201d; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 600; text-decoration: none; padding: 8px 14px; border-radius: 6px;">
+                  <a href="https://wattpryce.com/dashboard?renew=${a.id}" style="display: inline-block; background-color: #2fa79a; color: #ffffff; font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 600; text-decoration: none; padding: 8px 14px; border-radius: 6px;">
                     Just renewed? Update it here
                   </a>
                 </td>

@@ -89,7 +89,7 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, margin: 0 }}>Company overview</h2>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 20, fontWeight: 700, margin: 0 }}>Company overview</h2>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
             <X size={22} />
           </button>
@@ -102,7 +102,7 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
               onClick={() => setRangeMonths(opt.months)}
               style={{
                 background: rangeMonths === opt.months ? "var(--teal)" : "none",
-                color: rangeMonths === opt.months ? "#06201d" : "var(--muted)",
+                color: rangeMonths === opt.months ? "#ffffff" : "var(--muted)",
                 border: `1px solid ${rangeMonths === opt.months ? "var(--teal)" : "var(--border)"}`,
                 borderRadius: 6,
                 padding: "6px 12px",
@@ -147,7 +147,7 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
                 onClick={() => setMetric(m.key)}
                 style={{
                   background: metric === m.key ? "var(--teal)" : "none",
-                  color: metric === m.key ? "#06201d" : "var(--muted)",
+                  color: metric === m.key ? "#ffffff" : "var(--muted)",
                   border: `1px solid ${metric === m.key ? "var(--teal)" : "var(--border)"}`,
                   borderRadius: 6,
                   padding: "5px 10px",
@@ -163,14 +163,14 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
           <div style={{ width: "100%", height: 280, marginBottom: 24 }}>
             <ResponsiveContainer>
               <LineChart data={monthly} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
-                <CartesianGrid stroke="#24403F" strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 13, fill: "#B8C7C4" }} tickLine={false} axisLine={{ stroke: "#24403F" }} />
+                <CartesianGrid stroke="#dce6df" strokeDasharray="3 3" />
+                <XAxis dataKey="label" tick={{ fontSize: 13, fill: "#71847b" }} tickLine={false} axisLine={{ stroke: "#dce6df" }} />
                 <YAxis
-                  tick={{ fontSize: 12, fill: "#B8C7C4" }}
+                  tick={{ fontSize: 12, fill: "#71847b" }}
                   width={64}
                   tickLine={false}
-                  axisLine={{ stroke: "#24403F" }}
-                  label={{ value: metric === "cost" ? "€" : "kWh", angle: -90, position: "insideLeft", fontSize: 12, fill: "#8FA6A3" }}
+                  axisLine={{ stroke: "#dce6df" }}
+                  label={{ value: metric === "cost" ? "€" : "kWh", angle: -90, position: "insideLeft", fontSize: 12, fill: "#71847b" }}
                 />
                 <Tooltip
                   contentStyle={{ background: "var(--panel)", border: "1px solid var(--border-light)", fontSize: 13, borderRadius: 8 }}
@@ -181,16 +181,16 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
                   type="monotone"
                   dataKey={metric}
                   name={metric === "cost" ? "Estimated cost" : "Usage"}
-                  stroke={metric === "cost" ? "#2FA79A" : "#E8A33D"}
+                  stroke={metric === "cost" ? "#12895d" : "#b87412"}
                   strokeWidth={2.5}
-                  dot={{ r: 4, strokeWidth: 0, fill: metric === "cost" ? "#2FA79A" : "#E8A33D" }}
+                  dot={{ r: 4, strokeWidth: 0, fill: metric === "cost" ? "#12895d" : "#b87412" }}
                   activeDot={{ r: 6 }}
                 >
                   <LabelList
                     dataKey={metric}
                     position="top"
                     formatter={(v) => (metric === "cost" ? `€${v.toLocaleString()}` : v.toLocaleString())}
-                    style={{ fontSize: 12, fill: "#EDF3F1", fontWeight: 600 }}
+                    style={{ fontSize: 12, fill: "#16342b", fontWeight: 600 }}
                   />
                 </Line>
               </LineChart>

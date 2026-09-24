@@ -62,7 +62,7 @@ export default function AddQuoteForm() {
         style={{
           background: "var(--teal)",
           border: "none",
-          color: "#06201d",
+          color: "#ffffff",
           padding: "10px 20px",
           borderRadius: 8,
           cursor: loading || text.trim().length < 20 ? "default" : "pointer",

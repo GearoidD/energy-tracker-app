@@ -18,13 +18,13 @@ export function HeroGauge() {
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#24403F" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#dce6df" strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="#E8A33D"
+          stroke="#b87412"
           strokeWidth={stroke}
           strokeDasharray={c}
           strokeDashoffset={c * (1 - fill)}
@@ -33,8 +33,8 @@ export function HeroGauge() {
         />
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 30, fontWeight: 600, color: "#EDF3F1", lineHeight: 1 }}>62</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: "#8FA6A3", letterSpacing: 1 }}>DAYS LEFT</span>
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 30, fontWeight: 600, color: "#16342b", lineHeight: 1 }}>62</span>
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: "#71847b", letterSpacing: 1 }}>DAYS LEFT</span>
       </div>
     </div>
   );
@@ -44,9 +44,9 @@ export function HeroCard() {
   return (
     <div
       style={{
-        background: "#142A2E",
-        border: "1px solid #2E4C4A",
-        borderLeft: "3px solid #E8A33D",
+        background: "#ffffff",
+        border: "1px solid #cbd9d0",
+        borderLeft: "3px solid #b87412",
         borderRadius: 12,
         padding: "20px 24px",
         display: "flex",
@@ -59,14 +59,14 @@ export function HeroCard() {
     >
       <HeroGauge />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 15, color: "#EDF3F1", marginBottom: 6 }}>
+        <div style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600, fontSize: 15, color: "#16342b", marginBottom: 6 }}>
           Warehouse 2 — Cork
         </div>
-        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#0E1A1D", background: "#E8A33D", display: "inline-flex", borderRadius: 5, padding: "3px 8px", marginBottom: 9 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: "#ffffff", background: "#b87412", display: "inline-flex", borderRadius: 5, padding: "3px 8px", marginBottom: 9 }}>
           Renewing soon
         </div>
-        <div style={{ fontSize: 12, color: "#8FA6A3", marginBottom: 4 }}>Energia · 24.9c/kWh</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#4C9A6A", fontSize: 12 }}>
+        <div style={{ fontSize: 12, color: "#71847b", marginBottom: 4 }}>Energia · 24.9c/kWh</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#278453", fontSize: 12 }}>
           <TrendingDown size={12} />
           Save ~€410/yr by switching
         </div>

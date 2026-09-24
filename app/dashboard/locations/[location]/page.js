@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AccountsBoard from "../../AccountsBoard";
 import Header from "../../Header";
+import PortalShell from "../../PortalShell";
 
 export const dynamic = "force-dynamic";
 
@@ -45,16 +46,8 @@ export default async function LocationPage({ params }) {
 
   const locationName = decodeURIComponent(params.location);
 
-  return (
-    <div style={{ minHeight: "100vh" }}>
-      <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
-        <AccountsBoard
-          companyId={activeCompanyId}
-          companyName={companies.find((c) => c.id === activeCompanyId)?.name || ""}
-          lockedLocation={locationName}
-        />
-      </div>
-    </div>
-  );
+  const companyName = companies.find((c) => c.id === activeCompanyId)?.name || "";
+  return <PortalShell sectionOverride="accounts" companyName={companyName} header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
+    <AccountsBoard companyId={activeCompanyId} companyName={companyName} lockedLocation={locationName} section="accounts" />
+  </PortalShell>;
 }

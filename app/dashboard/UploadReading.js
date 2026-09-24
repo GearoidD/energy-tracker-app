@@ -786,7 +786,7 @@ export default function UploadReading({
           <h2
             style={{
               fontFamily:
-                "'Space Grotesk', sans-serif",
+                "'Manrope', sans-serif",
               fontSize: 18,
               fontWeight: 600,
               margin: 0,
@@ -1236,7 +1236,7 @@ export default function UploadReading({
                   : "var(--border)",
                 border: "none",
                 color: frontFile
-                  ? "#06201d"
+                  ? "#ffffff"
                   : "var(--muted)",
                 padding: "11px 18px",
                 borderRadius: 6,
@@ -1956,7 +1956,7 @@ export default function UploadReading({
                     background:
                       "var(--teal)",
                     border: "none",
-                    color: "#06201d",
+                    color: "#ffffff",
                     padding:
                       "9px 18px",
                     borderRadius: 6,

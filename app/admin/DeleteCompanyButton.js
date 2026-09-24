@@ -48,7 +48,7 @@ export default function DeleteCompanyButton({ companyId, companyName }) {
         style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 420, maxWidth: "100%", padding: 24 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 8px", color: "var(--red)" }}>
+        <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 17, fontWeight: 600, margin: "0 0 8px", color: "var(--red)" }}>
           Delete {companyName}?
         </h2>
         <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>

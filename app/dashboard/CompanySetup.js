@@ -68,7 +68,7 @@ export default function CompanySetup({ onDone }) {
 
   return (
     <div style={{ maxWidth: 420, margin: "60px auto 0" }}>
-      <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, marginBottom: 6 }}>Set up your company</h1>
+      <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 22, marginBottom: 6 }}>Set up your company</h1>
       <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 24 }}>
         This creates a workspace you can switch into later from the header. You can add more companies at any time.
       </p>
@@ -97,7 +97,7 @@ export default function CompanySetup({ onDone }) {
           style={{
             background: "var(--teal)",
             border: "none",
-            color: "#06201d",
+            color: "#ffffff",
             padding: "11px 16px",
             borderRadius: 6,
             cursor: "pointer",

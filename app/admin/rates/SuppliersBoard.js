@@ -110,7 +110,7 @@ export default function SuppliersBoard() {
 
   return (
     <div style={{ maxWidth: 900, margin: "48px auto 0" }}>
-      <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, margin: "0 0 6px" }}>Suppliers</h2>
+      <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 20, fontWeight: 700, margin: "0 0 6px" }}>Suppliers</h2>
       <p style={{ color: "var(--muted)", fontSize: 13.5, marginBottom: 24 }}>
         Presaved contact details used by the "Request a quote" button on every account. If a supplier doesn't take quotes by
         email, leave "Accepts email quotes" off — the app will show their phone number instead of guessing at an email.
@@ -160,7 +160,7 @@ export default function SuppliersBoard() {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={save}
-            style={{ background: "var(--teal)", border: "none", color: "#06201d", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+            style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
             {editingId ? "Save changes" : "Add supplier"}
           </button>

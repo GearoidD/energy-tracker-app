@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AccountsBoard from "../AccountsBoard";
 import Header from "../Header";
+import PortalShell from "../PortalShell";
 
 export const dynamic = "force-dynamic";
 
@@ -37,16 +38,7 @@ export default async function AllCompaniesPage() {
     companiesById[c.id] = c.name;
   });
 
-  return (
-    <div style={{ minHeight: "100vh" }}>
-      <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
-        <AccountsBoard
-          companyIds={companies.map((c) => c.id)}
-          companiesById={companiesById}
-          companyName="All companies"
-        />
-      </div>
-    </div>
-  );
+  return <PortalShell companyName="All companies" header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
+    <AccountsBoard companyIds={companies.map((c) => c.id)} companiesById={companiesById} companyName="All companies" section="overview" />
+  </PortalShell>;
 }

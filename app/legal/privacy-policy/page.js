@@ -1,14 +1,14 @@
-const wrap = { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "Inter, sans-serif" };
+const wrap = { minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "DM Sans, sans-serif" };
 const inner = { maxWidth: 720, margin: "0 auto", padding: "60px 24px 100px" };
-const h1 = { fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 700, marginBottom: 8 };
-const h2 = { fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 600, marginTop: 32, marginBottom: 10 };
+const h1 = { fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 700, marginBottom: 8 };
+const h2 = { fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, marginTop: 32, marginBottom: 10 };
 const p = { fontSize: 14.5, lineHeight: 1.7, color: "var(--muted)", marginBottom: 14 };
 const li = { fontSize: 14.5, lineHeight: 1.7, color: "var(--muted)", marginBottom: 6 };
 
 export default function PrivacyPolicyPage() {
   return (
     <div style={wrap}>
-      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap');` }} />
+      <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');` }} />
       <div style={inner}>
         <h1 style={h1}>Privacy Policy</h1>
         <p style={{ ...p, fontSize: 13, marginBottom: 30 }}>Last updated: July 2026</p>

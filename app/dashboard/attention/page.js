@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AttentionQueue from "../AttentionQueue";
 import Header from "../Header";
+import PortalShell from "../PortalShell";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +44,8 @@ export default async function AttentionQueuePage() {
       ? profile.active_company_id
       : companies[0].id;
 
-  return (
-    <div style={{ minHeight: "100vh" }}>
-      <Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 20px 60px" }}>
-        <AttentionQueue companyId={activeCompanyId} companyName={companies.find((c) => c.id === activeCompanyId)?.name || ""} />
-      </div>
-    </div>
-  );
+  const companyName = companies.find((c) => c.id === activeCompanyId)?.name || "";
+  return <PortalShell sectionOverride="attention" companyName={companyName} header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
+    <AttentionQueue companyId={activeCompanyId} companyName={companyName} />
+  </PortalShell>;
 }

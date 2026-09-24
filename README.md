@@ -26,7 +26,7 @@ accounts (both have free tiers that comfortably cover this).
 cp .env.local.example .env.local
 ```
 
-Open `.env.local` and paste in the Project URL and anon key from step 1.
+Open `.env.local` and add your Supabase Project URL and anon key from step 1. The service role key and the AI, email, and cron keys are optional; add them only if you use those features. Never commit `.env.local` to GitHub.
 
 ## 3. Run it locally
 
@@ -57,18 +57,8 @@ code — refuses to return or accept data for any company other than the
 one the logged-in user belongs to. This is what makes it safe to have
 multiple companies using the same database.
 
-## What's deliberately left simple, for you or a developer to extend
+## Portal sections
 
-- **Inviting teammates**: right now, a second person from the same
-  company needs to sign up and you'd manually update their `company_id`
-  in the Supabase table editor to match. A proper invite-by-email flow
-  is a natural next step.
-- **Reminder emails**: this version shows status on the dashboard only.
-  Adding actual email/SMS reminders means a scheduled job (e.g. a Vercel
-  Cron function or Supabase Edge Function) that runs daily, checks which
-  accounts are within X days of `contract_end`, and sends via a service
-  like Resend or Postmark.
-- **Live market rates**: `market_rate` is still a manual field. Wiring
-  this to a real supplier/broker rate feed is the phase 3 work discussed
-  earlier — it depends on getting API access via a broker partnership or
-  TPI accreditation.
+The client portal includes a portfolio dashboard, an account register, rate comparisons, usage and bill history, renewals, savings opportunities, report exports, and workspace settings. These views reuse the existing Supabase account and reading data.
+
+The overview only shows spend estimates when enough bill history exists, and charts display a clear empty state until readings are available.
