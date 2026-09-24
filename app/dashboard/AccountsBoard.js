@@ -54,6 +54,11 @@ function fmtMoney(n) {
   return "€" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
+function fmtReportRate(rate) {
+  if (rate === null || rate === undefined || rate === "" || Number.isNaN(Number(rate))) return "-";
+  return `${Number(rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh`;
+}
+
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -938,15 +943,77 @@ function gnReportTableStyles() {
     headStyles: { fillColor: c.deep, textColor: c.white, font: "helvetica", fontSize: 8, fontStyle: "bold", cellPadding: 3.2, lineColor: c.deep },
     bodyStyles: { font: "helvetica", fontSize: 8, textColor: c.ink, cellPadding: 3.2, lineColor: c.border, lineWidth: 0.15 },
     alternateRowStyles: { fillColor: c.pale },
+    margin: { top: 25, bottom: 22, left: 14, right: 14 },
   };
 }
 
-function drawGnReportFooters(doc) {
+function drawGnReportSectionHeading(doc, title, y, detail = "") {
+  const c = GNORATE_REPORT;
+  doc.setFillColor(...c.green);
+  doc.roundedRect(14, y - 4.5, 1.4, detail ? 10 : 7, 0.6, 0.6, "F");
+  doc.setTextColor(...c.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11.5);
+  doc.text(title, 19, y);
+  if (detail) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...c.muted);
+    doc.text(detail, 19, y + 5);
+  }
+  return y + (detail ? 13 : 9);
+}
+
+function drawGnReportInsight(doc, { y, pageWidth, eyebrow, title, detail, value }) {
+  const c = GNORATE_REPORT;
+  const x = 14;
+  const w = pageWidth - 28;
+  const h = 29;
+  doc.setFillColor(...c.deep);
+  doc.roundedRect(x, y, w, h, 3, 3, "F");
+  doc.setFillColor(...c.green);
+  doc.roundedRect(x, y, 2, h, 1, 1, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(117, 219, 179);
+  doc.text(eyebrow.toUpperCase(), x + 7, y + 7);
+  doc.setFontSize(11);
+  doc.setTextColor(...c.white);
+  doc.text(title, x + 7, y + 15);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.2);
+  doc.setTextColor(205, 224, 215);
+  doc.text(detail, x + 7, y + 22, { maxWidth: w - 62 });
+  if (value) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...c.bright);
+    doc.text(value, x + w - 7, y + 17, { align: "right" });
+  }
+  return y + h;
+}
+
+function drawGnReportFooters(doc, reportTitle) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const pageHeight = doc.internal.pageSize.getHeight();
+    if (i > 1) {
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.setFillColor(...GNORATE_REPORT.deep);
+      doc.rect(0, 0, pageWidth, 18, "F");
+      doc.setFillColor(...GNORATE_REPORT.green);
+      doc.rect(0, 17.5, pageWidth, 0.7, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...GNORATE_REPORT.white);
+      doc.text("GnóRate", 14, 11.5);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(190, 216, 205);
+      doc.text(reportTitle, pageWidth - 14, 11.5, { align: "right" });
+    }
     doc.setDrawColor(...GNORATE_REPORT.border);
     doc.setLineWidth(0.25);
     doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
@@ -968,17 +1035,17 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
 
   drawGnReportHeader(doc, "Portfolio overview", companyName);
 
-  let y = 52;
+  let y = drawGnReportSectionHeading(doc, "Portfolio at a glance", 52);
 
   // ---- KPI cards ----
   const cardW = (pageWidth - 28 - 3 * 6) / 4;
-  const cardH = 26;
-  const spendValue = summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : summaryStats.partialBillCount > 0 ? "Needs more data" : "—";
+  const cardH = 31;
+  const spendValue = summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : summaryStats.partialBillCount > 0 ? "Needs more data" : "-";
   const cards = [
     { label: "Total accounts", value: String(summaryStats.total), accent: teal, small: false },
     { label: "Need attention", value: String(summaryStats.needAttention), accent: summaryStats.needAttention > 0 ? amber : green, small: false },
     { label: "Est. annual spend", value: spendValue, accent: teal, small: !summaryStats.hasAnyCost },
-    { label: "Potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—", accent: green, small: false },
+    { label: "Potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: green, small: false },
   ];
   cards.forEach((card, i) => {
     const x = 14 + i * (cardW + 6);
@@ -990,17 +1057,17 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     doc.setFillColor(...card.accent);
     doc.rect(x, y, 1.2, cardH, "F");
 
-    doc.setTextColor(...dark);
-    doc.setFontSize(card.small ? 10 : 15);
-    doc.setFont(undefined, "bold");
-    doc.text(card.value, x + 6, y + 13, { maxWidth: cardW - 10 });
     doc.setFontSize(7.5);
     doc.setFont(undefined, "normal");
     doc.setTextColor(...muted);
-    doc.text(card.label, x + 6, y + 20);
+    doc.text(card.label, x + 6, y + 10, { maxWidth: cardW - 10 });
+    doc.setTextColor(...dark);
+    doc.setFontSize(card.small ? 9.5 : 14);
+    doc.setFont(undefined, "bold");
+    doc.text(card.value, x + 6, y + 23, { maxWidth: cardW - 10 });
   });
 
-  y += cardH + 6;
+  y += cardH + 7;
 
   if (summaryStats.partialBillCount > 0) {
     doc.setFontSize(7.5);
@@ -1008,7 +1075,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     doc.setFont(undefined, "italic");
     doc.text(
       summaryStats.hasAnyCost
-        ? `${summaryStats.partialBillCount} more account${summaryStats.partialBillCount === 1 ? "" : "s"} have some bill history but aren't included above yet — each needs 5+ bills for a reliable estimate.`
+        ? `${summaryStats.partialBillCount} more account${summaryStats.partialBillCount === 1 ? "" : "s"} have some bill history but aren't included above yet - each needs 5+ bills for a reliable estimate.`
         : `${summaryStats.partialBillCount} account${summaryStats.partialBillCount === 1 ? " has" : "s have"} some bill history, but need at least 5 bills before a reliable annual estimate is shown.`,
       14,
       y,
@@ -1018,18 +1085,14 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     y += 8;
   }
 
-  y += 8;
-
-  if (summaryStats.needAttention > 0) {
-    doc.setFontSize(8.5);
-    doc.setTextColor(...muted);
-    doc.text(
-      `${summaryStats.criticalCount} critical  ·  ${summaryStats.reviewCount} to review  ·  ${summaryStats.total - summaryStats.needAttention} healthy`,
-      14,
-      y
-    );
-    y += 10;
-  }
+  y = drawGnReportInsight(doc, {
+    y,
+    pageWidth,
+    eyebrow: "Portfolio pulse",
+    title: summaryStats.needAttention ? `${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? " needs" : "s need"} a review` : "Your portfolio is up to date",
+    detail: `${summaryStats.criticalCount} urgent  ·  ${summaryStats.reviewCount} to review  ·  ${summaryStats.total - summaryStats.needAttention} healthy`,
+    value: `${summaryStats.renewingSoon90} renewing soon`,
+  }) + 9;
 
   // ---- Spend trend chart (last 6 months, from real bill history) ----
   const monthBuckets = {}; // "2026-03" -> total cost
@@ -1052,24 +1115,24 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   const hasChartData = monthValues.some((v) => v > 0);
 
   if (hasChartData) {
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("Spend trend — last 6 months", 14, y);
-    y += 8;
+    y = drawGnReportSectionHeading(doc, "Spend trend", y, "Recorded bill costs over the last six months");
 
     const chartX = 14;
     const chartW = pageWidth - 28;
-    const chartH = 42;
+    const chartH = 39;
     const maxVal = Math.max(...monthValues, 1);
 
+    doc.setFillColor(...lightBg);
+    doc.roundedRect(chartX, y - 2, chartW, chartH + 15, 2.5, 2.5, "F");
     doc.setDrawColor(...GNORATE_REPORT.border);
-    doc.setLineWidth(0.2);
+    doc.setLineWidth(0.18);
+    doc.line(chartX + 7, y + chartH / 3, chartX + chartW - 7, y + chartH / 3);
+    doc.line(chartX + 7, y + (chartH * 2) / 3, chartX + chartW - 7, y + (chartH * 2) / 3);
     doc.line(chartX, y, chartX, y + chartH);
     doc.line(chartX, y + chartH, chartX + chartW, y + chartH);
 
     const points = monthKeys.map((k, i) => ({
-      x: chartX + (i / (monthKeys.length - 1)) * chartW,
+      x: chartX + 7 + (i / (monthKeys.length - 1)) * (chartW - 14),
       yVal: y + chartH - (monthBuckets[k] / maxVal) * (chartH - 6),
       val: monthBuckets[k],
       label: new Date(k + "-01").toLocaleDateString("en-IE", { month: "short", year: "2-digit" }),
@@ -1090,7 +1153,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
       doc.text(p.label, p.x, y + chartH + 6, { align: "center" });
     });
 
-    y += chartH + 16;
+    y += chartH + 20;
   }
 
   // ---- Spend by account, ranked ----
@@ -1102,13 +1165,9 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   if (spendByAccount.length > 0) {
     if (y > 220) {
       doc.addPage();
-      y = 20;
+      y = 28;
     }
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("Spend by account, ranked", 14, y);
-    y += 8;
+    y = drawGnReportSectionHeading(doc, "Spend by account", y, "Highest estimated annual spend first");
 
     autoTable(doc, {
       startY: y,
@@ -1116,9 +1175,9 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
       body: spendByAccount.map((a) => [a.name, fmtMoney(a.cost)]),
       ...gnReportTableStyles(),
       columnStyles: { 1: { halign: "right" } },
-      margin: { left: 14, right: 14 },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
-    y = doc.lastAutoTable.finalY + 14;
+    y = doc.lastAutoTable.finalY + 12;
   }
 
   // ---- Upcoming renewals ----
@@ -1127,25 +1186,17 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     .sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
 
   if (upcoming.length > 0) {
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("Upcoming renewals", 14, y);
-    doc.setFontSize(8);
-    doc.setFont(undefined, "normal");
-    doc.setTextColor(...muted);
-    doc.text("Next 90 days, soonest first", 14, y + 5);
-    y += 10;
+    y = drawGnReportSectionHeading(doc, "Upcoming renewals", y, "Next 90 days, soonest first");
 
     autoTable(doc, {
       startY: y,
       head: [["Account", "Location", "Provider", "Days left", "Rate (c/kWh)"]],
       body: upcoming.slice(0, 30).map((a) => [
         a.name,
-        a.location || "—",
-        a.provider || "—",
+        a.location || "-",
+        a.provider || "-",
         a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d overdue` : `${a.daysLeft}d`,
-        a.rate || "—",
+        fmtReportRate(a.rate),
       ]),
       ...gnReportTableStyles(),
       willDrawCell: (data) => {
@@ -1156,22 +1207,18 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
           }
         }
       },
-      margin: { left: 14, right: 14 },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
-    y = doc.lastAutoTable.finalY + 14;
+    y = doc.lastAutoTable.finalY + 12;
   }
 
   // ---- Issues breakdown, color-coded by severity ----
   if (attentionGroups.length > 0) {
     if (y > 220) {
       doc.addPage();
-      y = 20;
+      y = 28;
     }
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("Issues found", 14, y);
-    y += 8;
+    y = drawGnReportSectionHeading(doc, "Review queue", y, "Issues grouped by type and severity");
 
     autoTable(doc, {
       startY: y,
@@ -1193,7 +1240,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
           doc.circle(data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, 1.3, "F");
         }
       },
-      margin: { left: 14, right: 14 },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 14;
   }
@@ -1214,24 +1261,20 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   if (locationRows.length > 0) {
     if (y > 220) {
       doc.addPage();
-      y = 20;
+      y = 28;
     }
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("By location", 14, y);
-    y += 8;
+    y = drawGnReportSectionHeading(doc, "Portfolio by location", y, "Account count, open issues and annual spend");
 
     autoTable(doc, {
       startY: y,
       head: [["Location", "Accounts", "Need attention", "Est. annual spend"]],
-      body: locationRows.map(([loc, d]) => [loc, String(d.total), d.attention > 0 ? String(d.attention) : "—", d.spend > 0 ? fmtMoney(d.spend) : "Needs more data"]),
+      body: locationRows.map(([loc, d]) => [loc, String(d.total), d.attention > 0 ? String(d.attention) : "-", d.spend > 0 ? fmtMoney(d.spend) : "Needs more data"]),
       ...gnReportTableStyles(),
-      margin: { left: 14, right: 14 },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
   }
 
-  drawGnReportFooters(doc);
+  drawGnReportFooters(doc, "Portfolio overview");
 
   doc.save(`gnorate-portfolio-summary-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
@@ -1244,7 +1287,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
 
   drawGnReportHeader(doc, "Savings & renewal opportunities", companyName);
 
-  let y = 52;
+  let y = drawGnReportSectionHeading(doc, "Renewal performance", 52);
 
   // ---- KPI cards ----
   const renewedCount = enrichedAccounts.filter((a) => a.renewal_status === "renewed").length;
@@ -1257,10 +1300,10 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   }, 0);
 
   const cardW = (pageWidth - 28 - 3 * 6) / 4;
-  const cardH = 26;
+  const cardH = 31;
   const cards = [
-    { label: "Verified savings identified", value: verifiedSavings > 0 ? fmtMoney(verifiedSavings) : "—", accent: green },
-    { label: "All potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—", accent: teal },
+    { label: "Verified savings identified", value: verifiedSavings > 0 ? fmtMoney(verifiedSavings) : "-", accent: green },
+    { label: "All potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: teal },
     { label: "Renewals in progress", value: String(inProgressCount), accent: amber },
     { label: "Accounts renewed", value: String(renewedCount), accent: green },
   ];
@@ -1268,30 +1311,30 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
     const x = 14 + i * (cardW + 6);
     doc.setFillColor(...lightBg);
     doc.roundedRect(x, y, cardW, cardH, 2, 2, "F");
-    doc.setDrawColor(225, 225, 220);
+    doc.setDrawColor(...GNORATE_REPORT.border);
     doc.setLineWidth(0.3);
     doc.roundedRect(x, y, cardW, cardH, 2, 2, "S");
     doc.setFillColor(...card.accent);
     doc.rect(x, y, 1.2, cardH, "F");
-    doc.setTextColor(...dark);
-    doc.setFontSize(14);
-    doc.setFont(undefined, "bold");
-    doc.text(card.value, x + 6, y + 13);
     doc.setFontSize(7);
     doc.setFont(undefined, "normal");
     doc.setTextColor(...muted);
-    doc.text(card.label, x + 6, y + 20, { maxWidth: cardW - 10 });
+    doc.text(card.label, x + 6, y + 10, { maxWidth: cardW - 10 });
+    doc.setTextColor(...dark);
+    doc.setFontSize(14);
+    doc.setFont(undefined, "bold");
+    doc.text(card.value, x + 6, y + 23, { maxWidth: cardW - 10 });
   });
-  y += cardH + 10;
+  y += cardH + 8;
 
-  doc.setFontSize(7.5);
-  doc.setTextColor(...muted);
-  doc.text(
-    "\"Verified\" savings come from a quoted rate or a GnóRate-confirmed market rate. \"All potential\" also includes automated estimates.",
-    14,
-    y
-  );
-  y += 12;
+  y = drawGnReportInsight(doc, {
+    y,
+    pageWidth,
+    eyebrow: "Savings confidence",
+    title: verifiedSavings > 0 ? "Quoted and confirmed savings are tracked separately" : "Confirm a supplier quote to verify an opportunity",
+    detail: "Verified uses quoted or confirmed rates. Potential savings can also include automated estimates.",
+    value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-",
+  }) + 12;
 
   // ---- Top savings opportunities ----
   const opportunities = enrichedAccounts
@@ -1300,74 +1343,89 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
     .slice(0, 15);
 
   if (opportunities.length > 0) {
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("Biggest savings opportunities", 14, y);
-    y += 8;
+    y = drawGnReportSectionHeading(doc, "Highest-value opportunities", y, "Estimated annual saving from current account comparisons");
+    const topOpportunities = opportunities.slice(0, 5);
+    const maxSaving = Math.max(...topOpportunities.map((a) => a.saving), 1);
+    const panelY = y - 3;
+    const panelH = topOpportunities.length * 10 + 5;
+    doc.setFillColor(...lightBg);
+    doc.roundedRect(14, panelY, pageWidth - 28, panelH, 2.5, 2.5, "F");
+    topOpportunities.forEach((account, index) => {
+      const rowY = y + index * 10;
+      const name = account.name || "Account";
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.2);
+      doc.setTextColor(...dark);
+      doc.text(name.length > 23 ? `${name.slice(0, 20)}...` : name, 19, rowY + 5.8, { maxWidth: 44 });
+      doc.setFillColor(222, 235, 230);
+      doc.roundedRect(67, rowY + 2.5, 91, 3.3, 1.3, 1.3, "F");
+      doc.setFillColor(...green);
+      doc.roundedRect(67, rowY + 2.5, Math.max(2, (account.saving / maxSaving) * 91), 3.3, 1.3, 1.3, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...green);
+      doc.text(fmtMoney(account.saving), pageWidth - 19, rowY + 5.8, { align: "right" });
+    });
+    y += panelH + 8;
+
+    y = drawGnReportSectionHeading(doc, "Opportunity detail", y, "Current rate, comparison rate and estimate source");
 
     autoTable(doc, {
       startY: y,
       head: [["Account", "Current rate", "Market rate", "Est. saving/yr", "Source"]],
       body: opportunities.map((a) => [
         a.name,
-        `${a.rate}c/kWh`,
-        `${a.comparison.rate}c/kWh`,
+        fmtReportRate(a.rate),
+        fmtReportRate(a.comparison.rate),
         fmtMoney(a.saving),
         a.comparison.source === "verified" ? "Verified" : a.comparison.source === "quoted" ? "Quoted" : "Estimated",
       ]),
       ...gnReportTableStyles(),
-      margin: { left: 14, right: 14 },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
-    y = doc.lastAutoTable.finalY + 14;
+    y = doc.lastAutoTable.finalY + 12;
   }
 
   // ---- Renewals in progress ----
   const inProgress = enrichedAccounts.filter((a) => a.renewal_status === "quote_requested" || a.renewal_status === "switching");
   if (inProgress.length > 0) {
-    if (y > 220) {
+    if (y > 238) {
       doc.addPage();
-      y = 20;
+      y = 28;
     }
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("Renewals currently in progress", 14, y);
-    y += 8;
+    y = drawGnReportSectionHeading(doc, "Renewals in progress", y, "Quotes requested or supplier changes underway");
 
     autoTable(doc, {
       startY: y,
       head: [["Account", "Location", "Status"]],
-      body: inProgress.map((a) => [a.name, a.location || "—", a.renewal_status === "quote_requested" ? "Quote requested" : "Switching"]),
+      body: inProgress.map((a) => [a.name, a.location || "-", a.renewal_status === "quote_requested" ? "Quote requested" : "Switching"]),
       ...gnReportTableStyles(),
-      margin: { left: 14, right: 14 },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
-    y = doc.lastAutoTable.finalY + 14;
+    y = doc.lastAutoTable.finalY + 8;
   }
 
   // ---- Recently renewed ----
   const renewed = enrichedAccounts.filter((a) => a.renewal_status === "renewed");
   if (renewed.length > 0) {
-    if (y > 220) {
+    if (y > 238) {
       doc.addPage();
-      y = 20;
+      y = 28;
     }
-    doc.setFontSize(11.5);
-    doc.setFont(undefined, "bold");
-    doc.setTextColor(...dark);
-    doc.text("Recently renewed", 14, y);
-    y += 8;
+    y = drawGnReportSectionHeading(doc, "Recently renewed", y, "Accounts with a renewal marked complete");
 
     autoTable(doc, {
       startY: y,
       head: [["Account", "Provider", "Rate", "New contract end"]],
-      body: renewed.map((a) => [a.name, a.provider || "—", a.rate ? `${a.rate}c/kWh` : "—", a.contract_end || "—"]),
+      body: renewed.map((a) => [a.name, a.provider || "-", fmtReportRate(a.rate), a.contract_end || "-"]),
       ...gnReportTableStyles(),
-      margin: { left: 14, right: 14 },
+      headStyles: { fillColor: GNORATE_REPORT.deep, textColor: GNORATE_REPORT.white, fontStyle: "bold", cellPadding: 2.2 },
+      bodyStyles: { textColor: GNORATE_REPORT.ink, cellPadding: 2.2, fontSize: 7.5 },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
   }
 
-  drawGnReportFooters(doc);
+  drawGnReportFooters(doc, "Savings and renewal opportunities");
 
   doc.save(`gnorate-savings-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
