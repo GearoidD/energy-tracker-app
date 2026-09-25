@@ -5,8 +5,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal, FileText, Building2, Users } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Plus, X, AlertTriangle, Zap, Flame, TrendingDown, Search, Trash2, Pencil, Upload, ChevronDown, ChevronUp, LineChart as LineChartIcon, Download, MoreHorizontal, BarChart3, Loader2, Mail, SlidersHorizontal, FileText, Building2, Users, Activity } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
@@ -206,27 +206,54 @@ function overallStatusFor(a) {
     return { label: RENEWAL_STATUS_META[renewalStatus].label, color: "var(--teal)" };
   }
   if (a.confidence.missingBill) {
-    return { label: "Missing bill", color: "var(--amber)" };
+    return { label: "No recent bill data", color: "var(--amber)" };
   }
   if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) {
-    return { label: "Rate jumped", color: "var(--amber)" };
+    return { label: "Rate increased", color: "var(--amber)" };
   }
   if (a.status === "soon") {
     return { label: "Renewing soon", color: "var(--amber)" };
   }
-  if (a.confidence.score < 50) {
-    return { label: "Needs review", color: "var(--amber)" };
+  if (a.confidence.score < 50 || !a.provider || !a.rate || !a.usage || !a.contract_end) {
+    return { label: "Details incomplete", color: "var(--amber)" };
   }
   return { label: "On track", color: "var(--green)" };
+}
+
+function accountStatusDetail(a) {
+  const renewalStatus = a.renewal_status || "not_started";
+  if (renewalStatus === "quote_requested") return "A renewal quote has been requested.";
+  if (renewalStatus === "switching") return "A supplier change is in progress.";
+  if (a.daysLeft !== null && a.daysLeft < 0) return `Contract end date passed ${Math.abs(a.daysLeft)} day${Math.abs(a.daysLeft) === 1 ? "" : "s"} ago. Confirm current terms with the supplier.`;
+  if (a.daysLeft !== null && a.daysLeft <= 30) return `Contract ends in ${a.daysLeft} day${a.daysLeft === 1 ? "" : "s"}. Review renewal options.`;
+  if (a.confidence.missingBill) {
+    return a.confidence.daysSinceLastReading != null
+      ? `No bill dated in the last ${MISSING_BILL_DAYS} days. Latest on file is ${a.confidence.daysSinceLastReading} days old; check against the expected billing cycle.`
+      : "No bill is on file yet. Add one to see recorded usage and confirm rates.";
+  }
+  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) return `Rate rose ${a.rateChange.pct.toFixed(1)}% between bills (${a.rateChange.from}c to ${a.rateChange.to}c/kWh). Confirm whether the change is expected.`;
+  if (a.status === "soon") return `Contract ends in ${a.daysLeft} days. Compare renewal options when ready.`;
+  if (a.confidence.score < 50 && a.confidence.reasons.length) return `Review recorded data: ${a.confidence.reasons.join("; ")}.`;
+  const missing = [];
+  if (!a.provider) missing.push("supplier");
+  if (!a.rate) missing.push("current rate");
+  if (!a.usage) missing.push("annual usage");
+  if (!a.contract_end) missing.push("contract end date");
+  if (missing.length) return `Not recorded: ${missing.join(", ")}. Add these details to improve comparisons.`;
+  return a.contract_end ? `Contract currently recorded through ${new Date(`${a.contract_end}T00:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}.` : "No current account issue flagged from the information on file.";
+}
+
+function formatAccountDate(dateStr) {
+  return dateStr ? new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" }) : "Not recorded";
 }
 
 function severityRank(a) {
   const label = overallStatusFor(a).label;
   if (label === "Action needed") return 0;
-  if (label === "Missing bill") return 1;
-  if (label === "Rate jumped") return 2;
+  if (label === "No recent bill data") return 1;
+  if (label === "Rate increased") return 2;
   if (label === "Renewing soon") return 3;
-  if (label === "Needs review") return 4;
+  if (label === "Details incomplete") return 4;
   if (label === "On track") return 6;
   return 5; // being-handled: Quote requested / Switching
 }
@@ -329,55 +356,6 @@ function annualSaving(acc) {
   const usage = parseFloat(acc.usage);
   if (isNaN(rate) || isNaN(market) || isNaN(usage)) return null;
   return ((rate - market) / 100) * usage;
-}
-
-function RateSparkline({ readings }) {
-  const rated = [...(readings || [])]
-    .filter((r) => r.rate !== null && r.rate !== undefined && r.reading_date)
-    .sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date))
-    .slice(-6);
-
-  const width = 56;
-  const height = 40;
-
-  if (rated.length < 2) {
-    return (
-      <div style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <span style={{ fontSize: 13, color: "var(--border-light)" }}>—</span>
-      </div>
-    );
-  }
-
-  const rates = rated.map((r) => Number(r.rate));
-  const min = Math.min(...rates);
-  const max = Math.max(...rates);
-  const range = max - min || 1;
-
-  const coords = rates.map((r, i) => ({
-    x: (i / (rates.length - 1)) * (width - 6) + 3,
-    y: height - 5 - ((r - min) / range) * (height - 10),
-  }));
-
-  const trendUp = rates[rates.length - 1] > rates[0];
-  const color = trendUp ? "#b87412" : "#12895d";
-  const last = coords[coords.length - 1];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-      <svg width={width} height={height}>
-        <polyline
-          points={coords.map((c) => `${c.x},${c.y}`).join(" ")}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle cx={last.x} cy={last.y} r={2.5} fill={color} />
-      </svg>
-      <span style={{ fontSize: 8.5, color: "var(--muted)" }}>rate {trendUp ? "↑" : "↓"}</span>
-    </div>
-  );
 }
 
 function Gauge({ daysLeft, status, size = 64 }) {
@@ -1446,6 +1424,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRenewal, setFilterRenewal] = useState("all");
   const [filterLocation, setFilterLocation] = useState(lockedLocation || "all");
+  const [usageRangeMonths, setUsageRangeMonths] = useState(12);
+  const [usageLocation, setUsageLocation] = useState("all");
+  const [usageAccount, setUsageAccount] = useState("all");
+  const [usageFuel, setUsageFuel] = useState("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [locationOverflowOpen, setLocationOverflowOpen] = useState(false);
   const [locationSearchText, setLocationSearchText] = useState("");
@@ -2006,6 +1988,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         const matchesSearch =
           !q ||
           a.name.toLowerCase().includes(q) ||
+          (a.location || "").toLowerCase().includes(q) ||
           (a.provider || "").toLowerCase().includes(q) ||
           (a.account_number || "").toLowerCase().includes(q) ||
           (a.supplier_account_number || "").toLowerCase().includes(q);
@@ -2019,7 +2002,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             : overallStatusFor(a).label === filterStatus);
         const matchesRenewal = filterRenewal === "all" || (a.renewal_status || "not_started") === filterRenewal;
         const matchesLocation = filterLocation === "all" || (a.location || "") === filterLocation;
-        const matchesSection = section === "rates" ? !!a.comparison : section === "usage" ? a.usage != null : section === "renewals" ? (a.daysLeft !== null && a.daysLeft <= HORIZON_DAYS) : section === "savings" ? (a.saving != null && a.saving > 0) : true;
+        const hasRecordedUsage = (readingSummaries[a.id] || []).some((reading) => reading.usage != null && reading.reading_date);
+        const matchesSection = section === "rates" ? !!a.comparison : section === "usage" ? (a.usage != null || hasRecordedUsage) : section === "renewals" ? (a.daysLeft !== null && a.daysLeft <= HORIZON_DAYS) : section === "savings" ? (a.saving != null && a.saving > 0) : true;
         return matchesSearch && matchesFuel && matchesStatus && matchesRenewal && matchesLocation && matchesSection;
       })
       .sort((a, b) => {
@@ -2027,7 +2011,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         if (rankDiff !== 0) return rankDiff;
         return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
       });
-  }, [enrichedAll, search, filterFuel, filterStatus, filterRenewal, filterLocation, section]);
+  }, [enrichedAll, search, filterFuel, filterStatus, filterRenewal, filterLocation, section, readingSummaries]);
 
   const [groupByLocation, setGroupByLocation] = useState(!lockedLocation);
   const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
@@ -2134,7 +2118,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           account: a,
           severity: beingHandled ? 1.5 : 0,
           color: beingHandled ? "var(--teal)" : "var(--red)",
-          groupLabel: beingHandled ? "Overdue, being handled" : "Out of contract — likely on penalty rates",
+          groupLabel: beingHandled ? "Contract end date passed, renewal being handled" : "Contract end date passed — confirm current supplier terms",
           detail: statusSuffix ? statusSuffix.replace(" — ", "") : null,
         });
       } else if (a.status === "urgent") {
@@ -2153,13 +2137,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           account: a,
           severity: 2,
           color: "var(--amber)",
-          groupLabel: `No bill uploaded in ${MISSING_BILL_DAYS}+ days`,
-          detail: a.confidence.daysSinceLastReading ? `${a.confidence.daysSinceLastReading} days since last bill` : "no bills added yet",
+          groupLabel: `No bill dated in the last ${MISSING_BILL_DAYS} days`,
+          detail: a.confidence.daysSinceLastReading ? `${a.confidence.daysSinceLastReading} days since last bill · check expected billing cycle` : "no bill date on file",
         });
       }
       const latest = readingSummaries[a.id]?.[0];
       if (latest?.confidence === "low") {
-        items.push({ id: `${a.id}-lowconf`, account: a, severity: 3, color: "var(--amber)", groupLabel: "Low-confidence bill upload — worth checking", detail: null });
+        items.push({ id: `${a.id}-lowconf`, account: a, severity: 3, color: "var(--amber)", groupLabel: "Bill reading needs a quick check", detail: "Compare the recorded details with the original bill." });
       }
       if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) {
         items.push({
@@ -2167,8 +2151,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           account: a,
           severity: 1.8,
           color: "var(--amber)",
-          groupLabel: "Unexpected rate jump",
-          detail: `${a.rateChange.pct.toFixed(1)}% (${a.rateChange.from}c → ${a.rateChange.to}c)`,
+          groupLabel: "Rate increase recorded on latest bill",
+          detail: `${a.rateChange.pct.toFixed(1)}% (${a.rateChange.from}c → ${a.rateChange.to}c) · confirm if expected`,
         });
       }
     });
@@ -2235,10 +2219,54 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     return months;
   }, [readingSummaries]);
 
+  const usageLocations = useMemo(() => [...new Set(enrichedAll.map((account) => account.location).filter(Boolean))].sort(), [enrichedAll]);
+  const usageFilterAccounts = useMemo(() => enrichedAll.filter((account) =>
+    (usageLocation === "all" || account.location === usageLocation) &&
+    (usageFuel === "all" || (account.fuel_type || "electricity") === usageFuel)
+  ), [enrichedAll, usageLocation, usageFuel]);
+  const usageWindow = useMemo(() => {
+    const now = new Date();
+    const firstMonth = new Date(now.getFullYear(), now.getMonth() - usageRangeMonths + 1, 1);
+    const points = Array.from({ length: usageRangeMonths }, (_, index) => {
+      const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      return { key, label: date.toLocaleDateString("en-IE", { month: "short", year: usageRangeMonths > 6 ? "2-digit" : undefined }), usage: 0, billCount: 0, usageRecordCount: 0, accounts: new Set() };
+    });
+    const byMonth = Object.fromEntries(points.map((point) => [point.key, point]));
+    const includedIds = new Set(usageFilterAccounts.filter((account) => usageAccount === "all" || account.id === usageAccount).map((account) => account.id));
+    const byAccount = {};
+    let billCount = 0;
+    let usageRecordCount = 0;
+    Object.entries(readingSummaries).forEach(([accountId, readings]) => {
+      if (!includedIds.has(accountId)) return;
+      readings.forEach((reading) => {
+        if (!reading.reading_date) return;
+        const key = reading.reading_date.slice(0, 7);
+        const point = byMonth[key];
+        if (!point) return;
+        billCount += 1;
+        point.billCount += 1;
+        point.accounts.add(accountId);
+        if (!byAccount[accountId]) byAccount[accountId] = { usage: 0, billCount: 0, usageRecordCount: 0, latestDate: null };
+        byAccount[accountId].billCount += 1;
+        if (!byAccount[accountId].latestDate || reading.reading_date > byAccount[accountId].latestDate) byAccount[accountId].latestDate = reading.reading_date;
+        const usage = Number(reading.usage);
+        if (reading.usage === null || reading.usage === undefined || reading.usage === "" || !Number.isFinite(usage)) return;
+        point.usage += usage;
+        point.usageRecordCount += 1;
+        usageRecordCount += 1;
+        byAccount[accountId].usage += usage;
+        byAccount[accountId].usageRecordCount += 1;
+      });
+    });
+    const monthly = points.map((point) => ({ ...point, accounts: point.accounts.size, usage: point.usageRecordCount ? Math.round(point.usage) : null }));
+    const totalUsage = monthly.reduce((sum, point) => sum + (point.usage || 0), 0);
+    return { monthly, byAccount, billCount, usageRecordCount, totalUsage };
+  }, [readingSummaries, usageFilterAccounts, usageAccount, usageRangeMonths]);
+
   const opportunityCount = enrichedAll.filter((account) => account.saving != null && account.saving > 20).length;
-  const annualUsageTotal = enriched.reduce((sum, account) => sum + (Number(account.usage) || 0), 0);
   const spendTotal = utilitySpend.electricity + utilitySpend.gas;
-  const showAccountTable = ["accounts", "rates", "usage", "renewals", "savings"].includes(section) || !!lockedLocation;
+  const showAccountTable = ["accounts", "rates", "renewals", "savings"].includes(section) || !!lockedLocation;
   const dashboardRenewals = enrichedAll.filter((account) => account.daysLeft !== null && account.daysLeft <= HORIZON_DAYS).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5);
   const dashboardActions = [...new Map(attentionItems.map((item) => [item.account.id, item])).values()].slice(0, 5);
   const openDashboardAccount = (account) => {
@@ -2292,7 +2320,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           <div>
             <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>{combinedMode ? "All companies" : ({ overview: "Portfolio overview", accounts: "Accounts", rates: "Rate opportunities", usage: "Usage", renewals: "Upcoming renewals", savings: "Savings opportunities", reports: "Reports", settings: "Workspace settings" }[section] || "Accounts")}</h1>
             <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
-              {combinedMode ? "Every account across every company you belong to." : section === "rates" ? "Accounts with a current market comparison, connected to your Irish tariff data." : section === "usage" ? "Accounts with usage data on file. Upload a bill to keep readings up to date." : section === "renewals" ? "Contracts ending within the next 120 days, ordered by urgency." : section === "savings" ? "Accounts where current market comparisons indicate a potential saving." : "Your utility portfolio, connected to your existing account and bill data."}
+              {combinedMode ? "Every account across every company you belong to." : section === "rates" ? "Accounts with a current market comparison, connected to your Irish tariff data." : section === "usage" ? "Review dated bill readings by month and trace each total back to an account. Blank periods remain visible as gaps." : section === "renewals" ? "Contracts ending within the next 120 days, ordered by urgency." : section === "savings" ? "Accounts where current market comparisons indicate a potential saving." : "Your utility portfolio, connected to your existing account and bill data."}
             </p>
             {lastUpdated && (
               <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 3, opacity: 0.75 }}>
@@ -2417,11 +2445,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {spendTotal > 0 ? <div className="gn-donut-row"><div className="gn-donut" style={{ "--electric-share": `${Math.round((utilitySpend.electricity / spendTotal) * 100)}%` }}><b>{fmtMoney(spendTotal)}</b></div><div className="gn-legend"><span><i className="gn-dot electric"/> Electricity <b>{Math.round((utilitySpend.electricity / spendTotal) * 100)}%</b></span><span><i className="gn-dot gas"/> Gas <b>{Math.round((utilitySpend.gas / spendTotal) * 100)}%</b></span></div></div> : <div className="gn-empty-chart">Add bill readings and account usage to build your spend breakdown.</div>}
             </article>
             <article className="gn-card">
-              <div className="gn-card-heading"><div><h2>Recorded usage</h2><p>Monthly usage from uploaded bills · kWh</p></div><span className="gn-card-menu">6 months</span></div>
-              {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString()} kWh`}><div className="gn-bar-track"><i style={{ height: `${Math.max(5, (month.usage / max) * 100)}%` }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
+              <div className="gn-card-heading"><div><h2>Recorded usage</h2><p>Bill usage by month · bar height is relative to the highest month</p></div><Link href="/dashboard?section=usage" className="gn-card-link">Filter usage →</Link></div>
+              {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString("en-IE")} kWh`}><em>{month.usage ? Math.round(month.usage).toLocaleString("en-IE") : "-"}</em><div className="gn-bar-track"><i style={{ height: month.usage ? `${Math.max(5, (month.usage / max) * 100)}%` : "0%" }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
             </article>
           </div>
-          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : "/dashboard?section=accounts"}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need a review` : "Your portfolio is up to date"} <span aria-hidden="true">→</span></Link><Link href="/dashboard?section=accounts">View all accounts <span aria-hidden="true">→</span></Link></div>
+          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : "/dashboard?section=accounts"}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts have items to check` : "Your portfolio is up to date"} <span aria-hidden="true">→</span></Link><Link href="/dashboard?section=accounts">View all accounts <span aria-hidden="true">→</span></Link></div>
           <div className="gn-task-grid">
             <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Next actions from your account data</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
               {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
@@ -2433,9 +2461,79 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         </section>
       )}
 
-      {showAccountTable && section !== "accounts" && !lockedLocation && <div className="gn-section-summary"><strong>{enriched.length}</strong><span>{section === "rates" ? "accounts with a current market comparison" : section === "usage" ? `${Math.round(annualUsageTotal).toLocaleString("en-IE")} kWh estimated annual usage across accounts with data` : section === "renewals" ? "contracts overdue or ending within the next 120 days" : `${fmtMoney(enriched.reduce((sum, account) => sum + (account.saving > 20 ? account.saving : 0), 0))} estimated savings per year across positive comparisons`}</span>{section === "rates" && <button className="gn-inline-action" onClick={() => setShowBenchmarks(true)}>Market benchmarks →</button>}</div>}
+      {showAccountTable && section !== "accounts" && !lockedLocation && section !== "usage" && <div className="gn-section-summary"><strong>{enriched.length}</strong><span>{section === "rates" ? "accounts with a current market comparison" : section === "renewals" ? "contracts overdue or ending within the next 120 days" : `${fmtMoney(enriched.reduce((sum, account) => sum + (account.saving > 20 ? account.saving : 0), 0))} estimated savings per year across positive comparisons`}</span>{section === "rates" && <button className="gn-inline-action" onClick={() => setShowBenchmarks(true)}>Market benchmarks →</button>}</div>}
 
-      {section === "usage" && !lockedLocation && <section className="gn-card gn-usage-overview"><div className="gn-card-heading"><div><h2>Usage at a glance</h2><p>Recorded monthly usage from uploaded bills · kWh</p></div><span className="gn-card-menu">Last 6 months</span></div><div className="gn-usage-content"><div className="gn-usage-total"><strong>{Math.round(annualUsageTotal).toLocaleString("en-IE")}</strong><span>kWh estimated annual usage<br/>across accounts with data</span></div>{billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString()} kWh`}><div className="gn-bar-track"><i style={{ height: `${Math.max(5, (month.usage / max) * 100)}%` }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-usage-empty"><Activity size={19}/><span>Monthly bill readings will appear here once uploaded.</span><button onClick={() => setUploadingFor("new")}><Upload size={13}/> Upload a bill</button></div>}</div></section>}
+      {section === "usage" && !lockedLocation && (
+        <section className="gn-card gn-usage-explorer" aria-label="Recorded account usage">
+          <div className="gn-card-heading">
+            <div><h2>Recorded usage</h2><p>Bill usage totals by month. Bar height uses the kWh scale shown on the left.</p></div>
+            <div className="gn-usage-range" role="group" aria-label="Usage date range">
+              {[6, 12, 24].map((months) => <button key={months} type="button" aria-pressed={usageRangeMonths === months} className={usageRangeMonths === months ? "active" : ""} onClick={() => setUsageRangeMonths(months)}>{months} months</button>)}
+            </div>
+          </div>
+          <div className="gn-usage-filters">
+            <label>Location<select value={usageLocation} onChange={(e) => { setUsageLocation(e.target.value); setUsageAccount("all"); }}><option value="all">All locations</option>{usageLocations.map((location) => <option key={location} value={location}>{location}</option>)}</select></label>
+            <label>Utility<select value={usageFuel} onChange={(e) => { setUsageFuel(e.target.value); setUsageAccount("all"); }}><option value="all">All utilities</option><option value="electricity">Electricity</option><option value="gas">Gas</option></select></label>
+            <label>Account<select value={usageAccount} onChange={(e) => setUsageAccount(e.target.value)}><option value="all">All matching accounts</option>{usageFilterAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+            {(usageLocation !== "all" || usageFuel !== "all" || usageAccount !== "all" || usageRangeMonths !== 12) && <button className="gn-usage-clear" type="button" onClick={() => { setUsageLocation("all"); setUsageFuel("all"); setUsageAccount("all"); setUsageRangeMonths(12); }}>Clear filters and date range</button>}
+          </div>
+          <div className="gn-usage-stats">
+            <div><span>Recorded usage in period</span><strong>{usageWindow.totalUsage.toLocaleString("en-IE")} kWh</strong></div>
+            <div><span>Bill records with usage</span><strong>{usageWindow.usageRecordCount} / {usageWindow.billCount}</strong></div>
+            <div><span>Accounts represented</span><strong>{Object.keys(usageWindow.byAccount).length}</strong></div>
+          </div>
+          {usageWindow.usageRecordCount > 0 ? (
+            <>
+            <div className="gn-usage-chart-wrap">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={usageWindow.monthly} margin={{ top: 12, right: 14, left: 10, bottom: 4 }}>
+                  <CartesianGrid stroke="#e2ebe5" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#61756a" }} axisLine={{ stroke: "#cbd9d0" }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "#61756a" }} tickFormatter={(value) => Number(value).toLocaleString("en-IE")} width={72} domain={[0, "auto"]} allowDecimals={false} label={{ value: "kWh", position: "insideTopLeft", offset: 0, fontSize: 11, fill: "#61756a" }} />
+                  <Tooltip content={(props) => {
+                    if (!props.active || !props.payload?.length) return null;
+                    const point = props.payload[0].payload;
+                    return <div style={{ padding: "9px 11px", border: "1px solid #dce6df", borderRadius: 8, background: "#fff", boxShadow: "0 5px 16px #143d2b18", fontSize: 11 }}><strong style={{ display: "block", marginBottom: 4, color: "#173b2d" }}>{point.label} · {point.key}</strong><span>{point.usage === null ? "No usage figure on file" : `${point.usage.toLocaleString("en-IE")} kWh recorded`}</span><small style={{ display: "block", marginTop: 3, color: "#71847b" }}>{point.billCount} bill record{point.billCount === 1 ? "" : "s"} · {point.usageRecordCount} with usage</small></div>;
+                  }} />
+                  <Bar dataKey="usage" name="Recorded usage" fill="#0b9569" radius={[5, 5, 0, 0]} maxBarSize={38} />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="gn-usage-data-note">Blank months mean no dated bill reading is on file, not zero usage. Values are assigned to the month shown by bill date; a bill can cover days in more than one month. No gaps are filled with estimates.</p>
+            </div>
+            <div className="gn-usage-month-table" aria-label="Monthly recorded usage details">
+              {usageWindow.monthly.map((point) => <div key={point.key}><span>{point.label} · {point.key}</span><strong>{point.usage === null ? (point.billCount ? "Bill on file; usage not recorded" : "No bill on file") : `${point.usage.toLocaleString("en-IE")} kWh`}</strong><small>{point.billCount} bill record{point.billCount === 1 ? "" : "s"}{point.billCount > point.usageRecordCount ? ` · ${point.billCount - point.usageRecordCount} without usage` : ""}</small></div>)}
+            </div>
+            </>
+          ) : (
+            <div className="gn-usage-empty-panel"><Activity size={20} /><div><strong>No recorded usage for these filters</strong><span>{usageWindow.billCount > 0 ? "Bills are on file, but they do not include a usage figure in this period." : "Try a wider date range or another location, or upload a bill that includes usage."}</span></div><button onClick={() => setUploadingFor(usageAccount === "all" ? "new" : usageAccount)}><Upload size={14} /> Upload a bill</button></div>
+          )}
+          <div className="gn-usage-table-heading"><div><h3>Accounts in this view</h3><p>Totals include only dated bill readings inside the selected period.</p></div><span>{Object.keys(usageWindow.byAccount).length} accounts</span></div>
+          <div className="gn-usage-account-list">
+            {usageFilterAccounts.filter((account) => usageAccount === "all" || account.id === usageAccount).filter((account) => usageWindow.byAccount[account.id]).sort((a, b) => usageWindow.byAccount[b.id].usage - usageWindow.byAccount[a.id].usage).map((account) => {
+              const record = usageWindow.byAccount[account.id];
+              const status = overallStatusFor(account);
+              return <div className="gn-usage-account-row" key={account.id}>
+                <div className="gn-usage-account-name"><strong>{account.name}</strong><span>{account.location || "Location not set"} · {account.fuel_type === "gas" ? "Gas" : "Electricity"} · {account.provider || "Supplier not set"}</span></div>
+                <div><small>Recorded usage</small><strong>{record.usageRecordCount ? `${Math.round(record.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong></div>
+                <div><small>Bills with usage</small><strong>{record.usageRecordCount}</strong></div>
+                <div><small>Latest bill date</small><strong>{formatAccountDate(record.latestDate)}</strong></div>
+                <div className="gn-usage-account-status"><span style={{ color: status.color }}>{status.label}</span><small>{accountStatusDetail(account)}</small></div>
+                <button type="button" onClick={() => openDashboardAccount(account)}>Review account →</button>
+              </div>;
+            })}
+          </div>
+          {usageFilterAccounts.filter((account) => (usageAccount === "all" || account.id === usageAccount) && !usageWindow.byAccount[account.id]).length > 0 && (
+            <div className="gn-usage-no-records">
+              <div><strong>No bill records dated in this period</strong><span>These accounts have no bill reading within the selected dates. Check their last bill date and expected billing cycle before deciding whether anything is missing.</span></div>
+              {usageFilterAccounts.filter((account) => (usageAccount === "all" || account.id === usageAccount) && !usageWindow.byAccount[account.id]).map((account) => {
+                const latestBill = (readingSummaries[account.id] || []).find((reading) => reading.reading_date)?.reading_date;
+                const status = overallStatusFor(account);
+                return <div className="gn-usage-no-record-row" key={account.id}><span><strong>{account.name}</strong><small>{account.location || "Location not set"} · {account.fuel_type === "gas" ? "Gas" : "Electricity"} · Latest bill on file: {formatAccountDate(latestBill)}</small></span><span style={{ color: status.color }}>{status.label}</span><button type="button" onClick={() => openDashboardAccount(account)}>Review account →</button></div>;
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {section === "reports" && <section className="gn-action-grid"><button onClick={() => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries)}><FileText size={20}/><b>Portfolio report</b><span>Download a PDF summary of accounts and attention items.</span><strong>Download PDF →</strong></button><button onClick={() => generateSavingsReport(enrichedAll, summaryStats, companyName)}><TrendingDown size={20}/><b>Savings report</b><span>Review current savings estimates and comparisons.</span><strong>Download PDF →</strong></button><button onClick={() => exportAccountsExcel(accounts)}><Download size={20}/><b>Account data</b><span>Export your account register as a spreadsheet.</span><strong>Export Excel →</strong></button><button onClick={() => setShowOverview(true)}><BarChart3 size={20}/><b>Portfolio overview</b><span>Open a detailed portfolio summary.</span><strong>Open overview →</strong></button></section>}
 
@@ -2457,7 +2555,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                 {summaryStats.needAttention}
               </span>
               <span style={{ fontSize: 18, color: "var(--text)" }}>
-                account{summaryStats.needAttention === 1 ? "" : "s"} need{summaryStats.needAttention === 1 ? "s" : ""} attention
+                {summaryStats.needAttention === 1 ? "1 account has an item to check" : `${summaryStats.needAttention} accounts have items to check`}
               </span>
             </div>
             {summaryStats.needAttention > 0 && (
@@ -2467,7 +2565,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     onClick={() => { setFilterStatus("Action needed"); setGroupByLocation(false); }}
                     style={{ background: "none", border: "none", padding: 0, color: "var(--red)", cursor: "pointer" }}
                   >
-                    {summaryStats.criticalCount} critical
+                    {summaryStats.criticalCount} contract dates passed or due within 30 days
                   </button>
                 )}
                 {summaryStats.reviewCount > 0 && (
@@ -2484,8 +2582,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             {attentionGroups.length > 0 && (
               <div style={{ marginBottom: 14 }}>
                 <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 4 }}>
-                  WHY — {attentionItems.length} issue{attentionItems.length === 1 ? "" : "s"} across {summaryStats.needAttention} account{summaryStats.needAttention === 1 ? "" : "s"}
-                  {attentionItems.length !== summaryStats.needAttention ? " (some accounts have more than one issue)" : ""}
+                  WHAT THE RECORDS SHOW — {attentionItems.length} item{attentionItems.length === 1 ? "" : "s"} to check across {summaryStats.needAttention} account{summaryStats.needAttention === 1 ? "" : "s"}
+                  {attentionItems.length !== summaryStats.needAttention ? " (some accounts have more than one item)" : ""}
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {attentionGroups.map((group) => {
@@ -2581,7 +2679,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                           color: count > 0 ? (count / total >= 0.5 ? "var(--red)" : "var(--amber)") : "var(--green)",
                         }}
                       >
-                        {loc} — {count > 0 ? `${count}/${total} need attention` : `${total} accounts · 0 requiring action`}
+                        {loc} — {count > 0 ? `${count}/${total} have items to check` : `${total} accounts · no flagged items`}
                       </button>
                     ))}
                   </div>
@@ -2798,10 +2896,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
                   <option value="all">All statuses</option>
                   <option value="Action needed">Action needed</option>
-                  <option value="Missing bill">Missing bill</option>
-                  <option value="Rate jumped">Rate jumped</option>
+                  <option value="No recent bill data">No recent bill data</option>
+                  <option value="Rate increased">Rate increased</option>
                   <option value="Renewing soon">Renewing soon</option>
-                  <option value="Needs review">Needs review</option>
+                  <option value="Details incomplete">Details incomplete</option>
                   <option value="Quote requested">Quote requested</option>
                   <option value="Switching">Switching</option>
                   <option value="On track">On track</option>
@@ -3038,9 +3136,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>
                     {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"} · {fuelLabel}
                     {groupAttentionCount > 0 ? (
-                      <span style={{ color: worstColor, fontWeight: 600 }}> · {groupAttentionCount} need attention</span>
+                      <span style={{ color: worstColor, fontWeight: 600 }}> · {groupAttentionCount} with items to check</span>
                     ) : (
-                      <span style={{ color: "var(--green)", fontWeight: 600 }}> · 0 need attention</span>
+                      <span style={{ color: "var(--green)", fontWeight: 600 }}> · no flagged items</span>
                     )}
                   </span>
                 </button>
@@ -3063,6 +3161,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               >
                 <div
                   onClick={() => toggleReadings(a.id)}
+                  className="gn-account-primary-row"
                   style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer" }}
                 >
                   <input
@@ -3079,7 +3178,6 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     }}
                     style={{ flexShrink: 0, cursor: "pointer", width: 15, height: 15 }}
                   />
-                  <RateSparkline readings={readingSummaries[a.id]} />
                   {(a.fuel_type || "electricity") === "gas" ? (
                     <Flame size={13} color="var(--amber)" style={{ flexShrink: 0 }} />
                   ) : (
@@ -3145,11 +3243,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         : { color: overall.color, background: "none", border: `1px solid ${overall.color}66` }),
                     }}
                   >
-                    {overall.color === "var(--red)" && <AlertTriangle size={11} />}
+                {overall.color === "var(--red)" && <AlertTriangle size={11} />}
                     {overall.label}
                   </span>
-                  <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} title="Days until contract end date">
-                    {a.daysLeft === null ? "–" : a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d overdue` : `${a.daysLeft}d to renew`}
+                  <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} title="Recorded contract end date">
+                    {a.daysLeft === null ? "No end date" : a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d past end date` : `${a.daysLeft}d to end date`}
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); setUploadingFor(a.id); }}
@@ -3189,6 +3287,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     )}
                   </div>
                   {isExpanded ? <ChevronUp size={16} color="var(--muted)" /> : <ChevronDown size={16} color="var(--muted)" />}
+                </div>
+
+                <div className="gn-account-info-grid">
+                  <div><small>Supplier</small><strong>{a.provider || "Not recorded"}</strong></div>
+                  <div><small>Current unit rate</small><strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong></div>
+                  <div><small>Annual usage on account</small><strong>{a.usage ? `${Number(a.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong></div>
+                  <div><small>Latest bill on file</small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong></div>
+                  <div><small>Contract end date</small><strong>{formatAccountDate(a.contract_end)}</strong></div>
+                  <div className="gn-account-estimate"><small>Estimated annual spend</small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong></div>
+                  <div className="gn-account-status-detail" style={{ borderColor: `${overall.color}44` }}><strong style={{ color: overall.color }}>{overall.label}</strong><span>{accountStatusDetail(a)}</span></div>
                 </div>
 
                 {isExpanded && (
@@ -3316,20 +3424,20 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                           <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--amber)", fontSize: 12.5 }}>
                             <AlertTriangle size={13} />
                             {a.confidence.daysSinceLastReading
-                              ? `No bill added in ${a.confidence.daysSinceLastReading} days — check nothing's been missed`
-                              : "No bills added yet for this account"}
+                              ? `No bill dated in the last ${MISSING_BILL_DAYS} days — check the expected billing cycle (latest on file: ${a.confidence.daysSinceLastReading} days ago)`
+                              : "No bill is on file yet — upload one if available to record its usage and rate"}
                           </div>
                         )}
                         {a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--amber)", fontSize: 12.5 }}>
                             <AlertTriangle size={13} />
-                            Rate jumped {a.rateChange.pct.toFixed(1)}% since last bill ({a.rateChange.from}c → {a.rateChange.to}c/kWh)
+                            Rate rose {a.rateChange.pct.toFixed(1)}% between bills ({a.rateChange.from}c → {a.rateChange.to}c/kWh) — confirm whether expected
                           </div>
                         )}
                         {a.status === "overdue" && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--red)", fontSize: 12.5 }}>
                             <AlertTriangle size={13} />
-                            Likely on out-of-contract rates — act now
+                            Contract end date has passed — confirm the current rate and contract terms with the supplier
                           </div>
                         )}
                       </div>

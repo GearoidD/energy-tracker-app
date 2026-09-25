@@ -81,7 +81,7 @@ function accountConfidence(acc, latest) {
   return { missingBill, daysSinceLastReading };
 }
 
-// accounts needing "critical" treatment for out-of-contract / overdue status
+// Accounts with a recorded contract end date that has passed or is within 30 days
 function overallLabelFor(a) {
   const renewalStatus = a.renewal_status || "not_started";
   const beingHandled = renewalStatus === "quote_requested" || renewalStatus === "switching";
@@ -157,16 +157,16 @@ function AttentionQueueInner({ companyId, companyName }) {
     };
 
     if (status === "overdue" && !beingHandled) {
-      addTo("Out of contract — likely on penalty rates", "var(--red)", 0, null);
+      addTo("Contract end date passed — confirm current supplier terms", "var(--red)", 0, `${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? "" : "s"} past the recorded end date`);
     } else if (status === "urgent" && !beingHandled) {
-      addTo("Renewing soon", "var(--red)", 1, `${daysLeft} day(s) left`);
+      addTo("Contract ends within 30 days", "var(--red)", 1, `${daysLeft} day(s) until the recorded end date`);
     }
     if (confidence.missingBill) {
       addTo(
-        `No bill in ${MISSING_BILL_DAYS}+ days — spend may be out of date`,
+        `No bill dated in the last ${MISSING_BILL_DAYS} days`,
         "var(--amber)",
         2,
-        confidence.daysSinceLastReading ? `${confidence.daysSinceLastReading} days since last bill` : "no bills added yet"
+        confidence.daysSinceLastReading ? `latest on file: ${confidence.daysSinceLastReading} days ago · check expected billing cycle` : "no bill date on file"
       );
     }
     const latest = readingSummaries[a.id]?.[0];
@@ -174,7 +174,7 @@ function AttentionQueueInner({ companyId, companyName }) {
       addTo("Bill data uncertain — verify before relying on it", "var(--amber)", 3, null);
     }
     if (rateChange && rateChange.pct >= RATE_JUMP_THRESHOLD) {
-      addTo("Unexpected rate jump", "var(--amber)", 1.5, `${rateChange.pct.toFixed(1)}% (${rateChange.from}c → ${rateChange.to}c)`);
+      addTo("Rate increase recorded on latest bill", "var(--amber)", 1.5, `${rateChange.pct.toFixed(1)}% (${rateChange.from}c → ${rateChange.to}c) · confirm if expected`);
     }
   });
 
@@ -190,11 +190,11 @@ function AttentionQueueInner({ companyId, companyName }) {
         @keyframes wpSoftIn { from { opacity: 0; } to { opacity: 1; } }
         .wp-soft-in { animation: wpSoftIn 0.22s ease both; }
       ` }} />
-      <div className="gn-section-summary"><strong>{totalAccounts}</strong><span>{criticalOnly ? "accounts in the critical queue" : `${totalIssues} issues across your portfolio`}</span></div>
+      <div className="gn-section-summary"><strong>{totalAccounts}</strong><span>{criticalOnly ? "accounts with a contract end date passed or due within 30 days" : `${totalIssues} recorded items to check across your portfolio`}</span></div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--text)" }}>
-          Priority: highest first
+          Priority: recorded contract dates passed or due within 30 days
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--text)" }}>
           Grouped: Issue
@@ -204,7 +204,7 @@ function AttentionQueueInner({ companyId, companyName }) {
             onClick={() => router.push("/dashboard/attention")}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--red)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--red)", cursor: "pointer", fontWeight: 600 }}
           >
-            Critical only ×
+            Contract dates only ×
           </button>
         )}
       </div>
@@ -245,11 +245,12 @@ function AttentionQueueInner({ companyId, companyName }) {
                         {items.slice(0, 5).map((item) => {
                           const spend = fmtMoney(estimatedAnnualSpend(item.account, readingSummaries[item.account.id]));
                           return (
-                            <div key={item.account.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>
+                            <div key={item.account.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--muted)", padding: "5px 0", flexWrap: "wrap" }}>
                               {item.account.fuel_type === "gas" ? <Flame size={11} color="var(--amber)" /> : <Zap size={11} color="var(--teal)" />}
-                              {item.account.name}
-                              {item.detail ? ` — ${item.detail}` : ""}
-                              {spend && <span style={{ marginLeft: "auto", color: "var(--text)", fontWeight: 600, flexShrink: 0 }}>{spend}/yr</span>}
+                              <strong style={{ color: "var(--text)", fontSize: 12 }}>{item.account.name}</strong>
+                              {item.detail && <span>{item.detail}</span>}
+                              {spend && <span style={{ marginLeft: "auto", color: "var(--text)", fontWeight: 600, flexShrink: 0 }}>~{spend}/yr est.</span>}
+                              <button type="button" onClick={() => router.push(`/dashboard?section=accounts&search=${encodeURIComponent(item.account.name)}`)} style={{ marginLeft: "auto", border: "1px solid var(--border-light)", borderRadius: 6, padding: "5px 8px", color: "var(--teal)", background: "var(--panel)", fontSize: 10.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Review account →</button>
                             </div>
                           );
                         })}
