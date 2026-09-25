@@ -17,7 +17,7 @@ const copy = {
   rates: ["Compare rates", "See whether an available tariff may cost less."],
   usage: ["Usage and bills", "See recorded usage and bills by account, location and month."],
   renewals: ["Renewals", "See which contracts are ending and what needs a follow-up."],
-  savings: ["Savings", "Review estimated savings and the accounts behind them."],
+  savings: ["Savings", "Review indicative unit-rate differences and check full quotes before switching."],
   reports: ["Reports", "Export account data and portfolio summaries."],
   settings: ["Settings", "Manage your company and team access."],
   attention: ["Needs attention", "Accounts with something to check, with the reason and next step."],

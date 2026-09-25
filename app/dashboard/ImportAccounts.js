@@ -4,12 +4,15 @@ import { useState } from "react";
 import Papa from "papaparse";
 import { X, Upload, AlertTriangle, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { comparableMeterPoint, meterPointIssue, normalizeMeterPoint } from "@/lib/meter-points";
 
 const FIELD_ALIASES = {
   name: ["name", "site", "site name", "account name"],
+  location: ["location", "site location", "building", "premises", "address"],
   account_number: ["account_number", "mprn", "gprn", "mprn/gprn", "meter number", "meter point"],
   fuel_type: ["fuel_type", "fuel", "type"],
   provider: ["provider", "supplier"],
+  supplier_account_number: ["supplier_account_number", "supplier account number", "customer number"],
   rate: ["rate", "unit rate", "rate (c/kwh)", "rate c/kwh"],
   standing_charge: ["standing_charge", "standing charge"],
   usage: ["usage", "annual usage", "usage (kwh)"],
@@ -26,17 +29,53 @@ function normalizeHeader(header) {
   return null;
 }
 
+function normalizeIrishDate(value) {
+  const clean = String(value || "").trim();
+  const dmy = clean.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  return clean;
+}
+
+function isValidISODate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const [, year, month, day] = match.map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 function normalizeRow(row) {
   const out = {};
   for (const [key, value] of Object.entries(row)) {
     const field = normalizeHeader(key);
     if (field && value !== undefined && value !== null && String(value).trim() !== "") {
       out[field] = String(value).trim();
+      const header = key.trim().toLowerCase();
+      if (field === "account_number" && header.includes("gprn") && header.includes("mprn")) out.meter_point_type = "combined";
+      else if (field === "account_number" && header.includes("gprn")) out.meter_point_type = "gas";
+      else if (field === "account_number" && header.includes("mprn")) out.meter_point_type = "electricity";
     }
   }
   if (out.fuel_type) {
     out.fuel_type = out.fuel_type.toLowerCase().includes("gas") ? "gas" : "electricity";
+  } else if (out.meter_point_type === "gas" || out.meter_point_type === "electricity") {
+    out.fuel_type = out.meter_point_type;
+  } else if (out.account_number && String(out.account_number).replace(/\D/g, "").length <= 7) {
+    // Generic “meter point” columns can still be classified by Irish ID length.
+    out.fuel_type = "gas";
+  } else {
+    out.fuel_type = "electricity";
   }
+  if (out.account_number) out.account_number = normalizeMeterPoint(out.account_number, out.fuel_type);
+  if (out.contract_end) out.contract_end = normalizeIrishDate(out.contract_end);
+  const numericFields = ["rate", "standing_charge", "usage", "mic_kva", "spc_kwh"];
+  out.invalidNumericFields = [];
+  numericFields.forEach((field) => {
+    if (out[field] === undefined) return;
+    const numericValue = String(out[field]).replace(/,/g, "").trim();
+    if (/^\d+(\.\d+)?$/.test(numericValue)) out[field] = numericValue;
+    else out.invalidNumericFields.push(field.replaceAll("_", " "));
+  });
   return out;
 }
 
@@ -58,17 +97,36 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
           return;
         }
         const normalized = results.data.map(normalizeRow);
-        const existingNumbers = new Set(existingAccounts.map((a) => a.account_number).filter(Boolean));
-        const seenInFile = new Set();
+        const hasMeterPointColumn = (results.meta.fields || []).some((field) => normalizeHeader(field) === "account_number");
+        if (!hasMeterPointColumn) {
+          setError("I couldn’t find an MPRN/GPRN column. Add a column named MPRN, GPRN, or MPRN/GPRN and try again.");
+          return;
+        }
+        const existingNumbers = new Set(existingAccounts.map((a) => comparableMeterPoint(normalizeMeterPoint(a.account_number, a.fuel_type))).filter(Boolean));
+        const numberCounts = {};
+        normalized.forEach((row) => {
+          const key = comparableMeterPoint(row.account_number);
+          if (key) numberCounts[key] = (numberCounts[key] || 0) + 1;
+        });
 
         const checked = normalized.map((row) => {
-          const issues = [];
+          const issues = row.invalidNumericFields.map((field) => `${field} must be a number`);
+          const warnings = [];
+          const meterPointKey = comparableMeterPoint(row.account_number);
           if (!row.name) issues.push("Missing site name");
           if (!row.account_number) issues.push("Missing MPRN/GPRN");
-          else if (existingNumbers.has(row.account_number)) issues.push("Already exists in your accounts");
-          else if (seenInFile.has(row.account_number)) issues.push("Duplicate within this file");
-          if (row.account_number) seenInFile.add(row.account_number);
-          return { ...row, issues };
+          else {
+            if ((row.meter_point_type === "gas" || row.meter_point_type === "electricity") && row.meter_point_type !== row.fuel_type) issues.push(`The ${row.meter_point_type === "gas" ? "GPRN" : "MPRN"} column conflicts with the fuel type`);
+            const formatIssue = meterPointIssue(row.account_number, row.fuel_type);
+            if (formatIssue) issues.push(formatIssue);
+            if (existingNumbers.has(meterPointKey)) issues.push("Already exists in this company");
+            if (numberCounts[meterPointKey] > 1) issues.push("Duplicate within this file — keep only one row");
+          }
+          if (!row.location) warnings.push("No location — harder to group by site");
+          if (!row.provider) warnings.push("No supplier recorded");
+          if (!row.contract_end) warnings.push("No contract end date — renewal tracking will be limited");
+          else if (!isValidISODate(row.contract_end)) issues.push("Contract end date must be DD/MM/YYYY or YYYY-MM-DD");
+          return { ...row, issues, warnings };
         });
 
         setRows(checked);
@@ -86,9 +144,11 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
     const payload = validRows.map((r) => ({
       company_id: companyId,
       name: r.name,
-      account_number: r.account_number,
+      account_number: normalizeMeterPoint(r.account_number, r.fuel_type),
       fuel_type: r.fuel_type || "electricity",
+      location: r.location || null,
       provider: r.provider || null,
+      supplier_account_number: r.supplier_account_number || null,
       rate: r.rate || null,
       standing_charge: r.standing_charge || null,
       usage: r.usage || null,
@@ -130,8 +190,7 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
         {stage === "pick" && (
           <div>
             <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>
-              Upload a CSV with your existing accounts. Useful columns: site name, MPRN/GPRN, fuel type, provider, rate,
-              usage, contract end date, MIC, SPC — only site name and MPRN/GPRN are required, everything else is optional.
+              Upload a CSV of your utility accounts. Use one row per MPRN/GPRN; if a site has electricity and gas, use two rows with the same location. MPRNs must be 11 digits starting with 10; GPRNs are 7 digits. If a spreadsheet removed a GPRN’s leading zero, it will be restored. Use a dot for decimal values; commas in whole numbers are removed. Missing location, supplier or end-date details are allowed, but clearly flagged before import.
             </p>
             <input
               type="file"
@@ -157,6 +216,7 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
               <Upload size={22} color="var(--teal)" />
               <span style={{ fontSize: 13 }}>Choose a CSV file</span>
             </label>
+            <a href="data:text/csv;charset=utf-8,Site%20name%2CLocation%2CMPRN%2FGPRN%2CFuel%20type%2CSupplier%2CSupplier%20account%20number%2CUnit%20rate%20(c%2FkWh)%2CStanding%20charge%2CAnnual%20usage%20(kWh)%2CContract%20end%20date%2CMIC%20(kVA)%2CSPC%20(kWh)%0A" download="gnorate-account-import-template.csv" style={{ display: "inline-block", marginTop: 10, color: "var(--teal)", fontSize: 12, fontWeight: 600 }}>Download a CSV template</a>
             {error && (
               <div style={{ display: "flex", gap: 6, alignItems: "flex-start", color: "var(--red)", fontSize: 13, marginTop: 12 }}>
                 <AlertTriangle size={14} style={{ marginTop: 2, flexShrink: 0 }} />
@@ -168,7 +228,7 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
 
         {stage === "preview" && (
           <div>
-            <div style={{ display: "flex", gap: 16, marginBottom: 14, fontSize: 13 }}>
+            <div style={{ display: "flex", gap: 16, marginBottom: 8, fontSize: 13, flexWrap: "wrap" }}>
               <span style={{ color: "var(--green)" }}>
                 <Check size={13} style={{ display: "inline", marginRight: 4 }} />
                 {validRows.length} ready to import
@@ -176,11 +236,13 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
               {invalidRows.length > 0 && (
                 <span style={{ color: "var(--amber)" }}>
                   <AlertTriangle size={13} style={{ display: "inline", marginRight: 4 }} />
-                  {invalidRows.length} will be skipped
+                  {invalidRows.length} need fixing or will be skipped
                 </span>
               )}
+              {rows.filter((row) => row.warnings?.length).length > 0 && <span style={{ color: "var(--muted)" }}>{rows.filter((row) => row.warnings?.length).length} have useful details missing</span>}
             </div>
 
+            <p style={{ color: "var(--muted)", fontSize: 11.5, margin: "0 0 10px" }}>Rows with warnings can still be imported. Rows with errors are excluded; correct the CSV and choose it again to include them.</p>
             <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
               {rows.map((r, i) => (
                 <div
@@ -194,22 +256,23 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
                     background: r.issues.length > 0 ? "var(--bg)" : "none",
                   }}
                 >
-                  <div style={{ fontSize: 12.5, color: "var(--text)" }}>
-                    {r.name || <span style={{ color: "var(--muted)" }}>(no name)</span>}
-                    {r.account_number ? ` · ${r.account_number}` : ""}
+                  <div style={{ minWidth: 0, fontSize: 12.5, color: "var(--text)" }}>
+                    <strong>{r.name || <span style={{ color: "var(--muted)" }}>(no site name)</span>}</strong>
+                    <span style={{ display: "block", color: "var(--muted)", fontSize: 11, marginTop: 2 }}>{r.account_number ? `${r.fuel_type === "gas" ? "GPRN" : "MPRN"} ${r.account_number}` : "No meter point number"}{r.location ? ` · ${r.location}` : ""}{r.provider ? ` · ${r.provider}` : ""}</span>
+                    {(r.issues.length > 0 || r.warnings?.length > 0) && <span style={{ display: "block", color: r.issues.length ? "var(--amber)" : "var(--muted)", fontSize: 10.5, marginTop: 3 }}>{[...r.issues, ...(r.warnings || [])].join(" · ")}</span>}
                   </div>
-                  {r.issues.length > 0 ? (
-                    <span style={{ fontSize: 11, color: "var(--amber)" }}>{r.issues.join(", ")}</span>
-                  ) : (
-                    <Check size={13} color="var(--green)" />
-                  )}
+                  {r.issues.length > 0 ? <AlertTriangle size={14} color="var(--amber)" style={{ flexShrink: 0 }} /> : <Check size={13} color="var(--green)" style={{ flexShrink: 0 }} />}
                 </div>
               ))}
             </div>
 
             {error && <div style={{ color: "var(--red)", fontSize: 13, marginTop: 12 }}>{error}</div>}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 18 }}>
+              <button onClick={() => { setRows([]); setError(null); setStage("pick"); }} style={{ background: "none", border: "1px solid var(--border)", color: "var(--teal)", padding: "9px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
+                Choose a different file
+              </button>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button onClick={onCancel} style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)", padding: "9px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
                 Cancel
               </button>
@@ -229,6 +292,7 @@ export default function ImportAccounts({ companyId, existingAccounts = [], onCan
               >
                 Import {validRows.length} account{validRows.length === 1 ? "" : "s"}
               </button>
+              </div>
             </div>
           </div>
         )}

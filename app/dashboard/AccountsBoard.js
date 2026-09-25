@@ -13,6 +13,7 @@ import * as XLSX from "xlsx";
 import autoTable from "jspdf-autotable";
 import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
+import { comparableMeterPoint, meterPointIssue, normalizeMeterPoint } from "@/lib/meter-points";
 import BenchmarksBoard from "./BenchmarksBoard";
 import CompanyOverview from "./CompanyOverview";
 
@@ -350,20 +351,25 @@ function estimatedAnnualSpend(acc, readings) {
   const daySpan = Math.max((last - first) / 86400000, 30);
   const scaleFactor = 365 / daySpan;
 
-  const allHaveTotalCost = sorted.every((r) => r.total_cost !== null && r.total_cost !== undefined);
-
-  if (allHaveTotalCost) {
-    // The bill's real total already includes standing charges, taxes, everything —
-    // more accurate than reconstructing it from rate × usage.
-    const totalActualCost = sorted.reduce((sum, r) => sum + parseFloat(r.total_cost), 0);
-    return totalActualCost * scaleFactor;
+  const hasInvoiceTotal = (r) => r.total_cost !== null && r.total_cost !== undefined && Number.isFinite(parseFloat(r.total_cost));
+  if (sorted.every(hasInvoiceTotal)) {
+    // Invoice totals already include standing charges and other bill items.
+    return sorted.reduce((sum, r) => sum + parseFloat(r.total_cost), 0) * scaleFactor;
   }
 
-  const totalEnergyCost = sorted.reduce((sum, r) => sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage), 0);
+  // Use an actual invoice total where one was captured. For older/incomplete
+  // records, estimate that period from the recorded unit rate and usage.
+  const recordedPeriodCost = sorted.reduce((sum, r) => {
+    if (hasInvoiceTotal(r)) {
+      return sum + parseFloat(r.total_cost);
+    }
+    return sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage);
+  }, 0);
   const standing = parseFloat(acc.standing_charge) || 0;
-  const annualStanding = (standing / 100) * 365;
+  const estimatedBillShare = sorted.filter((r) => !hasInvoiceTotal(r)).length / sorted.length;
+  const annualStandingEstimate = (standing / 100) * 365 * estimatedBillShare;
 
-  return totalEnergyCost * scaleFactor + annualStanding;
+  return recordedPeriodCost * scaleFactor + annualStandingEstimate;
 }
 
 function annualSaving(acc) {
@@ -435,7 +441,7 @@ function Field({ label, required, hint, children }) {
   );
 }
 
-function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
+function AccountForm({ initial, existingLocations = [], existingAccounts = [], onSave, onCancel }) {
   const [form, setForm] = useState(
     initial
       ? { ...initial }
@@ -609,8 +615,19 @@ function AccountForm({ initial, existingLocations = [], onSave, onCancel }) {
                 setFormError(`${form.fuel_type === "gas" ? "GPRN" : "MPRN"} is required.`);
                 return;
               }
+              const number = normalizeMeterPoint(form.account_number, form.fuel_type);
+              const meterPointError = meterPointIssue(number, form.fuel_type);
+              if (meterPointError) {
+                setFormError(meterPointError);
+                return;
+              }
+              const duplicate = existingAccounts.some((account) => account.id !== form.id && account.fuel_type === form.fuel_type && comparableMeterPoint(normalizeMeterPoint(account.account_number, account.fuel_type)) === comparableMeterPoint(number));
+              if (duplicate) {
+                setFormError(`This ${form.fuel_type === "gas" ? "GPRN" : "MPRN"} is already listed in this company.`);
+                return;
+              }
               setFormError(null);
-              onSave(form);
+              onSave({ ...form, account_number: number });
             }}
             style={{ background: "var(--teal)", border: "none", color: "#ffffff", padding: "9px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}
           >
@@ -689,7 +706,7 @@ function ReadingsChart({ readings, marketRate }) {
 }
 
 function ManualReadingForm({ onSave, onCancel }) {
-  const [form, setForm] = useState({ reading_date: "", usage: "", rate: "", standing_charge: "" });
+  const [form, setForm] = useState({ reading_date: "", usage: "", rate: "", standing_charge: "", total_cost: "" });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
@@ -720,6 +737,9 @@ function ManualReadingForm({ onSave, onCancel }) {
           <Field label="Standing charge (c/day)">
             <input type="number" step="0.01" style={inputStyle} value={form.standing_charge} onChange={set("standing_charge")} placeholder="Optional" />
           </Field>
+          <Field label="Total bill amount (€)" hint="Enter the actual bill total shown on the bill, if available.">
+            <input type="number" step="0.01" style={inputStyle} value={form.total_cost} onChange={set("total_cost")} placeholder="Optional" />
+          </Field>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <button onClick={onCancel} style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)", padding: "9px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
@@ -739,31 +759,20 @@ function ManualReadingForm({ onSave, onCancel }) {
 
 function recommendationFor(a) {
   if (!a.comparison) {
-    return { verdict: "unknown", label: "No comparison yet", detail: "Pull a market rate or add a quote to get a recommendation.", color: "var(--muted)" };
+    return { verdict: "unknown", label: "No comparison yet", detail: "Add a supplier quote or current benchmark to compare this account.", color: "var(--muted)" };
   }
   const saving = a.saving;
-  const strongSource = a.comparison.source === "verified" || a.comparison.source === "quoted";
-
   if (saving === null) {
-    return { verdict: "unknown", label: "Not enough data", detail: "Add your current rate and usage to get a recommendation.", color: "var(--muted)" };
+    return { verdict: "unknown", label: "Not enough data", detail: "Add the current unit rate and annual usage to estimate a difference.", color: "var(--muted)" };
   }
   if (saving <= 20) {
-    return { verdict: "stay", label: "Stay put", detail: "Your current rate already looks competitive — switching wouldn't meaningfully help.", color: "var(--green)" };
+    return { verdict: "stay", label: "No material unit-rate gap", detail: "The recorded rates are close. Compare the full annual charges before deciding.", color: "var(--green)" };
   }
+  const detail = `The unit-rate difference is about ${fmtMoney(saving)} per year using the annual usage on this account. This excludes standing charges, capacity charges, levies, VAT and contract fees. Check a full supplier quote before switching.`;
   if (saving <= 100) {
-    return {
-      verdict: "marginal",
-      label: "Marginal — your call",
-      detail: `Switching could save ~${fmtMoney(saving)}/yr, but that's a small gain${strongSource ? "" : ", and this is only an estimate"}.`,
-      color: "var(--amber)",
-    };
+    return { verdict: "marginal", label: "Small rate difference", detail, color: "var(--amber)" };
   }
-  return {
-    verdict: "switch",
-    label: strongSource ? "Worth switching" : "Likely worth switching",
-    detail: `Switching could save ~${fmtMoney(saving)}/yr${strongSource ? "" : " — based on an estimate, worth confirming with a real quote before you commit"}.`,
-    color: "var(--teal)",
-  };
+  return { verdict: "switch", label: "Request a full quote", detail, color: "var(--teal)" };
 }
 
 function buildProviderNegotiationContent(acc, comparison, companyName) {
@@ -1039,7 +1048,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     { label: "Total accounts", value: String(summaryStats.total), accent: teal, small: false },
     { label: "Need attention", value: String(summaryStats.needAttention), accent: summaryStats.needAttention > 0 ? amber : green, small: false },
     { label: "Est. annual spend", value: spendValue, accent: teal, small: !summaryStats.hasAnyCost },
-    { label: "Potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: green, small: false },
+    { label: "Potential rate savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: green, small: false },
   ];
   cards.forEach((card, i) => {
     const x = 14 + i * (cardW + 6);
@@ -1286,7 +1295,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   // ---- KPI cards ----
   const renewedCount = enrichedAccounts.filter((a) => a.renewal_status === "renewed").length;
   const inProgressCount = enrichedAccounts.filter((a) => a.renewal_status === "quote_requested" || a.renewal_status === "switching").length;
-  const verifiedSavings = enrichedAccounts.reduce((sum, a) => {
+  const sourcedRateDifference = enrichedAccounts.reduce((sum, a) => {
     if (a.comparison && (a.comparison.source === "verified" || a.comparison.source === "quoted") && a.saving && a.saving > 0) {
       return sum + a.saving;
     }
@@ -1296,8 +1305,8 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   const cardW = (pageWidth - 28 - 3 * 6) / 4;
   const cardH = 31;
   const cards = [
-    { label: "Verified savings identified", value: verifiedSavings > 0 ? fmtMoney(verifiedSavings) : "-", accent: green },
-    { label: "All potential savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: teal },
+    { label: "Quoted/verified rate estimate", value: sourcedRateDifference > 0 ? fmtMoney(sourcedRateDifference) : "-", accent: green },
+    { label: "All unit-rate estimates", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: teal },
     { label: "Renewals in progress", value: String(inProgressCount), accent: amber },
     { label: "Accounts renewed", value: String(renewedCount), accent: green },
   ];
@@ -1324,9 +1333,9 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   y = drawGnReportInsight(doc, {
     y,
     pageWidth,
-    eyebrow: "Savings confidence",
-    title: verifiedSavings > 0 ? "Quoted and confirmed savings are tracked separately" : "Confirm a supplier quote to verify an opportunity",
-    detail: "Verified uses quoted or confirmed rates. Potential savings can also include automated estimates.",
+    eyebrow: "What this estimate means",
+    title: sourcedRateDifference > 0 ? "A quote or verified rate supports this comparison" : "Add a supplier quote to strengthen this comparison",
+    detail: "This is still an indicative unit-rate difference multiplied by recorded annual usage, not confirmed bill savings. It excludes standing and capacity charges, levies, VAT and contract fees; compare full annual quotes before deciding.",
     value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-",
   }) + 12;
 
@@ -1337,7 +1346,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
     .slice(0, 15);
 
   if (opportunities.length > 0) {
-    y = drawGnReportSectionHeading(doc, "Highest-value opportunities", y, "Estimated annual saving from current account comparisons");
+    y = drawGnReportSectionHeading(doc, "Highest-value opportunities", y, "Unit-rate difference × annual usage; excludes other bill charges");
     const topOpportunities = opportunities.slice(0, 5);
     const maxSaving = Math.max(...topOpportunities.map((a) => a.saving), 1);
     const panelY = y - 3;
@@ -1366,7 +1375,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
 
     autoTable(doc, {
       startY: y,
-      head: [["Account", "Current rate", "Market rate", "Est. saving/yr", "Source"]],
+      head: [["Account", "Current rate", "Market rate", "Unit-rate est./yr", "Source"]],
       body: opportunities.map((a) => [
         a.name,
         fmtReportRate(a.rate),
@@ -1540,7 +1549,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const loadReadingSummaries = useCallback(async () => {
     let query = supabase
       .from("readings")
-      .select("account_id, reading_date, rate, usage, standing_charge, confidence, created_at")
+      .select("account_id, reading_date, rate, usage, standing_charge, total_cost, confidence, created_at")
       .order("reading_date", { ascending: false, nullsFirst: false });
     query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
     const { data } = await query;
@@ -1842,6 +1851,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       usage: form.usage || null,
       rate: form.rate || null,
       standing_charge: form.standing_charge || null,
+      total_cost: form.total_cost === "" || form.total_cost == null ? null : Number(form.total_cost),
       source: "manual",
     });
     if (error) {
@@ -1977,14 +1987,15 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     return accounts.map((a) => {
       const daysLeft = daysUntil(a.contract_end);
       const status = statusOf(daysLeft);
-      const comparison = marketComparisonFor(a, benchmarks, masterRates);
+      const latestReading = readingSummaries[a.id]?.[0];
+      const currentRate = latestReading?.rate ?? a.rate;
+      const comparison = marketComparisonFor({ ...a, rate: currentRate }, benchmarks, masterRates);
       const usageNum = parseFloat(a.usage);
-      const rateNum = parseFloat(a.rate);
+      const rateNum = parseFloat(currentRate);
       const saving =
         comparison && !isNaN(usageNum) && !isNaN(rateNum)
           ? ((rateNum - comparison.rate) / 100) * usageNum
           : null;
-      const latestReading = readingSummaries[a.id]?.[0];
       const confidence = accountConfidence(a, latestReading);
       const lowConfidenceBill = latestReading?.confidence === "low";
 
@@ -1998,7 +2009,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         }
       }
 
-      return { ...a, daysLeft, status, saving, cost: estimatedAnnualSpend(a, readingSummaries[a.id]), comparison, confidence, lowConfidenceBill, rateChange };
+      return { ...a, rate: currentRate, daysLeft, status, saving, cost: estimatedAnnualSpend(a, readingSummaries[a.id]), comparison, confidence, lowConfidenceBill, rateChange };
     });
   }, [accounts, benchmarks, masterRates, readingSummaries]);
 
@@ -2446,7 +2457,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           </div>
           <div className="gn-kpis">
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Estimated annual spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></Link>
-            <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Potential savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Estimated per year against current comparisons" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
+            <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Potential rate savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Unit-rate estimate; excludes other bill charges" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></Link>
             <Link href={sectionHref("savings")} className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
           </div>
@@ -2775,7 +2786,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             </span>
             {summaryStats.hasAnyComparison && (
               <span>
-                <strong style={{ color: "var(--green)" }}>{fmtMoney(summaryStats.potentialSavings)}</strong> potential savings/yr
+                <strong style={{ color: "var(--green)" }}>{fmtMoney(summaryStats.potentialSavings)}</strong> estimated unit-rate difference/yr
               </span>
             )}
           </div>
@@ -2965,7 +2976,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   </strong>
                 </span>
                 <span>
-                  Combined potential savings:{" "}
+                  Combined estimated unit-rate savings:{" "}
                   <strong style={{ color: hasAnyComparison ? "var(--green)" : "var(--muted)" }}>
                     {hasAnyComparison ? fmtMoney(enriched.reduce((s, a) => (a.saving && a.saving > 20 ? s + a.saving : s), 0)) : "no comparison yet"}
                   </strong>
@@ -3505,9 +3516,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                             padding: "1px 5px",
                           }}
                         >
-                          {a.comparison.source === "quoted" ? "quoted" : a.comparison.source === "verified" ? "GnóRate verified" : "estimated"}
+                          {a.comparison.source === "quoted" ? "quoted rate" : a.comparison.source === "verified" ? "verified rate" : "estimated rate"}
                         </span>
-                        {a.saving !== null && a.saving > 20 && ` · switching could save ~${fmtMoney(a.saving)}/yr`}
+                        {a.saving !== null && a.saving > 20 && ` · estimated unit-rate difference ~${fmtMoney(a.saving)}/yr`}
                       </div>
                     )}
                     {a.comparison?.source === "verified" && (a.comparison.supplierName || a.comparison.note) && (
@@ -3517,6 +3528,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         {a.comparison.note || ""}
                         {" · updated "}
                         {new Date(a.comparison.updatedAt).toLocaleDateString("en-IE")}
+                      </div>
+                    )}
+                    {a.comparison && a.saving !== null && (
+                      <div style={{ fontSize: 10.5, color: "var(--muted)", marginBottom: 8 }}>
+                        Indicative unit-rate calculation only: excludes standing charges, capacity charges, levies, VAT and contract fees. Compare full quotes before switching.
                       </div>
                     )}
                     {a.comparison?.source === "verified" && a.comparison.dgGroup && (
@@ -3715,8 +3731,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                             <div style={{ fontSize: 12.5, marginBottom: 6, color: ratePullResult.typical_rate < a.rate ? "var(--green)" : "var(--muted)" }}>
                               Your current rate: {a.rate}c/kWh
                               {ratePullResult.typical_rate < a.rate
-                                ? ` — this could save ~${fmtMoney(((a.rate - ratePullResult.typical_rate) / 100) * (parseFloat(a.usage) || 0))}/yr`
-                                : " — you're already at or below this"}
+                                ? ` — estimated unit-rate difference ~${fmtMoney(((a.rate - ratePullResult.typical_rate) / 100) * (parseFloat(a.usage) || 0))}/yr before other charges`
+                                : " — your unit rate is already at or below this"}
                             </div>
                           )}
                           <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10 }}>
@@ -3766,6 +3782,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                                 <span style={{ color: "var(--muted)" }}>{r.reading_date || "no date"}</span>
                                 <span>{r.usage ? `${r.usage} kWh` : "—"}</span>
                                 <span>{r.rate ? `${r.rate}c/kWh` : "—"}</span>
+                                <span title="Actual total amount shown on the bill">Bill total {r.total_cost != null ? fmtMoney(Number(r.total_cost)) : "—"}</span>
                                 <span style={{ color: "var(--muted)", fontSize: 10 }}>{r.source}</span>
                                 <button
                                   onClick={() => deleteReading(r.id, a.id)}
@@ -3882,6 +3899,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         <AccountForm
           initial={editing}
           existingLocations={[...new Set(accounts.map((a) => a.location).filter(Boolean))]}
+          existingAccounts={accounts}
           onSave={saveAccount}
           onCancel={() => {
             setShowForm(false);

@@ -697,6 +697,8 @@ export default function UploadReading({
             extracted.rate || null,
           standing_charge:
             extracted.standing_charge || null,
+          total_cost:
+            extracted.total_cost === "" || extracted.total_cost == null ? null : Number(extracted.total_cost),
           source: "upload",
           confidence:
             extracted.confidence || null,
@@ -1735,6 +1737,14 @@ export default function UploadReading({
                       "standing_charge"
                     )}
                   />
+                </label>
+
+                <label
+                  style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "var(--muted)" }}
+                >
+                  Actual bill total (€)
+                  <input type="number" step="0.01" style={inputStyle} value={extracted.total_cost ?? ""} onChange={set("total_cost")} />
+                  <span style={{ fontSize: 10.5, color: "var(--muted)" }}>Confirm the amount shown on the bill; it is not calculated from usage.</span>
                 </label>
               </div>
 
