@@ -1426,6 +1426,7 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
 
 export default function AccountsBoard({ companyId, companyName, lockedLocation, companyIds, companiesById, section = "overview" }) {
   const combinedMode = Array.isArray(companyIds) && companyIds.length > 0;
+  const sectionHref = (target) => combinedMode ? `/dashboard/all-companies?section=${target}` : `/dashboard?scope=company&section=${target}`;
   const supabase = createClient();
   const searchParams = useSearchParams();
   const currentSearchTerm = searchParams.get("search") || "";
@@ -1858,6 +1859,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   };
 
   const loadAccounts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     let query = supabase.from("accounts").select("*").order("contract_end", { ascending: true, nullsFirst: false });
     query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
     const { data, error } = await query;
@@ -2266,7 +2269,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     setSearch(account.name);
     setExpandedId(account.id);
     jumpToAccount(account);
-    router.push(`/dashboard?section=accounts&search=${encodeURIComponent(account.name)}`);
+    router.push(`${sectionHref("accounts")}&search=${encodeURIComponent(account.name)}`);
   };
 
   if (loading) {
@@ -2350,9 +2353,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           <div style={{ position: "relative", display: ["overview", "accounts"].includes(section) ? "block" : "none" }}>
             <button
               onClick={() => setShowMoreMenu((v) => !v)}
-              style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--muted)", padding: "10px 12px", borderRadius: 8, display: "flex", alignItems: "center", cursor: "pointer" }}
+              style={{ background: "none", border: "1px solid var(--border-light)", color: "var(--muted)", padding: "10px 12px", borderRadius: 8, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
             >
-              <MoreHorizontal size={18} />
+              <MoreHorizontal size={17} /><span style={{ fontSize: 12 }}>More actions</span>
             </button>
             {showMoreMenu && (
               <div
@@ -2369,7 +2372,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                 }}
               >
                 {[
-                  { icon: BarChart3, label: "Overview", onClick: () => setShowOverview(true) },
+                  { icon: BarChart3, label: "Open company overview", onClick: () => setShowOverview(true) },
                   { icon: FileText, label: "Download report (PDF)", onClick: () => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries) },
                   { icon: Mail, label: "Feed in a quote", onClick: () => router.push("/dashboard/add-quote") },
                   { icon: TrendingDown, label: "Download savings report (PDF)", onClick: () => generateSavingsReport(enrichedAll, summaryStats, companyName) },
@@ -2407,16 +2410,31 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         </div>
       </div>
 
-      {section === "overview" && !lockedLocation && (
+      {section === "overview" && !lockedLocation && loading && <div className="gn-dashboard-load-state" role="status"><div><strong>Loading your company information…</strong>Account totals and activity will appear here in a moment.</div></div>}
+      {section === "overview" && !lockedLocation && !loading && error && <div className="gn-dashboard-load-state" role="alert"><div><strong>We couldn’t load this dashboard.</strong>{error}</div><button type="button" onClick={loadAccounts}>Try again</button></div>}
+      {section === "overview" && !lockedLocation && !loading && !error && (
         <section className="gn-overview" aria-label="Portfolio overview">
+          {combinedMode && <section className="gn-company-overview" aria-label="Companies overview">
+            <div className="gn-company-overview-heading"><h2>Companies overview</h2><p>See each company’s accounts and open its dashboard directly.</p></div>
+            <div className="gn-company-overview-grid">{companyIds.map((id) => {
+              const companyAccounts = enrichedAll.filter((account) => account.company_id === id);
+              const companySpend = companyAccounts.reduce((total, account) => total + (account.cost || 0), 0);
+              const needsCheck = companyAccounts.filter((account) => attentionLevelFor(account) !== "none").length;
+              return <article className="gn-company-overview-card" key={id}>
+                <h3>{companiesById?.[id] || "Company"}</h3>
+                <div className="gn-company-overview-stats"><div><span>Accounts</span><strong>{companyAccounts.length}</strong></div><div><span>Items to check</span><strong>{needsCheck}</strong></div><div><span>Estimated annual spend</span><strong>{companySpend > 0 ? fmtMoney(companySpend) : "Not available"}</strong></div></div>
+                <button type="button" onClick={() => switchToCompany(id)}>Open this company’s dashboard →</button>
+              </article>;
+            })}</div>
+          </section>}
           <div className="gn-welcome-panel">
             <div className="gn-welcome-copy">
               <span className="gn-welcome-eyebrow"><i /> {firstDashboardAction ? "NEXT ACCOUNT ACTION" : summaryStats.total ? "PORTFOLIO STATUS" : "GET STARTED"}</span>
               <h2>{firstDashboardAction ? firstDashboardAction.groupLabel : summaryStats.total ? "No urgent account actions." : "Add your first utility account."}</h2>
               <p>{firstDashboardAction ? `${firstDashboardAction.account.name}${firstDashboardAction.account.location ? ` · ${firstDashboardAction.account.location}` : ""}. ${firstDashboardAction.detail || "Open the account to see what to check."}` : summaryStats.total ? "You can plan ahead using the upcoming renewals list below. Older bills and missing account details are shown as information, not urgent alerts." : "Add an account or bill to start seeing costs, usage and contract dates in one place."}</p>
               <div className="gn-welcome-actions">
-                {firstDashboardAction ? <button className="gn-welcome-primary" type="button" onClick={() => openDashboardAccount(firstDashboardAction.account)}>Open {firstDashboardAction.account.name} <span aria-hidden="true">→</span></button> : <Link className="gn-welcome-primary" href="/dashboard?section=accounts">{summaryStats.total ? "View accounts" : "Add an account"} <span aria-hidden="true">→</span></Link>}
-                <Link href={firstDashboardAction ? "/dashboard/attention" : dashboardRenewals.length ? "/dashboard?section=renewals" : "/dashboard?section=usage"}>{firstDashboardAction ? "See all items to check" : dashboardRenewals.length ? "See contract dates" : "View usage and bills"} <span aria-hidden="true">→</span></Link>
+                {firstDashboardAction ? <button className="gn-welcome-primary" type="button" onClick={() => openDashboardAccount(firstDashboardAction.account)}>Open {firstDashboardAction.account.name} <span aria-hidden="true">→</span></button> : <Link className="gn-welcome-primary" href={sectionHref("accounts")}>{summaryStats.total ? "View accounts" : "Add an account"} <span aria-hidden="true">→</span></Link>}
+                <Link href={firstDashboardAction ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("usage")}>{firstDashboardAction ? "See all items to check" : dashboardRenewals.length ? "See contract dates" : "View usage and bills"} <span aria-hidden="true">→</span></Link>
               </div>
             </div>
             <div className="gn-welcome-insight">
@@ -2427,10 +2445,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             <div className="gn-welcome-orb" aria-hidden="true" />
           </div>
           <div className="gn-kpis">
-            <Link href="/dashboard?section=accounts" className="gn-kpi"><span>Estimated annual spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></Link>
-            <Link href="/dashboard?section=savings" className="gn-kpi gn-kpi-highlight"><span>Potential savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Estimated per year against current comparisons" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
-            <Link href="/dashboard?section=accounts" className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></Link>
-            <Link href="/dashboard?section=savings" className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
+            <Link href={sectionHref("accounts")} className="gn-kpi"><span>Estimated annual spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></Link>
+            <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Potential savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Estimated per year against current comparisons" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
+            <Link href={sectionHref("accounts")} className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></Link>
+            <Link href={sectionHref("savings")} className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
           </div>
           <div className="gn-insight-grid">
             <article className="gn-card">
@@ -2438,16 +2456,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {spendTotal > 0 ? <div className="gn-donut-row"><div className="gn-donut" style={{ "--electric-share": `${Math.round((utilitySpend.electricity / spendTotal) * 100)}%` }}><b>{fmtMoney(spendTotal)}</b></div><div className="gn-legend"><span><i className="gn-dot electric"/> Electricity <b>{Math.round((utilitySpend.electricity / spendTotal) * 100)}%</b></span><span><i className="gn-dot gas"/> Gas <b>{Math.round((utilitySpend.gas / spendTotal) * 100)}%</b></span></div></div> : <div className="gn-empty-chart">Add bill readings and account usage to build your spend breakdown.</div>}
             </article>
             <article className="gn-card">
-              <div className="gn-card-heading"><div><h2>Recorded usage</h2><p>Bill usage by month · bar height is relative to the highest month</p></div><Link href="/dashboard?section=usage" className="gn-card-link">Filter usage →</Link></div>
+              <div className="gn-card-heading"><div><h2>Recorded usage</h2><p>Bill usage by month · bar height is relative to the highest month</p></div><Link href={sectionHref("usage")} className="gn-card-link">Filter usage →</Link></div>
               {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString("en-IE")} kWh`}><em>{month.usage ? Math.round(month.usage).toLocaleString("en-IE") : "-"}</em><div className="gn-bar-track"><i style={{ height: month.usage ? `${Math.max(5, (month.usage / max) * 100)}%` : "0%" }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
             </article>
           </div>
-          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? "/dashboard?section=renewals" : "/dashboard?section=accounts"}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "No urgent account actions"} <span aria-hidden="true">→</span></Link><Link href="/dashboard?section=accounts">View all accounts <span aria-hidden="true">→</span></Link></div>
+          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("accounts")}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "No urgent account actions"} <span aria-hidden="true">→</span></Link><Link href={sectionHref("accounts")}>View all accounts <span aria-hidden="true">→</span></Link></div>
           <div className="gn-task-grid">
             <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Contracts ending within 30 days, rate rises of 5%+, or bill details to verify</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
               {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
             </article>
-            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Renewal timeline</h2><p>Dates in the next 120 days; past dates stay here until the record is updated</p></div><Link href="/dashboard?section=renewals" className="gn-card-link">View all →</Link></div>
+            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Renewal timeline</h2><p>Dates in the next 120 days; past dates stay here until the record is updated</p></div><Link href={sectionHref("renewals")} className="gn-card-link">View all →</Link></div>
               {dashboardRenewals.length ? <div className="gn-task-list">{dashboardRenewals.map((account) => <button key={account.id} onClick={() => openDashboardAccount(account)}><span className="gn-task-date">{account.daysLeft < 0 ? `${Math.abs(account.daysLeft)}d` : `${account.daysLeft}d`}</span><span><b>{account.name}</b><small>{account.provider || "Supplier not set"} · {account.daysLeft < 0 ? "contract end date passed" : `ends in ${account.daysLeft} days`}</small></span><strong>{["quote_requested", "switching"].includes(account.renewal_status || "not_started") ? "In progress" : account.daysLeft < 0 ? "Needs update" : account.daysLeft <= 30 ? "Start soon" : "Plan ahead"}</strong></button>)}</div> : <div className="gn-task-empty">No contracts are due in the next 120 days.</div>}
             </article>
           </div>
@@ -2534,7 +2552,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
 
       {lockedLocation ? (
         <div style={{ marginBottom: 22 }}>
-          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--muted)", textDecoration: "none", marginBottom: 12, width: "fit-content" }}>
+          <Link href={sectionHref("accounts")} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--muted)", textDecoration: "none", marginBottom: 12, width: "fit-content" }}>
             <ChevronDown size={13} style={{ transform: "rotate(90deg)" }} /> All locations
           </Link>
           <h2 style={{ fontFamily: "'Manrope', serif", fontSize: 20, fontWeight: 600, margin: 0 }}>{lockedLocation}</h2>
@@ -2652,7 +2670,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               if (locAttention.length === 0) return null;
               return (
                 <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>WHERE</p>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, marginBottom: 8 }}>LOCATIONS WITH ACCOUNT CHECKS</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
                     {locAttention.map(({ loc, count, urgent, total }) => (
                       <button
@@ -2841,18 +2859,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     cursor: "pointer",
                   }}
                 >
-                  {groupByLocation ? "Show as account list" : "Group by location"}
+                  {groupByLocation ? "Show accounts as a list" : "Group accounts by location"}
                 </button>
               )}
               {locations.length > 0 && !lockedLocation && groupByLocation && (
-                <select
-                  value={locationSortMode}
-                  onChange={(e) => setLocationSortMode(e.target.value)}
-                  style={{ ...inputStyle, width: "auto" }}
-                >
-                  <option value="alphabetical">Site name (A to Z)</option>
-                  <option value="attention">Most checks first</option>
-                </select>
+                <label style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--muted)", fontSize: 12 }}>
+                  Sort sites by
+                  <select aria-label="Sort sites by" value={locationSortMode} onChange={(e) => setLocationSortMode(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+                    <option value="attention">Needs review first</option>
+                    <option value="alphabetical">Site name A to Z</option>
+                  </select>
+                </label>
               )}
             </div>
 
