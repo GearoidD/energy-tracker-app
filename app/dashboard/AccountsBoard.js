@@ -2269,6 +2269,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const showAccountTable = ["accounts", "rates", "renewals", "savings"].includes(section) || !!lockedLocation;
   const dashboardRenewals = enrichedAll.filter((account) => account.daysLeft !== null && account.daysLeft <= HORIZON_DAYS).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5);
   const dashboardActions = [...new Map(attentionItems.map((item) => [item.account.id, item])).values()].slice(0, 5);
+  const firstDashboardAction = dashboardActions[0] || null;
+  const firstDashboardAccount = firstDashboardAction?.account || dashboardRenewals[0] || null;
   const openDashboardAccount = (account) => {
     setSearch(account.name);
     setExpandedId(account.id);
@@ -2418,12 +2420,12 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         <section className="gn-overview" aria-label="Portfolio overview">
           <div className="gn-welcome-panel">
             <div className="gn-welcome-copy">
-              <span className="gn-welcome-eyebrow"><i /> LIVE PORTFOLIO</span>
-              <h2>A clearer view of your energy costs.</h2>
-              <p>Track every site, spot renewal dates early and see where better rates could reduce spend.</p>
+              <span className="gn-welcome-eyebrow"><i /> {firstDashboardAction ? "START HERE · NEXT ACTION" : firstDashboardAccount ? "START HERE · UPCOMING RENEWAL" : "LIVE PORTFOLIO"}</span>
+              <h2>{firstDashboardAction ? firstDashboardAction.groupLabel : firstDashboardAccount ? firstDashboardAccount.daysLeft < 0 ? `${firstDashboardAccount.name} is out of contract` : `${firstDashboardAccount.name} renews in ${firstDashboardAccount.daysLeft} days` : summaryStats.total ? "Your portfolio is up to date." : "Start by adding your first account."}</h2>
+              <p>{firstDashboardAction ? `${firstDashboardAction.account.name}${firstDashboardAction.account.location ? ` · ${firstDashboardAction.account.location}` : ""}. ${firstDashboardAction.detail || "Open the account to see its details and next steps."}` : firstDashboardAccount ? `${firstDashboardAccount.name}${firstDashboardAccount.location ? ` · ${firstDashboardAccount.location}` : ""} · ${firstDashboardAccount.provider || "Supplier not set"}. Open the account to check its renewal details.` : summaryStats.total ? "There are no urgent account actions right now. Check usage, renewals or rate opportunities whenever you need to." : "Add a utility account or upload a bill to begin tracking costs, usage and renewals."}</p>
               <div className="gn-welcome-actions">
-                <Link className="gn-welcome-primary" href="/dashboard?section=accounts">Review accounts <span aria-hidden="true">→</span></Link>
-                <Link href="/dashboard?section=rates">Explore rate opportunities <span aria-hidden="true">→</span></Link>
+                {firstDashboardAccount ? <button className="gn-welcome-primary" type="button" onClick={() => openDashboardAccount(firstDashboardAccount)}>Open {firstDashboardAccount.name} <span aria-hidden="true">→</span></button> : <Link className="gn-welcome-primary" href="/dashboard?section=accounts">{summaryStats.total ? "View accounts" : "Add an account"} <span aria-hidden="true">→</span></Link>}
+                <Link href={firstDashboardAction ? "/dashboard/attention" : "/dashboard?section=usage"}>{firstDashboardAction ? "See all items to check" : "View usage and bills"} <span aria-hidden="true">→</span></Link>
               </div>
             </div>
             <div className="gn-welcome-insight">
