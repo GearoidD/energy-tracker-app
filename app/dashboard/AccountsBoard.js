@@ -1955,7 +1955,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       alert("Couldn't switch company: " + error.message);
       return;
     }
-    router.push("/dashboard");
+    router.push(`/dashboard?section=${encodeURIComponent(section || "accounts")}`);
   };
 
   const deleteAccount = async (id) => {
@@ -2009,7 +2009,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           (a.location || "").toLowerCase().includes(q) ||
           (a.provider || "").toLowerCase().includes(q) ||
           (a.account_number || "").toLowerCase().includes(q) ||
-          (a.supplier_account_number || "").toLowerCase().includes(q);
+          (a.supplier_account_number || "").toLowerCase().includes(q) ||
+          (combinedMode && (companiesById?.[a.company_id] || "").toLowerCase().includes(q));
         const matchesFuel = filterFuel === "all" || (a.fuel_type || "electricity") === filterFuel;
         const matchesStatus =
           filterStatus === "all" ||
@@ -2042,19 +2043,18 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     const groups = {};
     enriched.forEach((a) => {
       const location = a.location || "Location not set";
-      if (!groups[location]) groups[location] = [];
-      groups[location].push(a);
+      // Keep similarly named sites separate when viewing several companies together.
+      const groupKey = combinedMode ? `${a.company_id}::${location}` : location;
+      if (!groups[groupKey]) groups[groupKey] = { groupKey, location, companyName: companiesById?.[a.company_id], accounts: [] };
+      groups[groupKey].accounts.push(a);
     });
-    const attentionCountFor = (accts) =>
-      accts.filter((a) => {
-        return attentionLevelFor(a) !== "none";
-      }).length;
+    const attentionCountFor = (accts) => accts.filter((a) => attentionLevelFor(a) !== "none").length;
 
-    const groupList = Object.entries(groups)
-      .map(([location, accts]) => ({
-        location,
-        accounts: [...accts].sort((a, b) => severityRank(a) - severityRank(b) || a.name.localeCompare(b.name, undefined, { numeric: true })),
-        attentionCount: attentionCountFor(accts),
+    const groupList = Object.values(groups)
+      .map((group) => ({
+        ...group,
+        accounts: [...group.accounts].sort((a, b) => severityRank(a) - severityRank(b) || a.name.localeCompare(b.name, undefined, { numeric: true })),
+        attentionCount: attentionCountFor(group.accounts),
       }))
       .sort((a, b) =>
         locationSortMode === "attention"
@@ -2064,13 +2064,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
 
     const items = [];
     groupList.forEach((g) => {
-      items.push({ type: "location-header", location: g.location, accounts: g.accounts });
-      if (expandedLocationGroups.has(g.location)) {
+      items.push({ type: "location-header", groupKey: g.groupKey, location: g.location, companyName: g.companyName, accounts: g.accounts });
+      if (expandedLocationGroups.has(g.groupKey)) {
         g.accounts.forEach((a) => items.push({ type: "account", account: a }));
       }
     });
     return items;
-  }, [enriched, groupByLocation, expandedLocationGroups, locationSortMode]);
+  }, [enriched, groupByLocation, expandedLocationGroups, locationSortMode, combinedMode, companiesById]);
 
   const summaryStats = useMemo(() => {
     const urgentCount = enrichedAll.filter((a) => attentionLevelFor(a) === "urgent").length;
@@ -2311,7 +2311,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         <div style={{ display: lockedLocation ? "flex" : "none", alignItems: "flex-start", gap: 12 }}>
           <span className="gn-section-mark"><Building2 size={19}/></span>
           <div>
-            <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>{combinedMode ? "All companies" : ({ overview: "Portfolio overview", accounts: "Accounts", rates: "Rate opportunities", usage: "Usage", renewals: "Upcoming renewals", savings: "Savings opportunities", reports: "Reports", settings: "Workspace settings" }[section] || "Accounts")}</h1>
+            <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>{({ overview: combinedMode ? "All company accounts" : "Portfolio overview", accounts: "Accounts", rates: "Rate opportunities", usage: "Usage", renewals: "Upcoming renewals", savings: "Savings opportunities", reports: "Reports", settings: "Workspace settings" }[section] || "Accounts")}</h1>
             <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
               {combinedMode ? "Every account across every company you belong to." : section === "rates" ? "Accounts with a current market comparison, connected to your Irish tariff data." : section === "usage" ? "Review dated bill readings by month and trace each total back to an account. Blank periods remain visible as gaps." : section === "renewals" ? "Contracts ending within the next 120 days, ordered by urgency." : section === "savings" ? "Accounts where current market comparisons indicate a potential saving." : "Your utility portfolio, connected to your existing account and bill data."}
             </p>
@@ -3092,7 +3092,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {displayItems.map((item) => {
             if (item.type === "location-header") {
-              const isExpanded = expandedLocationGroups.has(item.location);
+              const isExpanded = expandedLocationGroups.has(item.groupKey);
               const groupAttentionCount = item.accounts.filter((a) => attentionLevelFor(a) !== "none").length;
               const groupUrgentCount = item.accounts.filter((a) => attentionLevelFor(a) === "urgent").length;
               const worstColor = groupUrgentCount > 0 ? "var(--red)" : groupAttentionCount > 0 ? "var(--amber)" : "var(--green)";
@@ -3101,12 +3101,12 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               const fuelLabel = elecCount > 0 && gasCount > 0 ? `${elecCount} Electricity, ${gasCount} Gas` : elecCount > 0 ? "Electricity" : "Gas";
               return (
                 <button
-                  key={`loc-${item.location}`}
+                  key={`loc-${item.groupKey}`}
                   onClick={() =>
                     setExpandedLocationGroups((prev) => {
                       const next = new Set(prev);
-                      if (next.has(item.location)) next.delete(item.location);
-                      else next.add(item.location);
+                      if (next.has(item.groupKey)) next.delete(item.groupKey);
+                      else next.add(item.groupKey);
                       return next;
                     })
                   }
@@ -3126,6 +3126,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                 >
                   <ChevronDown size={14} color="var(--muted)" style={{ transform: isExpanded ? "none" : "rotate(-90deg)", flexShrink: 0, transition: "transform 0.15s ease" }} />
                   <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: 14.5, fontWeight: 600, color: "var(--text)" }}>{item.location}</span>
+                  {combinedMode && item.companyName && <span style={{ fontSize: 11, fontWeight: 600, color: "var(--state)", background: "var(--bg)", borderRadius: 5, padding: "3px 7px" }}>{item.companyName}</span>}
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>
                     {item.accounts.length} account{item.accounts.length === 1 ? "" : "s"} · {fuelLabel}
                     {groupAttentionCount > 0 ? (

@@ -6,7 +6,10 @@ import PortalShell from "../PortalShell";
 
 export const dynamic = "force-dynamic";
 
-export default async function AllCompaniesPage() {
+export default async function AllCompaniesPage({ searchParams }) {
+  const params = await searchParams;
+  const requestedSection = params?.section || "overview";
+  const section = ["overview", "accounts", "rates", "usage", "renewals", "savings", "reports", "settings"].includes(requestedSection) ? requestedSection : "overview";
   const supabase = createClient();
 
   const {
@@ -39,6 +42,6 @@ export default async function AllCompaniesPage() {
   });
 
   return <PortalShell companyName="All companies" header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
-    <AccountsBoard companyIds={companies.map((c) => c.id)} companiesById={companiesById} companyName="All companies" section="overview" />
+    <AccountsBoard companyIds={companies.map((c) => c.id)} companiesById={companiesById} companyName="All companies" section={section} />
   </PortalShell>;
 }

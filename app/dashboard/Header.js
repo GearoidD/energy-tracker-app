@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LogOut, ChevronDown, Plus, Trash2, UserPlus, Users, HelpCircle, Building2, Shield } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,9 @@ import TeamMembers from "./TeamMembers";
 export default function Header({ email, userId, companies = [], activeCompanyId }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const section = searchParams.get("section") || "overview";
+  const sectionPath = ["overview", "accounts", "rates", "usage", "renewals", "savings", "reports", "settings"].includes(section) ? section : "overview";
   const onAllCompanies = pathname === "/dashboard/all-companies";
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
@@ -75,7 +78,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
         alert("The switch didn't actually save (0 rows updated) — this points to a permissions rule blocking it. Tell Claude this exact message.");
         return;
       }
-      window.location.href = "/dashboard";
+      window.location.href = `/dashboard?section=${encodeURIComponent(sectionPath)}`;
     } catch (e) {
       alert("Something unexpected went wrong switching company: " + (e?.message || String(e)));
     }
@@ -201,7 +204,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
               >
                 {companies.length > 1 && (
                   <Link
-                    href="/dashboard/all-companies"
+                    href={`/dashboard/all-companies?section=${encodeURIComponent(onAllCompanies ? sectionPath : sectionPath === "overview" && pathname === "/dashboard" ? "accounts" : sectionPath)}`}
                     onClick={() => setMenuOpen(false)}
                     style={{
                       display: "flex",
