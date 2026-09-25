@@ -2013,7 +2013,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       });
   }, [enrichedAll, search, filterFuel, filterStatus, filterRenewal, filterLocation, section, readingSummaries]);
 
-  const [groupByLocation, setGroupByLocation] = useState(!lockedLocation);
+  const [groupByLocation, setGroupByLocation] = useState(false);
   const [expandedLocationGroups, setExpandedLocationGroups] = useState(new Set());
   const [locationSortMode, setLocationSortMode] = useState("alphabetical"); // alphabetical or attention
 
@@ -2821,7 +2821,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   cursor: "pointer",
                 }}
               >
-                <SlidersHorizontal size={14} /> Filters
+                <SlidersHorizontal size={14} /> Filter accounts
                 {activeFilterCount > 0 && (
                   <span style={{ background: "var(--teal)", color: "#ffffff", borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>
                     {activeFilterCount}
@@ -2848,7 +2848,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     cursor: "pointer",
                   }}
                 >
-                  Group by location
+                  {groupByLocation ? "Showing by location" : "Group by location"}
                 </button>
               )}
               {locations.length > 0 && !lockedLocation && groupByLocation && (
@@ -3249,11 +3249,20 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     {overall.label}
                   </span>
                   <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} title="Recorded contract end date">
-                    {a.daysLeft === null ? "No end date" : a.daysLeft < 0 ? `${Math.abs(a.daysLeft)}d past end date` : `${a.daysLeft}d to end date`}
+                    {a.daysLeft === null ? "End date not set" : a.daysLeft < 0 ? `Ended ${Math.abs(a.daysLeft)} days ago` : `Ends in ${a.daysLeft} days`}
                   </span>
+                  <button
+                    type="button"
+                    className="gn-account-details-button"
+                    aria-expanded={isExpanded}
+                    onClick={(e) => { e.stopPropagation(); toggleReadings(a.id); }}
+                  >
+                    {isExpanded ? "Hide details" : "View details"}
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setUploadingFor(a.id); }}
                     title="Upload a bill for this account"
+                    aria-label={`Upload a bill for ${a.name}` }
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", padding: 5, flexShrink: 0 }}
                   >
                     <Upload size={14} />
@@ -3261,6 +3270,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setMenuForId(menuForId === a.id ? null : a.id)}
+                      aria-label={`More actions for ${a.name}`}
+                      title="More actions"
                       style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", display: "flex", padding: 4 }}
                     >
                       <MoreHorizontal size={18} />

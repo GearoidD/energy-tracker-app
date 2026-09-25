@@ -139,6 +139,9 @@ a {
 .gn-task-card:nth-child(2) .gn-task-list button { grid-template-columns:36px minmax(0,1fr) auto; }
 .gn-task-empty { display:grid; place-items:center; min-height:138px; color:#849188; font-size:11px; }
 .gn-account-primary-row { flex-wrap:wrap; }
+.gn-account-details-button { border:1px solid #cfe3d4; border-radius:7px; padding:7px 10px; background:#fff; color:#08784e; font-size:10px; font-weight:700; white-space:nowrap; cursor:pointer; }
+.gn-account-details-button:hover { background:#f1f8f3; border-color:#8fc7a7; }
+.gn-account-details-button:focus-visible { outline:3px solid #61c995; outline-offset:2px; }
 .gn-account-info-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:0; margin:0 16px 13px 47px; border:1px solid #e5ece7; border-radius:9px; overflow:hidden; background:#fbfcfb; }
 .gn-account-info-grid>div { min-width:0; display:grid; align-content:start; gap:5px; padding:10px 11px; border-right:1px solid #e5ece7; border-bottom:1px solid #e5ece7; }
 .gn-account-info-grid small,.gn-usage-account-row small { color:#75877d; font-size:9px; font-weight:700; letter-spacing:.45px; text-transform:uppercase; }

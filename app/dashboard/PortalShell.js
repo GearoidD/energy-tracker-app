@@ -5,22 +5,22 @@ import { useSearchParams } from "next/navigation";
 import { Activity, BarChart3, Building2, CircleDollarSign, Gauge, LayoutDashboard, ListChecks, Settings, Zap } from "lucide-react";
 
 const groups = [
-  ["Portfolio", [["overview", "Dashboard", LayoutDashboard], ["accounts", "Accounts", Building2], ["usage", "Usage", Activity]]],
-  ["Monitor", [["renewals", "Renewals", Gauge], ["attention", "Review queue", ListChecks]]],
-  ["Optimise", [["rates", "Rates", Zap], ["savings", "Savings", CircleDollarSign]]],
+  ["Your business", [["overview", "Dashboard", LayoutDashboard], ["accounts", "Accounts", Building2], ["usage", "Usage and bills", Activity]]],
+  ["Keep on track", [["renewals", "Renewals", Gauge], ["attention", "Needs attention", ListChecks]]],
+  ["Reduce costs", [["rates", "Compare rates", Zap], ["savings", "Savings", CircleDollarSign]]],
   ["Manage", [["reports", "Reports", BarChart3], ["settings", "Settings", Settings]]],
 ];
 
 const copy = {
   overview: ["Dashboard", "Your utility contracts at a glance."],
   accounts: ["Accounts", "Every site, supplier, contract and bill in one place."],
-  rates: ["Rates", "Compare current tariffs with available market opportunities."],
-  usage: ["Usage", "Review account readings and keep consumption data current."],
-  renewals: ["Renewals", "Stay ahead of contract end dates and renewal actions."],
-  savings: ["Savings", "See estimated and verified opportunities across your portfolio."],
+  rates: ["Compare rates", "See whether an available tariff may cost less."],
+  usage: ["Usage and bills", "See recorded usage and bills by account, location and month."],
+  renewals: ["Renewals", "See which contracts are ending and what needs a follow-up."],
+  savings: ["Savings", "Review estimated savings and the accounts behind them."],
   reports: ["Reports", "Export account data and portfolio summaries."],
   settings: ["Settings", "Manage your company and team access."],
-  attention: ["Review queue", "Accounts that need a follow-up from your team."],
+  attention: ["Needs attention", "Accounts with something to check, with the reason and next step."],
 };
 
 export default function PortalShell({ children, header, companyName, sectionOverride }) {
