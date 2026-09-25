@@ -234,26 +234,30 @@ function overallStatusFor(a) {
 
 function accountStatusDetail(a) {
   const renewalStatus = a.renewal_status || "not_started";
-  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) return `Recorded rate rose ${a.rateChange.pct.toFixed(1)}% between bills (${a.rateChange.from}c to ${a.rateChange.to}c/kWh). Check the latest bill to confirm the change.`;
+  const beingHandled = renewalStatus === "quote_requested" || renewalStatus === "switching";
+  if ((a.status === "overdue" || a.status === "urgent") && !beingHandled) {
+    return a.status === "overdue"
+      ? "Contract end date passed " + Math.abs(a.daysLeft) + " day" + (Math.abs(a.daysLeft) === 1 ? "" : "s") + " ago. Confirm the current terms with the supplier."
+      : "Contract ends in " + a.daysLeft + " day" + (a.daysLeft === 1 ? "" : "s") + ". Start reviewing renewal options.";
+  }
+  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) return "Recorded rate rose " + a.rateChange.pct.toFixed(1) + "% between bills (" + a.rateChange.from + "c to " + a.rateChange.to + "c/kWh). Check the latest bill to confirm the change.";
   if (a.lowConfidenceBill) return "Some bill details could not be read confidently. Compare them with the original bill.";
   if (renewalStatus === "quote_requested") return "A renewal quote has been requested.";
   if (renewalStatus === "switching") return "A supplier change is in progress.";
-  if (a.daysLeft !== null && a.daysLeft < 0) return `Contract end date passed ${Math.abs(a.daysLeft)} day${Math.abs(a.daysLeft) === 1 ? "" : "s"} ago. Confirm current terms with the supplier.`;
-  if (a.daysLeft !== null && a.daysLeft <= 30) return `Contract ends in ${a.daysLeft} day${a.daysLeft === 1 ? "" : "s"}. Review renewal options.`;
+  if (a.status === "soon") return "Contract ends in " + a.daysLeft + " days. Compare renewal options when ready.";
   if (a.confidence.missingBill) {
     return a.confidence.daysSinceLastReading != null
-      ? `Latest bill on file is ${a.confidence.daysSinceLastReading} days old. Billing cycles vary, so check whether a newer bill is expected.`
+      ? "Latest bill on file is " + a.confidence.daysSinceLastReading + " days old. Billing cycles vary, so check whether a newer bill is expected."
       : "No bill is on file yet. Upload one when available to see recorded usage and confirm rates.";
   }
-  if (a.status === "soon") return `Contract ends in ${a.daysLeft} days. Compare renewal options when ready.`;
-  if (a.confidence.score < 50 && a.confidence.reasons.length) return `Some account details are not recorded yet: ${a.confidence.reasons.join("; ")}.`;
+  if (a.confidence.score < 50 && a.confidence.reasons.length) return "Some account details are not recorded yet: " + a.confidence.reasons.join("; ") + ".";
   const missing = [];
   if (!a.provider) missing.push("supplier");
   if (!a.rate) missing.push("current rate");
   if (!a.usage) missing.push("annual usage");
   if (!a.contract_end) missing.push("contract end date");
-  if (missing.length) return `Not recorded: ${missing.join(", ")}. Add these details to improve comparisons.`;
-  return a.contract_end ? `Contract currently recorded through ${new Date(`${a.contract_end}T00:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}.` : "No current account issue flagged from the information on file.";
+  if (missing.length) return "Not recorded: " + missing.join(", ") + ". Add these details to improve comparisons.";
+  return a.contract_end ? "Contract currently recorded through " + new Date(a.contract_end + "T00:00:00").toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" }) + "." : "No current account issue flagged from the information on file.";
 }
 
 function formatAccountDate(dateStr) {
@@ -1079,7 +1083,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     y,
     pageWidth,
     eyebrow: "Portfolio pulse",
-    title: summaryStats.needAttention ? `${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? " needs" : "s need"} a review` : "Your portfolio is up to date",
+    title: summaryStats.needAttention ? `${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? " needs" : "s need"} a review` : "No urgent account actions",
     detail: `${summaryStats.criticalCount} urgent  ·  ${summaryStats.reviewCount} checks  ·  ${summaryStats.total - summaryStats.needAttention} not currently flagged`,
     value: `${summaryStats.renewingSoon90} renewing soon`,
   }) + 9;
@@ -2251,10 +2255,12 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const opportunityCount = enrichedAll.filter((account) => account.saving != null && account.saving > 20).length;
   const spendTotal = utilitySpend.electricity + utilitySpend.gas;
   const showAccountTable = ["accounts", "rates", "renewals", "savings"].includes(section) || !!lockedLocation;
-  const dashboardRenewals = enrichedAll.filter((account) => account.daysLeft !== null && account.daysLeft <= HORIZON_DAYS).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5);
+  const dashboardRenewals = enrichedAll
+    .filter((account) => account.daysLeft !== null && account.daysLeft <= HORIZON_DAYS)
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 5);
   const dashboardActions = [...new Map(attentionItems.map((item) => [item.account.id, item])).values()].slice(0, 5);
   const firstDashboardAction = dashboardActions[0] || null;
-  const firstDashboardAccount = firstDashboardAction?.account || dashboardRenewals[0] || null;
   const openDashboardAccount = (account) => {
     setGroupByLocation(false);
     setSearch(account.name);
@@ -2405,18 +2411,18 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         <section className="gn-overview" aria-label="Portfolio overview">
           <div className="gn-welcome-panel">
             <div className="gn-welcome-copy">
-              <span className="gn-welcome-eyebrow"><i /> {firstDashboardAction ? "START HERE · NEXT ACTION" : firstDashboardAccount ? "START HERE · UPCOMING RENEWAL" : "LIVE PORTFOLIO"}</span>
-              <h2>{firstDashboardAction ? firstDashboardAction.groupLabel : firstDashboardAccount ? firstDashboardAccount.daysLeft < 0 ? `${firstDashboardAccount.name} is out of contract` : `${firstDashboardAccount.name} renews in ${firstDashboardAccount.daysLeft} days` : summaryStats.total ? "Your portfolio is up to date." : "Start by adding your first account."}</h2>
-              <p>{firstDashboardAction ? `${firstDashboardAction.account.name}${firstDashboardAction.account.location ? ` · ${firstDashboardAction.account.location}` : ""}. ${firstDashboardAction.detail || "Open the account to see its details and next steps."}` : firstDashboardAccount ? `${firstDashboardAccount.name}${firstDashboardAccount.location ? ` · ${firstDashboardAccount.location}` : ""} · ${firstDashboardAccount.provider || "Supplier not set"}. Open the account to check its renewal details.` : summaryStats.total ? "There are no urgent account actions right now. Check usage, renewals or rate opportunities whenever you need to." : "Add a utility account or upload a bill to begin tracking costs, usage and renewals."}</p>
+              <span className="gn-welcome-eyebrow"><i /> {firstDashboardAction ? "NEXT ACCOUNT ACTION" : summaryStats.total ? "PORTFOLIO STATUS" : "GET STARTED"}</span>
+              <h2>{firstDashboardAction ? firstDashboardAction.groupLabel : summaryStats.total ? "No urgent account actions." : "Add your first utility account."}</h2>
+              <p>{firstDashboardAction ? `${firstDashboardAction.account.name}${firstDashboardAction.account.location ? ` · ${firstDashboardAction.account.location}` : ""}. ${firstDashboardAction.detail || "Open the account to see what to check."}` : summaryStats.total ? "You can plan ahead using the upcoming renewals list below. Older bills and missing account details are shown as information, not urgent alerts." : "Add an account or bill to start seeing costs, usage and contract dates in one place."}</p>
               <div className="gn-welcome-actions">
-                {firstDashboardAccount ? <button className="gn-welcome-primary" type="button" onClick={() => openDashboardAccount(firstDashboardAccount)}>Open {firstDashboardAccount.name} <span aria-hidden="true">→</span></button> : <Link className="gn-welcome-primary" href="/dashboard?section=accounts">{summaryStats.total ? "View accounts" : "Add an account"} <span aria-hidden="true">→</span></Link>}
-                <Link href={firstDashboardAction ? "/dashboard/attention" : "/dashboard?section=usage"}>{firstDashboardAction ? "See all items to check" : "View usage and bills"} <span aria-hidden="true">→</span></Link>
+                {firstDashboardAction ? <button className="gn-welcome-primary" type="button" onClick={() => openDashboardAccount(firstDashboardAction.account)}>Open {firstDashboardAction.account.name} <span aria-hidden="true">→</span></button> : <Link className="gn-welcome-primary" href="/dashboard?section=accounts">{summaryStats.total ? "View accounts" : "Add an account"} <span aria-hidden="true">→</span></Link>}
+                <Link href={firstDashboardAction ? "/dashboard/attention" : dashboardRenewals.length ? "/dashboard?section=renewals" : "/dashboard?section=usage"}>{firstDashboardAction ? "See all items to check" : dashboardRenewals.length ? "See contract dates" : "View usage and bills"} <span aria-hidden="true">→</span></Link>
               </div>
             </div>
             <div className="gn-welcome-insight">
               <span>Portfolio health</span>
-              <strong>{summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : "All caught up"}</strong>
-              <small>{summaryStats.needAttention ? "Open the list to see why, then go straight to the account" : "Contract dates, rate changes and bill checks are shown here"}</small>
+              <strong>{summaryStats.needAttention ? `${summaryStats.needAttention} accounts to check` : "No urgent issues"}</strong>
+              <small>{summaryStats.needAttention ? "Open the list to see the reason and account" : dashboardRenewals.length ? `${dashboardRenewals.length} contract date${dashboardRenewals.length === 1 ? "" : "s"} listed below` : "We will show an alert if an account needs action"}</small>
             </div>
             <div className="gn-welcome-orb" aria-hidden="true" />
           </div>
@@ -2436,13 +2442,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString("en-IE")} kWh`}><em>{month.usage ? Math.round(month.usage).toLocaleString("en-IE") : "-"}</em><div className="gn-bar-track"><i style={{ height: month.usage ? `${Math.max(5, (month.usage / max) * 100)}%` : "0%" }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
             </article>
           </div>
-          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : "/dashboard?section=accounts"}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : "Your portfolio is up to date"} <span aria-hidden="true">→</span></Link><Link href="/dashboard?section=accounts">View all accounts <span aria-hidden="true">→</span></Link></div>
+          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? "/dashboard?section=renewals" : "/dashboard?section=accounts"}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "No urgent account actions"} <span aria-hidden="true">→</span></Link><Link href="/dashboard?section=accounts">View all accounts <span aria-hidden="true">→</span></Link></div>
           <div className="gn-task-grid">
-            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Only urgent contract dates and bill checks are listed</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
+            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Contracts ending within 30 days, rate rises of 5%+, or bill details to verify</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
               {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
             </article>
-            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Upcoming renewals</h2><p>Coming up in the next 120 days; shown separately from urgent issues</p></div><Link href="/dashboard?section=renewals" className="gn-card-link">All renewals →</Link></div>
-              {dashboardRenewals.length ? <div className="gn-task-list">{dashboardRenewals.map((account) => <button key={account.id} onClick={() => openDashboardAccount(account)}><span className="gn-task-date">{account.daysLeft < 0 ? `${Math.abs(account.daysLeft)}d` : `${account.daysLeft}d`}</span><span><b>{account.name}</b><small>{account.provider || "Supplier not set"} · {account.daysLeft < 0 ? "overdue" : "to contract end"}</small></span><strong>{account.daysLeft < 0 ? "Urgent" : "Review →"}</strong></button>)}</div> : <div className="gn-task-empty">No contracts are due in the next 120 days.</div>}
+            <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Renewal timeline</h2><p>Dates in the next 120 days; past dates stay here until the record is updated</p></div><Link href="/dashboard?section=renewals" className="gn-card-link">View all →</Link></div>
+              {dashboardRenewals.length ? <div className="gn-task-list">{dashboardRenewals.map((account) => <button key={account.id} onClick={() => openDashboardAccount(account)}><span className="gn-task-date">{account.daysLeft < 0 ? `${Math.abs(account.daysLeft)}d` : `${account.daysLeft}d`}</span><span><b>{account.name}</b><small>{account.provider || "Supplier not set"} · {account.daysLeft < 0 ? "contract end date passed" : `ends in ${account.daysLeft} days`}</small></span><strong>{["quote_requested", "switching"].includes(account.renewal_status || "not_started") ? "In progress" : account.daysLeft < 0 ? "Needs update" : account.daysLeft <= 30 ? "Start soon" : "Plan ahead"}</strong></button>)}</div> : <div className="gn-task-empty">No contracts are due in the next 120 days.</div>}
             </article>
           </div>
         </section>
@@ -2774,11 +2780,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           setFilterRenewal("all");
           setFilterLocation("all");
           setSearch("");
+          setGroupByLocation(!lockedLocation);
+          setExpandedLocationGroups(new Set());
           setFiltersOpen(false);
         };
         return (
           <div style={{ position: "relative", marginBottom: 18 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div className="gn-account-list-toolbar" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <div style={{ position: "relative", maxWidth: 320, flex: 1, minWidth: 200 }}>
                 <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: 10 }} />
                 <input
@@ -2833,7 +2841,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     cursor: "pointer",
                   }}
                 >
-                  {groupByLocation ? "Showing by location" : "Group by location"}
+                  {groupByLocation ? "Show as account list" : "Group by location"}
                 </button>
               )}
               {locations.length > 0 && !lockedLocation && groupByLocation && (
@@ -2842,8 +2850,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   onChange={(e) => setLocationSortMode(e.target.value)}
                   style={{ ...inputStyle, width: "auto" }}
                 >
-                  <option value="alphabetical">Sort: A–Z</option>
-                  <option value="attention">Sort: most issues first</option>
+                  <option value="alphabetical">Site name (A to Z)</option>
+                  <option value="attention">Most checks first</option>
                 </select>
               )}
             </div>
