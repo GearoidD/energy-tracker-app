@@ -1098,24 +1098,25 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   }) + 9;
 
   // ---- Spend trend chart (last 6 months, from real bill history) ----
-  const monthBuckets = {}; // "2026-03" -> total cost
+  const monthBuckets = {}; // Month key -> actual invoice total, or null if no total is recorded.
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    monthBuckets[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`] = 0;
+    monthBuckets[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`] = null;
   }
   Object.values(readingSummaries || {})
     .flat()
     .forEach((r) => {
       if (!r.reading_date) return;
       const key = r.reading_date.slice(0, 7);
-      if (key in monthBuckets && r.total_cost) {
-        monthBuckets[key] += parseFloat(r.total_cost);
+      const totalCost = Number(r.total_cost);
+      if (key in monthBuckets && r.total_cost !== null && r.total_cost !== undefined && r.total_cost !== "" && Number.isFinite(totalCost) && totalCost >= 0) {
+        monthBuckets[key] = (monthBuckets[key] || 0) + totalCost;
       }
     });
   const monthKeys = Object.keys(monthBuckets);
   const monthValues = monthKeys.map((k) => monthBuckets[k]);
-  const hasChartData = monthValues.some((v) => v > 0);
+  const hasChartData = monthValues.some((v) => v !== null && v > 0);
 
   if (hasChartData) {
     y = drawGnReportSectionHeading(doc, "Spend trend", y, "Recorded bill costs over the last six months");
@@ -1136,7 +1137,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
 
     const points = monthKeys.map((k, i) => ({
       x: chartX + 7 + (i / (monthKeys.length - 1)) * (chartW - 14),
-      yVal: y + chartH - (monthBuckets[k] / maxVal) * (chartH - 6),
+      yVal: monthBuckets[k] === null ? null : y + chartH - (monthBuckets[k] / maxVal) * (chartH - 6),
       val: monthBuckets[k],
       label: new Date(k + "-01").toLocaleDateString("en-IE", { month: "short", year: "2-digit" }),
     }));
@@ -1144,19 +1145,47 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     doc.setDrawColor(...teal);
     doc.setLineWidth(0.8);
     for (let i = 0; i < points.length - 1; i++) {
-      doc.line(points[i].x, points[i].yVal, points[i + 1].x, points[i + 1].yVal);
+      if (points[i].yVal !== null && points[i + 1].yVal !== null) doc.line(points[i].x, points[i].yVal, points[i + 1].x, points[i + 1].yVal);
     }
     points.forEach((p) => {
-      doc.setFillColor(...teal);
-      doc.circle(p.x, p.yVal, 1.1, "F");
-      doc.setFontSize(6.5);
-      doc.setTextColor(...dark);
-      doc.text(fmtMoney(p.val) || "€0", p.x, p.yVal - 3, { align: "center" });
+      if (p.yVal !== null) {
+        doc.setFillColor(...teal);
+        doc.circle(p.x, p.yVal, 1.1, "F");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...dark);
+        doc.text(fmtMoney(p.val) || "€0", p.x, p.yVal - 3, { align: "center" });
+      }
       doc.setTextColor(...muted);
       doc.text(p.label, p.x, y + chartH + 6, { align: "center" });
     });
 
     y += chartH + 20;
+  }
+
+  // ---- Data coverage ----
+  const allBillRecords = Object.values(readingSummaries || {}).flat().filter((reading) => reading.reading_date);
+  const accountsWithBillHistory = enrichedAccounts.filter((account) => (readingSummaries?.[account.id] || []).some((reading) => reading.reading_date)).length;
+  const accountsWithUsageAndRate = enrichedAccounts.filter((account) => account.usage !== null && account.usage !== undefined && account.rate !== null && account.rate !== undefined).length;
+  const invoiceTotalsCount = allBillRecords.filter((reading) => reading.total_cost !== null && reading.total_cost !== undefined && reading.total_cost !== "" && Number.isFinite(Number(reading.total_cost))).length;
+  const coverageRows = [
+    ["Location recorded", `${enrichedAccounts.filter((account) => Boolean(account.location)).length} / ${enrichedAccounts.length}`, "Helps group spend and activity by site."],
+    ["Contract end date recorded", `${enrichedAccounts.filter((account) => Boolean(account.contract_end)).length} / ${enrichedAccounts.length}`, "Needed for reliable renewal planning."],
+    ["Dated usage / cost history", `${accountsWithBillHistory} / ${enrichedAccounts.length} accounts`, `${allBillRecords.length} dated reading records are on file.`],
+    ["Usage and current rate recorded", `${accountsWithUsageAndRate} / ${enrichedAccounts.length} accounts`, "Supports comparisons and estimated costs."],
+    ["Actual bill totals recorded", `${invoiceTotalsCount} / ${allBillRecords.length || "—"} reading records`, "These are invoice amounts; other cost figures are estimates."],
+  ];
+  if (enrichedAccounts.length > 0) {
+    if (y > 213) { doc.addPage(); y = 28; }
+    y = drawGnReportSectionHeading(doc, "Data coverage", y, "A quick check of what is and is not recorded in GnóRate");
+    autoTable(doc, {
+      startY: y,
+      head: [["Data check", "Coverage", "Why it matters"]],
+      body: coverageRows,
+      ...gnReportTableStyles(),
+      columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 38, halign: "center" } },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
   }
 
   // ---- Spend by account, ranked ----
@@ -1215,34 +1244,35 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     y = doc.lastAutoTable.finalY + 12;
   }
 
-  // ---- Issues breakdown, color-coded by severity ----
+  // ---- Actionable account review queue ----
   if (attentionGroups.length > 0) {
     if (y > 220) {
       doc.addPage();
       y = 28;
     }
-    y = drawGnReportSectionHeading(doc, "Review queue", y, "Issues grouped by type and severity");
+    y = drawGnReportSectionHeading(doc, "Accounts to review", y, "Each row shows why the account was flagged and a practical next step");
+
+    const reviewRows = attentionGroups.flatMap((group) => group.items.map((item) => {
+      const account = item.account || {};
+      const priority = item.severity <= 1 ? "Urgent" : "Check";
+      const nextStep = item.id.endsWith("-contract")
+        ? "Confirm the current supplier terms and update the contract end date."
+        : item.id.endsWith("-lowconf")
+          ? "Compare the recorded fields with the original bill and correct any mismatch."
+          : item.id.endsWith("-ratejump")
+            ? "Check the new unit rate on the bill; contact the supplier if the change is unexplained."
+            : "Open this account and confirm the recorded details.";
+      const meterPoint = account.account_number ? `${account.fuel_type === "gas" ? "GPRN" : "MPRN"} ${account.account_number}` : "Meter point not recorded";
+      return [priority, `${account.name || "Account"}\n${account.location || "Location not set"} · ${meterPoint}`, `${item.groupLabel}\nNext: ${nextStep}`, item.detail || "-"];
+    }));
 
     autoTable(doc, {
       startY: y,
-      head: [["", "Issue", "Accounts"]],
-      body: attentionGroups.map((g) => ["", g.groupLabel, String(g.items.length)]),
+      head: [["Priority", "Account and meter point", "What to do", "Recorded detail"]],
+      body: reviewRows,
       ...gnReportTableStyles(),
-      columnStyles: { 0: { cellWidth: 6 } },
-      didParseCell: (data) => {
-        if (data.section === "body" && data.column.index === 0) {
-          const group = attentionGroups[data.row.index];
-          const dotColor = group.color === "var(--red)" ? red : group.color === "var(--amber)" ? amber : muted;
-          data.cell.text = [];
-          data.cell._dotColor = dotColor;
-        }
-      },
-      didDrawCell: (data) => {
-        if (data.section === "body" && data.column.index === 0 && data.cell._dotColor) {
-          doc.setFillColor(...data.cell._dotColor);
-          doc.circle(data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, 1.3, "F");
-        }
-      },
+      columnStyles: { 0: { cellWidth: 17 }, 1: { cellWidth: 48 }, 2: { cellWidth: 72 } },
+      didParseCell: (data) => { if (data.section === "body" && data.column.index === 0) data.cell.styles.textColor = data.cell.raw === "Urgent" ? red : amber; },
       margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 14;
@@ -1375,15 +1405,17 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
 
     autoTable(doc, {
       startY: y,
-      head: [["Account", "Current rate", "Market rate", "Unit-rate est./yr", "Source"]],
+      head: [["Account", "Annual usage", "Current rate", "Comparison rate", "Unit-rate est./yr", "Rate source"]],
       body: opportunities.map((a) => [
         a.name,
+        a.usage != null ? `${Number(a.usage).toLocaleString("en-IE")} kWh` : "-",
         fmtReportRate(a.rate),
         fmtReportRate(a.comparison.rate),
         fmtMoney(a.saving),
-        a.comparison.source === "verified" ? "Verified" : a.comparison.source === "quoted" ? "Quoted" : "Estimated",
+        a.comparison.source === "verified" ? "Verified rate" : a.comparison.source === "quoted" ? "Quoted rate" : "Estimated rate",
       ]),
       ...gnReportTableStyles(),
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
       margin: { top: 25, bottom: 22, left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 12;
@@ -1433,6 +1465,162 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   doc.save(`gnorate-savings-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
+function generateUsageCostReport(enrichedAccounts, readingSummaries, companyName) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const { green, ink: dark, muted, pale: lightBg } = GNORATE_REPORT;
+  const now = new Date();
+  const firstMonth = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const months = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    return { key, label: date.toLocaleDateString("en-IE", { month: "short", year: "2-digit" }), billCount: 0, usage: 0, usageCount: 0, actualCost: 0, actualCostCount: 0, estimatedCost: 0, estimatedCostCount: 0 };
+  });
+  const monthMap = Object.fromEntries(months.map((month) => [month.key, month]));
+  const byAccount = {};
+  let billCount = 0;
+
+  enrichedAccounts.forEach((account) => {
+    const record = { usage: 0, usageCount: 0, billCount: 0, actualCost: 0, actualCostCount: 0, estimatedCost: 0, estimatedCostCount: 0, latestDate: null };
+    (readingSummaries?.[account.id] || []).forEach((reading) => {
+      if (!reading.reading_date) return;
+      const month = monthMap[reading.reading_date.slice(0, 7)];
+      if (!month) return;
+      month.billCount += 1;
+      record.billCount += 1;
+      billCount += 1;
+      if (!record.latestDate || reading.reading_date > record.latestDate) record.latestDate = reading.reading_date;
+
+      const usage = Number(reading.usage);
+      const hasUsage = reading.usage !== null && reading.usage !== undefined && reading.usage !== "" && Number.isFinite(usage);
+      if (hasUsage) {
+        month.usage += usage;
+        month.usageCount += 1;
+        record.usage += usage;
+        record.usageCount += 1;
+      }
+
+      const totalCost = Number(reading.total_cost);
+      const hasActualTotal = reading.total_cost !== null && reading.total_cost !== undefined && reading.total_cost !== "" && Number.isFinite(totalCost);
+      if (hasActualTotal) {
+        month.actualCost += totalCost;
+        month.actualCostCount += 1;
+        record.actualCost += totalCost;
+        record.actualCostCount += 1;
+        return;
+      }
+
+      const rate = Number(reading.rate);
+      if (hasUsage && reading.rate !== null && reading.rate !== undefined && reading.rate !== "" && Number.isFinite(rate) && rate >= 0) {
+        const standingCharge = Number(reading.standing_charge ?? account.standing_charge);
+        const estimate = (rate / 100) * usage + (Number.isFinite(standingCharge) ? (standingCharge / 100) * 30 : 0);
+        month.estimatedCost += estimate;
+        month.estimatedCostCount += 1;
+        record.estimatedCost += estimate;
+        record.estimatedCostCount += 1;
+      }
+    });
+    byAccount[account.id] = record;
+  });
+
+  const totalUsage = months.reduce((sum, month) => sum + month.usage, 0);
+  const actualTotal = months.reduce((sum, month) => sum + month.actualCost, 0);
+  const estimatedTotal = months.reduce((sum, month) => sum + month.estimatedCost, 0);
+  const accountsWithRecords = Object.values(byAccount).filter((record) => record.billCount > 0).length;
+
+  drawGnReportHeader(doc, "Usage & cost report", companyName);
+  let y = drawGnReportSectionHeading(doc, "Last 12 months at a glance", 52, `${months[0].label}–${months[months.length - 1].label} · dated reading records only`);
+  const cardW = (pageWidth - 28 - 3 * 6) / 4;
+  const cardH = 31;
+  const cards = [
+    { label: "Accounts with readings", value: `${accountsWithRecords} / ${enrichedAccounts.length}` },
+    { label: "Dated readings", value: String(billCount) },
+    { label: "Recorded usage", value: `${Math.round(totalUsage).toLocaleString("en-IE")} kWh` },
+    { label: "Invoice totals recorded", value: fmtMoney(actualTotal) },
+  ];
+  cards.forEach((card, index) => {
+    const x = 14 + index * (cardW + 6);
+    doc.setFillColor(...lightBg);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "F");
+    doc.setDrawColor(...GNORATE_REPORT.border);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "S");
+    doc.setFillColor(...green);
+    doc.rect(x, y, 1.2, cardH, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.3);
+    doc.setTextColor(...muted);
+    doc.text(card.label, x + 6, y + 10, { maxWidth: cardW - 10 });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(...dark);
+    doc.text(card.value, x + 6, y + 23, { maxWidth: cardW - 10 });
+  });
+  y += cardH + 9;
+
+  y = drawGnReportInsight(doc, {
+    y,
+    pageWidth,
+    eyebrow: "How to read these figures",
+    title: `${fmtMoney(actualTotal)} in invoice totals · ${fmtMoney(estimatedTotal)} estimated`,
+    detail: "Invoice totals are copied from bills where entered. Estimates use recorded unit rate × usage plus up to 30 days of standing charge; they may exclude taxes and other charges. Blank data means no figure was recorded.",
+    value: `${Math.round(totalUsage).toLocaleString("en-IE")} kWh`,
+  }) + 10;
+
+  y = drawGnReportSectionHeading(doc, "Month-by-month record", y, "Figures are grouped by reading date; a billing period may span more than one month");
+  autoTable(doc, {
+    startY: y,
+    head: [["Month", "Reading records", "Usage (kWh)", "Invoice totals", "Cost estimates"]],
+    body: months.map((month) => [
+      month.label,
+      String(month.billCount),
+      month.usageCount ? Math.round(month.usage).toLocaleString("en-IE") : "No usage data",
+      month.actualCostCount ? fmtMoney(month.actualCost) : "No invoice totals",
+      month.estimatedCostCount ? fmtMoney(month.estimatedCost) : "No estimate",
+    ]),
+    ...gnReportTableStyles(),
+    columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+    margin: { top: 25, bottom: 22, left: 14, right: 14 },
+  });
+  y = doc.lastAutoTable.finalY + 12;
+
+  if (y > 230) { doc.addPage(); y = 28; }
+  y = drawGnReportSectionHeading(doc, "By account", y, "Every account with a dated reading in the last 12 months, ranked by recorded and estimated costs");
+  const accountRows = enrichedAccounts
+    .filter((account) => byAccount[account.id]?.billCount > 0)
+    .sort((a, b) => (byAccount[b.id].actualCost + byAccount[b.id].estimatedCost) - (byAccount[a.id].actualCost + byAccount[a.id].estimatedCost))
+    .map((account) => {
+      const record = byAccount[account.id];
+      const meterPoint = account.account_number ? `${account.fuel_type === "gas" ? "GPRN" : "MPRN"} ${account.account_number}` : "No meter point";
+      return [
+        `${account.name}\n${account.location || "Location not set"} · ${meterPoint}`,
+        account.fuel_type === "gas" ? "Gas" : "Electricity",
+        record.usageCount ? `${Math.round(record.usage).toLocaleString("en-IE")} kWh` : "-",
+        record.actualCostCount ? fmtMoney(record.actualCost) : "-",
+        record.estimatedCostCount ? fmtMoney(record.estimatedCost) : "-",
+        `${record.billCount} · ${formatAccountDate(record.latestDate)}`,
+      ];
+    });
+
+  if (accountRows.length) {
+    autoTable(doc, {
+      startY: y,
+      head: [["Account / site", "Utility", "Usage", "Invoice totals", "Estimates", "Readings · latest"]],
+      body: accountRows,
+      ...gnReportTableStyles(),
+      columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 22 }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+      margin: { top: 25, bottom: 22, left: 14, right: 14 },
+    });
+  } else {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...muted);
+    doc.text("No dated readings were recorded in this period.", 14, y + 5);
+  }
+
+  drawGnReportFooters(doc, "Usage and cost report");
+  doc.save(`gnorate-usage-cost-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 export default function AccountsBoard({ companyId, companyName, lockedLocation, companyIds, companiesById, section = "overview" }) {
   const combinedMode = Array.isArray(companyIds) && companyIds.length > 0;
   const sectionHref = (target) => combinedMode ? `/dashboard/all-companies?section=${target}` : `/dashboard?scope=company&section=${target}`;
@@ -1451,6 +1639,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const [filterRenewal, setFilterRenewal] = useState("all");
   const [filterLocation, setFilterLocation] = useState(lockedLocation || "all");
   const [usageRangeMonths, setUsageRangeMonths] = useState(12);
+  const [usageMetric, setUsageMetric] = useState("usage");
   const [usageLocation, setUsageLocation] = useState("all");
   const [usageAccount, setUsageAccount] = useState("all");
   const [usageFuel, setUsageFuel] = useState("all");
@@ -1549,7 +1738,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const loadReadingSummaries = useCallback(async () => {
     let query = supabase
       .from("readings")
-      .select("account_id, reading_date, rate, usage, standing_charge, total_cost, confidence, created_at")
+      .select("account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at")
       .order("reading_date", { ascending: false, nullsFirst: false });
     query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
     const { data } = await query;
@@ -2232,13 +2421,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     const points = Array.from({ length: usageRangeMonths }, (_, index) => {
       const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      return { key, label: date.toLocaleDateString("en-IE", { month: "short", year: usageRangeMonths > 6 ? "2-digit" : undefined }), usage: 0, billCount: 0, usageRecordCount: 0, accounts: new Set() };
+      return { key, label: date.toLocaleDateString("en-IE", { month: "short", year: usageRangeMonths > 6 ? "2-digit" : undefined }), usage: 0, cost: 0, billCount: 0, usageRecordCount: 0, costRecordCount: 0, actualCostCount: 0, estimatedCostCount: 0, accounts: new Set() };
     });
     const byMonth = Object.fromEntries(points.map((point) => [point.key, point]));
     const includedIds = new Set(usageFilterAccounts.filter((account) => usageAccount === "all" || account.id === usageAccount).map((account) => account.id));
     const byAccount = {};
+    const accountById = Object.fromEntries(usageFilterAccounts.map((account) => [account.id, account]));
     let billCount = 0;
     let usageRecordCount = 0;
+    let costRecordCount = 0;
+    let actualCostCount = 0;
+    let estimatedCostCount = 0;
     Object.entries(readingSummaries).forEach(([accountId, readings]) => {
       if (!includedIds.has(accountId)) return;
       readings.forEach((reading) => {
@@ -2249,21 +2442,48 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         billCount += 1;
         point.billCount += 1;
         point.accounts.add(accountId);
-        if (!byAccount[accountId]) byAccount[accountId] = { usage: 0, billCount: 0, usageRecordCount: 0, latestDate: null };
+        if (!byAccount[accountId]) byAccount[accountId] = { usage: 0, cost: 0, billCount: 0, usageRecordCount: 0, costRecordCount: 0, actualCostCount: 0, estimatedCostCount: 0, latestDate: null };
         byAccount[accountId].billCount += 1;
         if (!byAccount[accountId].latestDate || reading.reading_date > byAccount[accountId].latestDate) byAccount[accountId].latestDate = reading.reading_date;
         const usage = Number(reading.usage);
-        if (reading.usage === null || reading.usage === undefined || reading.usage === "" || !Number.isFinite(usage)) return;
-        point.usage += usage;
-        point.usageRecordCount += 1;
-        usageRecordCount += 1;
-        byAccount[accountId].usage += usage;
-        byAccount[accountId].usageRecordCount += 1;
+        const hasUsage = reading.usage !== null && reading.usage !== undefined && reading.usage !== "" && Number.isFinite(usage);
+        if (hasUsage) {
+          point.usage += usage;
+          point.usageRecordCount += 1;
+          usageRecordCount += 1;
+          byAccount[accountId].usage += usage;
+          byAccount[accountId].usageRecordCount += 1;
+        }
+
+        const invoiceTotal = Number(reading.total_cost);
+        const hasInvoiceTotal = reading.total_cost !== null && reading.total_cost !== undefined && reading.total_cost !== "" && Number.isFinite(invoiceTotal);
+        const unitRate = Number(reading.rate);
+        const standingCharge = Number(reading.standing_charge ?? accountById[accountId]?.standing_charge);
+        const hasRateEstimate = hasUsage && reading.rate !== null && reading.rate !== undefined && reading.rate !== "" && Number.isFinite(unitRate) && unitRate >= 0;
+        const estimatedTotal = hasRateEstimate ? (unitRate / 100) * usage + (Number.isFinite(standingCharge) ? (standingCharge / 100) * 30 : 0) : null;
+        const cost = hasInvoiceTotal ? invoiceTotal : estimatedTotal;
+        if (cost !== null) {
+          point.cost += cost;
+          point.costRecordCount += 1;
+          byAccount[accountId].cost += cost;
+          byAccount[accountId].costRecordCount += 1;
+          costRecordCount += 1;
+          if (hasInvoiceTotal) {
+            point.actualCostCount += 1;
+            byAccount[accountId].actualCostCount += 1;
+            actualCostCount += 1;
+          } else {
+            point.estimatedCostCount += 1;
+            byAccount[accountId].estimatedCostCount += 1;
+            estimatedCostCount += 1;
+          }
+        }
       });
     });
-    const monthly = points.map((point) => ({ ...point, accounts: point.accounts.size, usage: point.usageRecordCount ? Math.round(point.usage) : null }));
+    const monthly = points.map((point) => ({ ...point, accounts: point.accounts.size, usage: point.usageRecordCount ? Math.round(point.usage) : null, cost: point.costRecordCount ? Math.round(point.cost * 100) / 100 : null }));
     const totalUsage = monthly.reduce((sum, point) => sum + (point.usage || 0), 0);
-    return { monthly, byAccount, billCount, usageRecordCount, totalUsage };
+    const totalCost = monthly.reduce((sum, point) => sum + (point.cost || 0), 0);
+    return { monthly, byAccount, billCount, usageRecordCount, totalUsage, costRecordCount, actualCostCount, estimatedCostCount, totalCost };
   }, [readingSummaries, usageFilterAccounts, usageAccount, usageRangeMonths]);
 
   const opportunityCount = enrichedAll.filter((account) => account.saving != null && account.saving > 20).length;
@@ -2327,7 +2547,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           <div>
             <h1 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 24, fontWeight: 700, margin: 0 }}>{({ overview: combinedMode ? "All company accounts" : "Portfolio overview", accounts: "Accounts", rates: "Rate opportunities", usage: "Usage", renewals: "Upcoming renewals", savings: "Savings opportunities", reports: "Reports", settings: "Workspace settings" }[section] || "Accounts")}</h1>
             <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
-              {combinedMode ? "Every account across every company you belong to." : section === "rates" ? "Accounts with a current market comparison, connected to your Irish tariff data." : section === "usage" ? "Review dated bill readings by month and trace each total back to an account. Blank periods remain visible as gaps." : section === "renewals" ? "Contracts ending within the next 120 days, ordered by urgency." : section === "savings" ? "Accounts where current market comparisons indicate a potential saving." : "Your utility portfolio, connected to your existing account and bill data."}
+              {combinedMode ? "Every account across every company you belong to." : section === "rates" ? "Accounts with a current market comparison, connected to your Irish tariff data." : section === "usage" ? "Review dated usage and cost records by month, location and account. Blank periods stay visible as gaps." : section === "renewals" ? "Contracts ending within the next 120 days, ordered by urgency." : section === "savings" ? "Accounts where current market comparisons indicate a potential saving." : "Your utility portfolio, connected to your existing account and bill data."}
             </p>
             {lastUpdated && (
               <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 3, opacity: 0.75 }}>
@@ -2488,57 +2708,67 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       {section === "usage" && !lockedLocation && (
         <section className="gn-card gn-usage-explorer" aria-label="Recorded account usage">
           <div className="gn-card-heading">
-            <div><h2>Recorded usage</h2><p>Bill usage totals by month. Bar height uses the kWh scale shown on the left.</p></div>
-            <div className="gn-usage-range" role="group" aria-label="Usage date range">
-              {[6, 12, 24].map((months) => <button key={months} type="button" aria-pressed={usageRangeMonths === months} className={usageRangeMonths === months ? "active" : ""} onClick={() => setUsageRangeMonths(months)}>{months} months</button>)}
+            <div><h2>{usageMetric === "usage" ? "Usage by month" : "Energy cost by month"}</h2><p>{usageMetric === "usage" ? "Recorded kWh from dated usage readings. Missing months stay blank." : "Invoice totals where entered; otherwise an estimate from the recorded rate, usage and standing charge."}</p></div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <div className="gn-usage-range" role="group" aria-label="Choose usage or cost">
+                {[{ value: "usage", label: "Usage (kWh)" }, { value: "cost", label: "Cost (€)" }].map((option) => <button key={option.value} type="button" aria-pressed={usageMetric === option.value} className={usageMetric === option.value ? "active" : ""} onClick={() => setUsageMetric(option.value)}>{option.label}</button>)}
+              </div>
+              <div className="gn-usage-range" role="group" aria-label="Date range">
+                {[6, 12, 24].map((months) => <button key={months} type="button" aria-pressed={usageRangeMonths === months} className={usageRangeMonths === months ? "active" : ""} onClick={() => setUsageRangeMonths(months)}>{months} months</button>)}
+              </div>
             </div>
           </div>
           <div className="gn-usage-filters">
             <label>Location<select value={usageLocation} onChange={(e) => { setUsageLocation(e.target.value); setUsageAccount("all"); }}><option value="all">All locations</option>{usageLocations.map((location) => <option key={location} value={location}>{location}</option>)}</select></label>
             <label>Utility<select value={usageFuel} onChange={(e) => { setUsageFuel(e.target.value); setUsageAccount("all"); }}><option value="all">All utilities</option><option value="electricity">Electricity</option><option value="gas">Gas</option></select></label>
             <label>Account<select value={usageAccount} onChange={(e) => setUsageAccount(e.target.value)}><option value="all">All matching accounts</option>{usageFilterAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
-            {(usageLocation !== "all" || usageFuel !== "all" || usageAccount !== "all" || usageRangeMonths !== 12) && <button className="gn-usage-clear" type="button" onClick={() => { setUsageLocation("all"); setUsageFuel("all"); setUsageAccount("all"); setUsageRangeMonths(12); }}>Clear filters and date range</button>}
+            {(usageLocation !== "all" || usageFuel !== "all" || usageAccount !== "all" || usageRangeMonths !== 12 || usageMetric !== "usage") && <button className="gn-usage-clear" type="button" onClick={() => { setUsageLocation("all"); setUsageFuel("all"); setUsageAccount("all"); setUsageRangeMonths(12); setUsageMetric("usage"); }}>Clear filters and date range</button>}
           </div>
           <div className="gn-usage-stats">
-            <div><span>Recorded usage in period</span><strong>{usageWindow.totalUsage.toLocaleString("en-IE")} kWh</strong></div>
-            <div><span>Bill records with usage</span><strong>{usageWindow.usageRecordCount} / {usageWindow.billCount}</strong></div>
+            <div><span>{usageMetric === "usage" ? "Recorded usage in period" : "Cost represented in period"}</span><strong>{usageMetric === "usage" ? (usageWindow.usageRecordCount ? `${usageWindow.totalUsage.toLocaleString("en-IE")} kWh` : "—") : (usageWindow.costRecordCount ? fmtMoney(usageWindow.totalCost) : "—")}</strong></div>
+            <div><span>{usageMetric === "usage" ? "Records with usage" : "Records with cost"}</span><strong>{usageMetric === "usage" ? `${usageWindow.usageRecordCount} / ${usageWindow.billCount}` : `${usageWindow.costRecordCount} / ${usageWindow.billCount}`}</strong><small>{usageMetric === "cost" ? `${usageWindow.actualCostCount} invoice totals · ${usageWindow.estimatedCostCount} estimates` : "Dated records in selected range"}</small></div>
             <div><span>Accounts represented</span><strong>{Object.keys(usageWindow.byAccount).length}</strong></div>
           </div>
-          {usageWindow.usageRecordCount > 0 ? (
+          {(usageMetric === "usage" ? usageWindow.usageRecordCount : usageWindow.costRecordCount) > 0 ? (
             <>
             <div className="gn-usage-chart-wrap">
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={usageWindow.monthly} margin={{ top: 12, right: 14, left: 10, bottom: 4 }}>
                   <CartesianGrid stroke="#e2ebe5" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#61756a" }} axisLine={{ stroke: "#cbd9d0" }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#61756a" }} tickFormatter={(value) => Number(value).toLocaleString("en-IE")} width={72} domain={[0, "auto"]} allowDecimals={false} label={{ value: "kWh", position: "insideTopLeft", offset: 0, fontSize: 11, fill: "#61756a" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#61756a" }} tickFormatter={(value) => usageMetric === "cost" ? `€${Number(value).toLocaleString("en-IE")}` : Number(value).toLocaleString("en-IE")} width={72} domain={usageMetric === "cost" ? ["auto", "auto"] : [0, "auto"]} allowDecimals={false} label={{ value: usageMetric === "cost" ? "€" : "kWh", position: "insideTopLeft", offset: 0, fontSize: 11, fill: "#61756a" }} />
                   <Tooltip content={(props) => {
                     if (!props.active || !props.payload?.length) return null;
                     const point = props.payload[0].payload;
-                    return <div style={{ padding: "9px 11px", border: "1px solid #dce6df", borderRadius: 8, background: "#fff", boxShadow: "0 5px 16px #143d2b18", fontSize: 11 }}><strong style={{ display: "block", marginBottom: 4, color: "#173b2d" }}>{point.label} · {point.key}</strong><span>{point.usage === null ? "No usage figure on file" : `${point.usage.toLocaleString("en-IE")} kWh recorded`}</span><small style={{ display: "block", marginTop: 3, color: "#71847b" }}>{point.billCount} bill record{point.billCount === 1 ? "" : "s"} · {point.usageRecordCount} with usage</small></div>;
+                    const value = usageMetric === "cost" ? (point.cost === null ? "No cost data available" : `${fmtMoney(point.cost)} bill cost`) : (point.usage === null ? "No usage figure on file" : `${point.usage.toLocaleString("en-IE")} kWh recorded`);
+                    return <div style={{ padding: "9px 11px", border: "1px solid #dce6df", borderRadius: 8, background: "#fff", boxShadow: "0 5px 16px #143d2b18", fontSize: 11 }}><strong style={{ display: "block", marginBottom: 4, color: "#173b2d" }}>{point.label} · {point.key}</strong><span>{value}</span><small style={{ display: "block", marginTop: 3, color: "#71847b" }}>{point.billCount} dated record{point.billCount === 1 ? "" : "s"} · {usageMetric === "cost" ? `${point.actualCostCount} actual totals, ${point.estimatedCostCount} estimates` : `${point.usageRecordCount} with usage`}</small></div>;
                   }} />
-                  <Bar dataKey="usage" name="Recorded usage" fill="#0b9569" radius={[5, 5, 0, 0]} maxBarSize={38} />
+                  <Bar dataKey={usageMetric} name={usageMetric === "cost" ? "Bill cost" : "Recorded usage"} fill={usageMetric === "cost" ? "#087b59" : "#0b9569"} radius={[5, 5, 0, 0]} maxBarSize={38} />
                 </BarChart>
               </ResponsiveContainer>
-              <p className="gn-usage-data-note">Blank months mean no dated bill reading is on file, not zero usage. Values are assigned to the month shown by bill date; a bill can cover days in more than one month. No gaps are filled with estimates.</p>
+              <p className="gn-usage-data-note">Blank months mean no matching figure is on file, not zero {usageMetric === "cost" ? "cost" : "usage"}. Values are grouped by reading date. {usageMetric === "cost" ? "Actual invoice totals are used when available; estimates use recorded rate × usage plus up to 30 days of standing charge." : "No gaps are filled with estimates."}</p>
             </div>
             <div className="gn-usage-month-table" aria-label="Monthly recorded usage details">
-              {usageWindow.monthly.map((point) => <div key={point.key}><span>{point.label} · {point.key}</span><strong>{point.usage === null ? (point.billCount ? "Bill on file; usage not recorded" : "No bill on file") : `${point.usage.toLocaleString("en-IE")} kWh`}</strong><small>{point.billCount} bill record{point.billCount === 1 ? "" : "s"}{point.billCount > point.usageRecordCount ? ` · ${point.billCount - point.usageRecordCount} without usage` : ""}</small></div>)}
+              {usageWindow.monthly.map((point) => {
+                const hasData = usageMetric === "cost" ? point.cost !== null : point.usage !== null;
+                const metricValue = usageMetric === "cost" ? (point.cost === null ? "No cost figure" : fmtMoney(point.cost)) : (point.usage === null ? "No usage figure" : `${point.usage.toLocaleString("en-IE")} kWh`);
+                return <div key={point.key}><span>{point.label} · {point.key}</span><strong>{hasData ? metricValue : point.billCount ? "Record on file; figure missing" : "No reading on file"}</strong><small>{point.billCount} dated record{point.billCount === 1 ? "" : "s"}{usageMetric === "cost" ? ` · ${point.actualCostCount} actual / ${point.estimatedCostCount} estimated` : ` · ${point.usageRecordCount} with usage`}</small></div>;
+              })}
             </div>
             </>
           ) : (
-            <div className="gn-usage-empty-panel"><Activity size={20} /><div><strong>No recorded usage for these filters</strong><span>{usageWindow.billCount > 0 ? "Bills are on file, but they do not include a usage figure in this period." : "Try a wider date range or another location, or upload a bill that includes usage."}</span></div><button onClick={() => setUploadingFor(usageAccount === "all" ? "new" : usageAccount)}><Upload size={14} /> Upload a bill</button></div>
+            <div className="gn-usage-empty-panel"><Activity size={20} /><div><strong>{usageMetric === "cost" ? "No cost figures for these filters" : "No recorded usage for these filters"}</strong><span>{usageWindow.billCount > 0 ? (usageMetric === "cost" ? "Records are on file, but they need an invoice total or both usage and a unit rate to show cost." : "Records are on file, but they do not include a usage figure in this period.") : "Try a wider date range or another location, or upload a bill that includes the figures you need."}</span></div><button onClick={() => setUploadingFor(usageAccount === "all" ? "new" : usageAccount)}><Upload size={14} /> Upload a bill</button></div>
           )}
-          <div className="gn-usage-table-heading"><div><h3>Accounts in this view</h3><p>Totals include only dated bill readings inside the selected period.</p></div><span>{Object.keys(usageWindow.byAccount).length} accounts</span></div>
+          <div className="gn-usage-table-heading"><div><h3>Accounts in this view</h3><p>{usageMetric === "cost" ? "Invoice total when available; otherwise an estimate. See counts beside each account." : "Totals include only dated records with recorded usage."}</p></div><span>{Object.keys(usageWindow.byAccount).length} accounts</span></div>
           <div className="gn-usage-account-list">
-            {usageFilterAccounts.filter((account) => usageAccount === "all" || account.id === usageAccount).filter((account) => usageWindow.byAccount[account.id]).sort((a, b) => usageWindow.byAccount[b.id].usage - usageWindow.byAccount[a.id].usage).map((account) => {
+            {usageFilterAccounts.filter((account) => usageAccount === "all" || account.id === usageAccount).filter((account) => usageWindow.byAccount[account.id]).sort((a, b) => usageWindow.byAccount[b.id][usageMetric] - usageWindow.byAccount[a.id][usageMetric]).map((account) => {
               const record = usageWindow.byAccount[account.id];
               const status = overallStatusFor(account);
               return <div className="gn-usage-account-row" key={account.id}>
                 <div className="gn-usage-account-name"><strong>{account.name}</strong><span>{account.location || "Location not set"} · {account.fuel_type === "gas" ? "Gas" : "Electricity"} · {account.provider || "Supplier not set"}</span></div>
-                <div><small>Recorded usage</small><strong>{record.usageRecordCount ? `${Math.round(record.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong></div>
-                <div><small>Bills with usage</small><strong>{record.usageRecordCount}</strong></div>
-                <div><small>Latest bill date</small><strong>{formatAccountDate(record.latestDate)}</strong></div>
+                <div><small>{usageMetric === "cost" ? "Cost represented" : "Recorded usage"}</small><strong>{usageMetric === "cost" ? (record.costRecordCount ? fmtMoney(record.cost) : "Not recorded") : (record.usageRecordCount ? `${Math.round(record.usage).toLocaleString("en-IE")} kWh` : "Not recorded")}</strong></div>
+                <div><small>{usageMetric === "cost" ? "Actual / estimated" : "Records with usage"}</small><strong>{usageMetric === "cost" ? `${record.actualCostCount} / ${record.estimatedCostCount}` : record.usageRecordCount}</strong></div>
+                <div><small>Latest dated record</small><strong>{formatAccountDate(record.latestDate)}</strong></div>
                 <div className="gn-usage-account-status"><span style={{ color: status.color }}>{status.label}</span><small>{accountStatusDetail(account)}</small></div>
                 <button type="button" onClick={() => openDashboardAccount(account)}>Review account →</button>
               </div>;
@@ -2546,18 +2776,18 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           </div>
           {usageFilterAccounts.filter((account) => (usageAccount === "all" || account.id === usageAccount) && !usageWindow.byAccount[account.id]).length > 0 && (
             <div className="gn-usage-no-records">
-              <div><strong>No bill records dated in this period</strong><span>These accounts have no bill reading within the selected dates. Check their last bill date and expected billing cycle before deciding whether anything is missing.</span></div>
+              <div><strong>No dated records in this period</strong><span>These accounts have no saved reading within the selected dates. Check their last recorded date and expected billing cycle before deciding whether anything is missing.</span></div>
               {usageFilterAccounts.filter((account) => (usageAccount === "all" || account.id === usageAccount) && !usageWindow.byAccount[account.id]).map((account) => {
                 const latestBill = (readingSummaries[account.id] || []).find((reading) => reading.reading_date)?.reading_date;
                 const status = overallStatusFor(account);
-                return <div className="gn-usage-no-record-row" key={account.id}><span><strong>{account.name}</strong><small>{account.location || "Location not set"} · {account.fuel_type === "gas" ? "Gas" : "Electricity"} · Latest bill on file: {formatAccountDate(latestBill)}</small></span><span style={{ color: status.color }}>{status.label}</span><button type="button" onClick={() => openDashboardAccount(account)}>Review account →</button></div>;
+                return <div className="gn-usage-no-record-row" key={account.id}><span><strong>{account.name}</strong><small>{account.location || "Location not set"} · {account.fuel_type === "gas" ? "Gas" : "Electricity"} · Latest dated record: {formatAccountDate(latestBill)}</small></span><span style={{ color: status.color }}>{status.label}</span><button type="button" onClick={() => openDashboardAccount(account)}>Review account →</button></div>;
               })}
             </div>
           )}
         </section>
       )}
 
-      {section === "reports" && <section className="gn-action-grid"><button onClick={() => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries)}><FileText size={20}/><b>Portfolio report</b><span>Download a PDF summary of accounts and attention items.</span><strong>Download PDF →</strong></button><button onClick={() => generateSavingsReport(enrichedAll, summaryStats, companyName)}><TrendingDown size={20}/><b>Savings report</b><span>Review current savings estimates and comparisons.</span><strong>Download PDF →</strong></button><button onClick={() => exportAccountsExcel(accounts)}><Download size={20}/><b>Account data</b><span>Export your account register as a spreadsheet.</span><strong>Export Excel →</strong></button><button onClick={() => setShowOverview(true)}><BarChart3 size={20}/><b>Portfolio overview</b><span>Open a detailed portfolio summary.</span><strong>Open overview →</strong></button></section>}
+      {section === "reports" && <section className="gn-action-grid"><button onClick={() => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries)}><FileText size={20}/><b>Portfolio report</b><span>See portfolio data coverage, spend trends, renewals and account-by-account actions.</span><strong>Download PDF →</strong></button><button onClick={() => generateUsageCostReport(enrichedAll, readingSummaries, companyName)}><Activity size={20}/><b>Usage &amp; cost report</b><span>Compare monthly kWh, actual invoice totals and clearly marked cost estimates.</span><strong>Download PDF →</strong></button><button onClick={() => generateSavingsReport(enrichedAll, summaryStats, companyName)}><TrendingDown size={20}/><b>Savings report</b><span>Review annual usage, compared rates, renewal progress and indicative savings.</span><strong>Download PDF →</strong></button><button onClick={() => exportAccountsExcel(accounts)}><Download size={20}/><b>Account data</b><span>Export the account register for checking or sharing.</span><strong>Export Excel →</strong></button><button onClick={() => setShowOverview(true)}><BarChart3 size={20}/><b>Portfolio overview</b><span>Explore a chart view of your current data.</span><strong>Open overview →</strong></button></section>}
 
       {section === "settings" && <section className="gn-settings-grid"><article className="gn-card"><div className="gn-settings-icon"><Building2 size={20}/></div><h2>Company workspace</h2><p>{companyName || "Set up a company workspace"}</p><span>Company data, accounts and utility records are shared with your invited team members.</span><button onClick={() => router.push("/dashboard/all-companies")}>Manage companies →</button></article><article className="gn-card"><div className="gn-settings-icon"><Users size={20}/></div><h2>Team access</h2><p>Invite colleagues and manage membership.</p><span>Team access follows the active company selected in the header.</span><button onClick={() => window.dispatchEvent(new Event("gnorate:open-team"))}>Manage team →</button></article><article className="gn-card"><div className="gn-settings-icon"><BarChart3 size={20}/></div><h2>Market benchmarks</h2><p>Review benchmark rates for your account categories.</p><span>Current comparisons use account details alongside available Irish tariff data.</span><button onClick={() => setShowBenchmarks(true)}>Open benchmarks →</button></article></section>}
 

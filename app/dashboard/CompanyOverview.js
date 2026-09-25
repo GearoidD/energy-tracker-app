@@ -38,7 +38,7 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
       (readingSummaries[a.id] || []).forEach((r) => {
         if (!r.reading_date) return;
         if (cutoff && new Date(r.reading_date) < cutoff) return;
-        list.push({ ...r, accountName: a.name });
+        list.push({ ...r, accountId: a.id, accountName: a.name, accountLocation: a.location, accountNumber: a.account_number, fuelType: a.fuel_type, accountStandingCharge: a.standing_charge });
       });
     });
     return list;
@@ -48,36 +48,70 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
     const map = {};
     allReadings.forEach((r) => {
       const key = monthKey(r.reading_date);
-      if (!map[key]) map[key] = { key, cost: 0, usage: 0 };
-      const usage = Number(r.usage) || 0;
-      const rate = Number(r.rate) || 0;
-      const standing = Number(r.standing_charge) || 0;
-      map[key].usage += usage;
-      map[key].cost += r.total_cost !== null && r.total_cost !== undefined ? Number(r.total_cost) : (rate / 100) * usage + (standing / 100) * 30;
+      if (!map[key]) map[key] = { key, cost: 0, usage: 0, costCount: 0, usageCount: 0, actualCostCount: 0, estimatedCostCount: 0 };
+      const usage = Number(r.usage);
+      const hasUsage = r.usage !== null && r.usage !== undefined && r.usage !== "" && Number.isFinite(usage);
+      if (hasUsage) {
+        map[key].usage += usage;
+        map[key].usageCount += 1;
+      }
+      const invoiceTotal = Number(r.total_cost);
+      const hasInvoiceTotal = r.total_cost !== null && r.total_cost !== undefined && r.total_cost !== "" && Number.isFinite(invoiceTotal);
+      const rate = Number(r.rate);
+      const hasRate = r.rate !== null && r.rate !== undefined && r.rate !== "" && Number.isFinite(rate) && rate >= 0;
+      const standing = Number(r.standing_charge ?? r.accountStandingCharge);
+      if (hasInvoiceTotal) {
+        map[key].cost += invoiceTotal;
+        map[key].costCount += 1;
+        map[key].actualCostCount += 1;
+      } else if (hasUsage && hasRate) {
+        map[key].cost += (rate / 100) * usage + (Number.isFinite(standing) ? (standing / 100) * 30 : 0);
+        map[key].costCount += 1;
+        map[key].estimatedCostCount += 1;
+      }
     });
     return Object.values(map)
       .sort((a, b) => a.key.localeCompare(b.key))
-      .map((m) => ({ ...m, label: monthLabel(m.key), cost: Math.round(m.cost), usage: Math.round(m.usage) }));
+      .map((m) => ({ ...m, label: monthLabel(m.key), cost: m.costCount ? Math.round(m.cost) : null, usage: m.usageCount ? Math.round(m.usage) : null }));
   }, [allReadings]);
 
   const totals = useMemo(() => {
-    const totalCost = monthly.reduce((s, m) => s + m.cost, 0);
-    const totalUsage = monthly.reduce((s, m) => s + m.usage, 0);
-    return { totalCost, totalUsage, accountCount: accounts.length };
+    const totalCost = monthly.reduce((s, m) => s + (m.cost || 0), 0);
+    const totalUsage = monthly.reduce((s, m) => s + (m.usage || 0), 0);
+    const costCount = monthly.reduce((s, m) => s + m.costCount, 0);
+    const usageCount = monthly.reduce((s, m) => s + m.usageCount, 0);
+    return { totalCost, totalUsage, costCount, usageCount, accountCount: accounts.length };
   }, [monthly, accounts]);
 
   const byAccount = useMemo(() => {
     const map = {};
     allReadings.forEach((r) => {
-      if (!map[r.accountName]) map[r.accountName] = 0;
-      const usage = Number(r.usage) || 0;
-      const rate = Number(r.rate) || 0;
-      map[r.accountName] += (rate / 100) * usage;
+      if (!map[r.accountId]) map[r.accountId] = { name: r.accountName, location: r.accountLocation, accountNumber: r.accountNumber, fuelType: r.fuelType, cost: 0, usage: 0, costCount: 0, usageCount: 0, actualCostCount: 0, estimatedCostCount: 0 };
+      const usage = Number(r.usage);
+      const hasUsage = r.usage !== null && r.usage !== undefined && r.usage !== "" && Number.isFinite(usage);
+      if (hasUsage) {
+        map[r.accountId].usage += usage;
+        map[r.accountId].usageCount += 1;
+      }
+      const invoiceTotal = Number(r.total_cost);
+      const hasInvoiceTotal = r.total_cost !== null && r.total_cost !== undefined && r.total_cost !== "" && Number.isFinite(invoiceTotal);
+      const rate = Number(r.rate);
+      const hasRate = r.rate !== null && r.rate !== undefined && r.rate !== "" && Number.isFinite(rate) && rate >= 0;
+      const standing = Number(r.standing_charge ?? r.accountStandingCharge);
+      if (hasInvoiceTotal) {
+        map[r.accountId].cost += invoiceTotal;
+        map[r.accountId].costCount += 1;
+        map[r.accountId].actualCostCount += 1;
+      } else if (hasUsage && hasRate) {
+        map[r.accountId].cost += (rate / 100) * usage + (Number.isFinite(standing) ? (standing / 100) * 30 : 0);
+        map[r.accountId].costCount += 1;
+        map[r.accountId].estimatedCostCount += 1;
+      }
     });
     return Object.entries(map)
-      .map(([name, cost]) => ({ name, cost: Math.round(cost) }))
-      .sort((a, b) => b.cost - a.cost);
-  }, [allReadings]);
+      .map(([id, values]) => ({ id, ...values, cost: values.costCount ? Math.round(values.cost) : null, usage: values.usageCount ? Math.round(values.usage) : null }))
+      .sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+  }, [allReadings, metric]);
 
   return (
     <div
@@ -122,18 +156,18 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
             <div style={{ fontSize: 11, color: "var(--muted)" }}>Accounts</div>
           </div>
           <div style={{ background: "var(--bg)", borderRadius: 10, padding: "14px 16px" }}>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 22, fontWeight: 600 }}>€{totals.totalCost.toLocaleString()}</div>
-            <div style={{ fontSize: 11, color: "var(--muted)" }}>Estimated spend, this range</div>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 22, fontWeight: 600 }}>{totals.costCount ? `€${totals.totalCost.toLocaleString()}` : "—"}</div>
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>Invoice totals + estimates, this range</div>
           </div>
           <div style={{ background: "var(--bg)", borderRadius: 10, padding: "14px 16px" }}>
-            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 22, fontWeight: 600 }}>{totals.totalUsage.toLocaleString()}</div>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 22, fontWeight: 600 }}>{totals.usageCount ? totals.totalUsage.toLocaleString() : "—"}</div>
             <div style={{ fontSize: 11, color: "var(--muted)" }}>Total kWh, this range</div>
           </div>
         </div>
 
         {monthly.length < 2 ? (
           <div style={{ fontSize: 13, color: "var(--muted)", padding: "20px 0", textAlign: "center", border: "1px dashed var(--border)", borderRadius: 10, marginBottom: 20 }}>
-            Add more dated readings across your accounts to see a spend trend here.
+            Add more dated bill readings across your accounts to see a {metric === "cost" ? "cost" : "usage"} trend here.
           </div>
         ) : (
           <>
@@ -175,12 +209,12 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
                 <Tooltip
                   contentStyle={{ background: "var(--panel)", border: "1px solid var(--border-light)", fontSize: 13, borderRadius: 8 }}
                   labelStyle={{ color: "var(--text)", fontWeight: 600 }}
-                  formatter={(v) => [metric === "cost" ? `€${v.toLocaleString()}` : `${v.toLocaleString()} kWh`, metric === "cost" ? "Estimated cost" : "Usage"]}
+                    formatter={(v) => [v == null ? "No data" : metric === "cost" ? `€${Number(v).toLocaleString()}` : `${Number(v).toLocaleString()} kWh`, metric === "cost" ? "Invoice totals + estimates" : "Recorded usage"]}
                 />
                 <Line
                   type="monotone"
                   dataKey={metric}
-                  name={metric === "cost" ? "Estimated cost" : "Usage"}
+                  name={metric === "cost" ? "Invoice totals + estimates" : "Recorded usage"}
                   stroke={metric === "cost" ? "#12895d" : "#b87412"}
                   strokeWidth={2.5}
                   dot={{ r: 4, strokeWidth: 0, fill: metric === "cost" ? "#12895d" : "#b87412" }}
@@ -189,7 +223,7 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
                   <LabelList
                     dataKey={metric}
                     position="top"
-                    formatter={(v) => (metric === "cost" ? `€${v.toLocaleString()}` : v.toLocaleString())}
+                    formatter={(v) => (v == null ? "" : metric === "cost" ? `€${Number(v).toLocaleString()}` : Number(v).toLocaleString())}
                     style={{ fontSize: 12, fill: "#16342b", fontWeight: 600 }}
                   />
                 </Line>
@@ -200,15 +234,15 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
         )}
 
         <div>
-          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, fontWeight: 600 }}>Spend by account, this range</p>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, fontWeight: 600 }}>{metric === "cost" ? "Cost by account, this range" : "Usage by account, this range"}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {byAccount.length === 0 ? (
               <div style={{ fontSize: 12, color: "var(--muted)" }}>No data in this range yet.</div>
             ) : (
               byAccount.map((a) => (
-                <div key={a.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--text)", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span>{a.name}</span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>€{a.cost.toLocaleString()}</span>
+                <div key={a.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5, color: "var(--text)", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                  <span>{a.name}<small style={{ display: "block", color: "var(--muted)", marginTop: 2 }}>{a.location || "Location not set"} · {a.accountNumber ? `${a.fuelType === "gas" ? "GPRN" : "MPRN"} ${a.accountNumber}` : "Meter point not set"}</small></span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{metric === "cost" ? (a.cost === null ? "No cost data" : `€${a.cost.toLocaleString()} (${a.actualCostCount} actual / ${a.estimatedCostCount} estimated)`) : (a.usage === null ? "No usage data" : `${a.usage.toLocaleString()} kWh`)}</span>
                 </div>
               ))
             )}
@@ -216,7 +250,7 @@ export default function CompanyOverview({ accounts, readingSummaries, onClose })
         </div>
 
         <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 16 }}>
-          Costs are estimated from usage × rate (plus a rough standing-charge allowance) recorded in each bill — not exact invoiced totals.
+          When available, the chart uses the actual invoice total. Otherwise it estimates cost from recorded usage × unit rate plus up to 30 days of standing charge. Estimates can omit VAT, levies and other charges; empty months mean no matching data is saved.
         </p>
       </div>
     </div>
