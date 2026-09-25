@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Mail, Zap, Flame } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-const MISSING_BILL_DAYS = 45;
 const RATE_JUMP_THRESHOLD = 5;
 
 const RENEWAL_STATUS_META = {
@@ -67,19 +66,6 @@ function statusOf(daysLeft) {
   return "ok";
 }
 
-function accountConfidence(acc, latest) {
-  let daysSinceLastReading = null;
-  if (!latest) {
-    return { missingBill: true, daysSinceLastReading: null };
-  }
-  if (latest.reading_date) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    daysSinceLastReading = Math.round((today - new Date(latest.reading_date + "T00:00:00")) / 86400000);
-  }
-  const missingBill = daysSinceLastReading !== null && daysSinceLastReading > MISSING_BILL_DAYS;
-  return { missingBill, daysSinceLastReading };
-}
 
 // Accounts with a recorded contract end date that has passed or is within 30 days
 function overallLabelFor(a) {
@@ -137,7 +123,6 @@ function AttentionQueueInner({ companyId, companyName }) {
   accounts.forEach((a) => {
     const daysLeft = daysUntil(a.contract_end);
     const status = statusOf(daysLeft);
-    const confidence = accountConfidence(a, readingSummaries[a.id]?.[0]);
     const renewalStatus = a.renewal_status || "not_started";
     const beingHandled = renewalStatus === "quote_requested" || renewalStatus === "switching";
 
@@ -161,14 +146,6 @@ function AttentionQueueInner({ companyId, companyName }) {
     } else if (status === "urgent" && !beingHandled) {
       addTo("Contract ends within 30 days", "var(--red)", 1, `${daysLeft} day(s) until the recorded end date`);
     }
-    if (confidence.missingBill) {
-      addTo(
-        `No bill dated in the last ${MISSING_BILL_DAYS} days`,
-        "var(--amber)",
-        2,
-        confidence.daysSinceLastReading ? `latest on file: ${confidence.daysSinceLastReading} days ago · check expected billing cycle` : "no bill date on file"
-      );
-    }
     const latest = readingSummaries[a.id]?.[0];
     if (latest?.confidence === "low") {
       addTo("Bill data uncertain — verify before relying on it", "var(--amber)", 3, null);
@@ -182,6 +159,8 @@ function AttentionQueueInner({ companyId, companyName }) {
   const sortedGroups = criticalOnly ? allGroups.filter(([, g]) => g.color === "var(--red)") : allGroups;
   const totalAccounts = new Set(sortedGroups.flatMap(([, g]) => g.items.map((i) => i.account.id))).size;
   const totalIssues = sortedGroups.reduce((sum, [, g]) => sum + g.items.length, 0);
+  const urgentAccounts = new Set(sortedGroups.filter(([, group]) => group.color === "var(--red)").flatMap(([, group]) => group.items.map((item) => item.account.id))).size;
+  const checkAccounts = new Set(sortedGroups.filter(([, group]) => group.color === "var(--amber)").flatMap(([, group]) => group.items.map((item) => item.account.id))).size;
 
   return (
     <div>
@@ -190,14 +169,17 @@ function AttentionQueueInner({ companyId, companyName }) {
         @keyframes wpSoftIn { from { opacity: 0; } to { opacity: 1; } }
         .wp-soft-in { animation: wpSoftIn 0.22s ease both; }
       ` }} />
-      <div className="gn-section-summary"><strong>{totalAccounts}</strong><span>{criticalOnly ? "accounts with a contract end date passed or due within 30 days" : `${totalIssues} recorded items to check across your portfolio`}</span></div>
+      <div className="gn-section-summary"><strong>{totalAccounts}</strong><span>{criticalOnly ? "accounts with a contract date passed or due within 30 days" : `${urgentAccounts} urgent · ${checkAccounts} bill checks · ${totalIssues} items across your portfolio`}</span></div>
+      <p style={{ maxWidth: 900, margin: "-12px 0 20px", color: "var(--muted)", fontSize: 12, lineHeight: 1.6 }}>
+        An account is flagged only when its contract has ended or ends within 30 days and renewal is not marked as underway, a bill shows a rate increase of 5% or more, or bill details were read with low confidence. Old or missing bills, incomplete account details, and renewals more than 30 days away are shown as information instead.
+      </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--text)" }}>
-          Priority: recorded contract dates passed or due within 30 days
+          Urgent: contract ended or due within 30 days
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 999, padding: "6px 12px", fontSize: 12, color: "var(--text)" }}>
-          Grouped: Issue
+          Check: bill rate increase or low-confidence reading
         </span>
         {criticalOnly && (
           <button
