@@ -41,7 +41,7 @@ export default async function AllCompaniesPage({ searchParams }) {
     companiesById[c.id] = c.name;
   });
 
-  return <PortalShell companyName="All companies" header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
+  return <PortalShell allCompanies companyName="All companies" header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
     <AccountsBoard companyIds={companies.map((c) => c.id)} companiesById={companiesById} companyName="All companies" section={section} />
   </PortalShell>;
 }

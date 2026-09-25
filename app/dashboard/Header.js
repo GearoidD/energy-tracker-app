@@ -78,7 +78,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
         alert("The switch didn't actually save (0 rows updated) — this points to a permissions rule blocking it. Tell Claude this exact message.");
         return;
       }
-      window.location.href = `/dashboard?section=${encodeURIComponent(sectionPath)}`;
+      window.location.href = `/dashboard?scope=company&section=${encodeURIComponent(sectionPath)}`;
     } catch (e) {
       alert("Something unexpected went wrong switching company: " + (e?.message || String(e)));
     }
@@ -204,7 +204,7 @@ export default function Header({ email, userId, companies = [], activeCompanyId 
               >
                 {companies.length > 1 && (
                   <Link
-                    href={`/dashboard/all-companies?section=${encodeURIComponent(onAllCompanies ? sectionPath : sectionPath === "overview" && pathname === "/dashboard" ? "accounts" : sectionPath)}`}
+                    href={`/dashboard/all-companies?section=${encodeURIComponent(sectionPath)}`}
                     onClick={() => setMenuOpen(false)}
                     style={{
                       display: "flex",

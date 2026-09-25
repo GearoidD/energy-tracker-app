@@ -48,7 +48,11 @@ export default async function DashboardPage({ searchParams }) {
       : companies[0].id;
 
   const companyName = companies.find((c) => c.id === activeCompanyId)?.name || "";
-  const section = searchParams?.section || "overview";
+  const params = await searchParams;
+  const section = params?.section || "overview";
+  if (companies.length > 1 && params?.scope !== "company") {
+    redirect(`/dashboard/all-companies?section=${encodeURIComponent(section)}`);
+  }
   return <PortalShell companyName={companyName} header={<Header email={user.email} userId={user.id} companies={companies} activeCompanyId={activeCompanyId} />}>
     <AccountsBoard companyId={activeCompanyId} companyName={companyName} section={section} />
   </PortalShell>;

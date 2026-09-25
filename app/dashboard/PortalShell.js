@@ -23,15 +23,17 @@ const copy = {
   attention: ["Needs attention", "Accounts with something to check, with the reason and next step."],
 };
 
-export default function PortalShell({ children, header, companyName, sectionOverride }) {
+export default function PortalShell({ children, header, companyName, sectionOverride, allCompanies = false }) {
   const params = useSearchParams();
   const section = sectionOverride || params.get("section") || "overview";
   const [title, subtitle] = copy[section] || copy.overview;
   const activeItem = section;
+  const dashboardBase = allCompanies ? "/dashboard/all-companies" : "/dashboard?scope=company";
+  const sectionHref = (id) => `${dashboardBase}${allCompanies ? "?" : "&"}section=${id}`;
   return <div className="portal-layout">
     <aside className="portal-sidebar">
-      <Link href="/dashboard" className="portal-brand"><span className="portal-brand-mark"><Zap size={20}/></span><span className="portal-brand-name">GnóRate</span></Link>
-      {groups.map(([group, links]) => <div key={group}><div className="portal-nav-label">{group}</div><nav className="portal-nav">{links.map(([id, label, Icon]) => <Link key={id} href={id === "attention" ? "/dashboard/attention" : id === "overview" ? "/dashboard" : `/dashboard?section=${id}`} className={activeItem === id ? "active" : ""}><Icon size={17}/>{label}</Link>)}</nav></div>)}
+      <Link href={sectionHref("overview")} className="portal-brand"><span className="portal-brand-mark"><Zap size={20}/></span><span className="portal-brand-name">GnóRate</span></Link>
+      {groups.map(([group, links]) => <div key={group}><div className="portal-nav-label">{group}</div><nav className="portal-nav">{links.map(([id, label, Icon]) => <Link key={id} href={id === "attention" ? "/dashboard/attention" : sectionHref(id)} className={activeItem === id ? "active" : ""}><Icon size={17}/>{label}</Link>)}</nav></div>)}
       <div className="portal-sidebar-foot">Irish by name. Built for business.<br/>Commercial utility intelligence</div>
     </aside>
     <main className="portal-main">{header}<div className="portal-content"><div className="portal-heading"><div><div className="portal-kicker">{companyName || "GnóRate client portal"}</div><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</div></main>

@@ -1955,7 +1955,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       alert("Couldn't switch company: " + error.message);
       return;
     }
-    router.push(`/dashboard?section=${encodeURIComponent(section || "accounts")}`);
+    router.push(`/dashboard?scope=company&section=${encodeURIComponent(section || "accounts")}`);
   };
 
   const deleteAccount = async (id) => {
