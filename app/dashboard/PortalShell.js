@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Activity, BarChart3, Building2, CircleDollarSign, Gauge, LayoutDashboard, ListChecks, Settings, Zap } from "lucide-react";
+import GnoRateLogo from "../GnoRateLogo";
 
 const groups = [
   ["Your business", [["overview", "Dashboard", LayoutDashboard], ["accounts", "Accounts", Building2], ["usage", "Usage and bills", Activity]]],
@@ -32,7 +33,7 @@ export default function PortalShell({ children, header, companyName, sectionOver
   const sectionHref = (id) => `${dashboardBase}${allCompanies ? "?" : "&"}section=${id}`;
   return <div className="portal-layout">
     <aside className="portal-sidebar">
-      <Link href={sectionHref("overview")} className="portal-brand"><span className="portal-brand-mark"><Zap size={20}/></span><span className="portal-brand-name">GnóRate</span></Link>
+      <Link href={sectionHref("overview")} className="portal-brand"><GnoRateLogo tone="light" size={36}/></Link>
       {groups.map(([group, links]) => <div key={group}><div className="portal-nav-label">{group}</div><nav className="portal-nav">{links.map(([id, label, Icon]) => <Link key={id} href={id === "attention" ? "/dashboard/attention" : sectionHref(id)} className={activeItem === id ? "active" : ""}><Icon size={17}/>{label}</Link>)}</nav></div>)}
       <div className="portal-sidebar-foot">Irish by name. Built for business.<br/>Commercial utility intelligence</div>
     </aside>

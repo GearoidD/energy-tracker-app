@@ -913,30 +913,52 @@ function drawGnReportHeader(doc, title, companyName) {
   doc.setFillColor(...c.green);
   doc.rect(0, 38, pageWidth, 1.2, "F");
 
-  doc.setFillColor(...c.green);
-  doc.roundedRect(14, 7.5, 9, 9, 2, 2, "F");
+  drawGnReportMark(doc, 14, 8, 10);
   doc.setTextColor(...c.white);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("G", 17, 14);
   doc.setFontSize(18);
-  doc.text("Gnó", 27, 16);
+  doc.text("Gnó", 28, 16);
   const brandWidth = doc.getTextWidth("Gnó");
   doc.setTextColor(...c.bright);
-  doc.text("Rate", 27 + brandWidth, 16);
+  doc.text("Rate", 28 + brandWidth, 16);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.3);
+  doc.setTextColor(140, 220, 188);
+  doc.text("COMMERCIAL UTILITY INTELLIGENCE", 28, 23);
 
   doc.setTextColor(...c.white);
-  doc.setFontSize(10);
+  doc.setFontSize(10.5);
   doc.setFont("helvetica", "bold");
-  doc.text(title, 14, 25);
+  doc.text(title, pageWidth - 14, 13.5, { align: "right" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(190, 216, 205);
   doc.text(
-    `${companyName || "All companies"}  ·  Generated ${new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}`,
-    14,
-    33
+    `${companyName || "All companies"}  ·  ${new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}`,
+    pageWidth - 14,
+    21,
+    { align: "right", maxWidth: pageWidth - 70 }
   );
+}
+
+function drawGnReportMark(doc, x, y, size = 10) {
+  const c = GNORATE_REPORT;
+  const scale = size / 40;
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  doc.setFillColor(...c.green);
+  doc.roundedRect(x, y, size, size, size * 0.3, size * 0.3, "F");
+  doc.setDrawColor(...c.white);
+  doc.setLineWidth(size * 0.075);
+  doc.ellipse(cx, cy, size * 0.285, size * 0.285, "S");
+  doc.setFillColor(...c.green);
+  doc.rect(x + size * 0.69, y + size * 0.25, size * 0.31, size * 0.5, "F");
+  doc.setDrawColor(...c.white);
+  doc.setLineWidth(size * 0.078);
+  doc.line(cx, cy, x + size * 0.82, cy);
+  doc.setFillColor(...c.bright);
+  doc.circle(x + size * 0.83, cy, size * 0.04, "F");
+  return { x: x + size + 4 * scale, y };
 }
 
 function gnReportTableStyles() {
@@ -1008,10 +1030,14 @@ function drawGnReportFooters(doc, reportTitle) {
       doc.rect(0, 0, pageWidth, 18, "F");
       doc.setFillColor(...GNORATE_REPORT.green);
       doc.rect(0, 17.5, pageWidth, 0.7, "F");
+      const logoText = drawGnReportMark(doc, 14, 4.5, 8);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(...GNORATE_REPORT.white);
-      doc.text("GnóRate", 14, 11.5);
+      doc.text("Gnó", logoText.x, 11.5);
+      const continuedBrandWidth = doc.getTextWidth("Gnó");
+      doc.setTextColor(...GNORATE_REPORT.bright);
+      doc.text("Rate", logoText.x + continuedBrandWidth, 11.5);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(190, 216, 205);

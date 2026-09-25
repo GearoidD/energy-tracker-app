@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Activity, ArrowDownRight, ArrowRight, BarChart3, Building2, Check, ChevronDown, CircleDollarSign, FileText, Flame, Leaf, Menu, ShieldCheck, Users, Zap } from "lucide-react";
+import GnoRateLogo from "./GnoRateLogo";
 
 function IrelandScene() {
   return <svg className="home-ireland-scene" viewBox="0 0 900 430" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -28,7 +29,7 @@ function PortalPreview() {
   return <div className="home-preview-wrap">
     <div className="home-preview-caption"><span className="home-preview-live"/> SAMPLE CLIENT PORTAL</div>
     <div className="home-preview">
-      <aside className="home-preview-side"><b><Zap size={15}/> Gnó<span>Rate</span></b>{[[BarChart3,"Dashboard"],[Building2,"Accounts"],[Zap,"Rates"],[Activity,"Usage"],[CircleDollarSign,"Savings"],[FileText,"Reports"]].map(([Icon,label],i)=><span key={label} className={i===0?"selected":""}><Icon size={12}/>{label}</span>)}<small>Illustrative preview</small></aside>
+      <aside className="home-preview-side"><GnoRateLogo tone="light" size={22} className="home-preview-logo"/>{[[BarChart3,"Dashboard"],[Building2,"Accounts"],[Zap,"Rates"],[Activity,"Usage"],[CircleDollarSign,"Savings"],[FileText,"Reports"]].map(([Icon,label],i)=><span key={label} className={`home-preview-nav-item ${i===0?"selected":""}`}><Icon size={12}/>{label}</span>)}<small>Illustrative preview</small></aside>
       <div className="home-preview-main"><div className="home-preview-top"><div><small>YOUR PORTFOLIO</small><h3>Dashboard</h3></div><span>Last 12 months <ChevronDown size={12}/></span></div>
         <div className="home-preview-metrics">{[["Annual spend","€482,320"],["Potential savings","€64,800"],["Active accounts","12"],["Rate opportunities","5"]].map(([label,value],i)=><div key={label}><small>{label}</small><b className={i===1?"positive":""}>{value}</b><em>{i===1?<><ArrowDownRight size={11}/> Opportunity</>:i===2?"2 renewing soon":"Portfolio view"}</em></div>)}</div>
         <div className="home-preview-charts"><div className="home-preview-chart"><b>Spend by utility</b><div className="home-donut"><span>€482k</span></div><small><i/> Electricity <i className="gas-dot"/> Gas</small></div><div className="home-preview-chart"><b>Monthly usage</b><div className="home-bars">{[30,44,38,58,49,69,54,82,63,76,58,91].map((h,i)=><i key={i} style={{height:`${h}%`}}/>)}</div><small>Recorded account usage</small></div></div>
@@ -48,7 +49,7 @@ export default function HomePage() {
   const [mobileOpen, setMobileOpen] = useState(false);
   return <main className="gn-home">
     <header className="home-nav"><div className="home-nav-inner">
-      <Link href="/" className="home-brand"><span><Zap size={20}/></span><b>Gnó<span>Rate</span></b></Link>
+      <Link href="/" className="home-brand"><GnoRateLogo size={35}/></Link>
       <nav className="home-nav-links"><a href="#platform">Product</a><a href="#solutions">Solutions</a><a href="#utilities">Utilities</a><a href="#how-it-works">Resources</a><a href="#about">About</a></nav>
       <div className="home-nav-actions"><Link className="home-login" href="/login">Client login</Link><Link className="home-button small" href="/signup">Get started <ArrowRight size={14}/></Link></div>
       <button className="home-mobile-toggle" aria-label="Toggle navigation" onClick={()=>setMobileOpen(v=>!v)}><Menu size={21}/></button>
@@ -72,7 +73,7 @@ export default function HomePage() {
 
     <section className="home-final-cta"><div className="home-wrap final-cta-inner"><div><div className="home-eyebrow light"><span/> READY TO TAKE CONTROL?</div><h2>Make your next renewal<br/>a more informed one.</h2><p>Bring your utility contracts into one clear view with GnóRate.</p></div><div className="final-cta-actions"><Link className="home-button" href="/signup">Get started <ArrowRight size={16}/></Link><Link href="/login">Already have an account? Client login</Link></div></div><i className="cta-ring ring-one"/><i className="cta-ring ring-two"/></section>
 
-    <footer className="home-footer"><div className="home-wrap"><div className="footer-main"><div className="footer-brand"><Link href="/" className="home-brand"><span><Zap size={19}/></span><b>Gnó<span>Rate</span></b></Link><p>Commercial utility intelligence for smarter business decisions.</p><small>Born in Ireland. Built for business.</small></div><div><b>Product</b><a href="#platform">Overview</a><a href="#utilities">Utilities</a><a href="#how-it-works">How it works</a></div><div><b>Resources</b><Link href="/help">Help centre</Link><Link href="/legal/terms">Terms</Link><Link href="/legal/privacy-policy">Privacy</Link></div><div><b>Account</b><Link href="/login">Client login</Link><Link href="/signup">Get started</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} GnóRate. All rights reserved.</span><span>Ireland · Commercial energy</span></div></div></footer>
+    <footer className="home-footer"><div className="home-wrap"><div className="footer-main"><div className="footer-brand"><Link href="/" className="home-brand"><GnoRateLogo tone="light" size={35}/></Link><p>Commercial utility intelligence for smarter business decisions.</p><small>Born in Ireland. Built for business.</small></div><div><b>Product</b><a href="#platform">Overview</a><a href="#utilities">Utilities</a><a href="#how-it-works">How it works</a></div><div><b>Resources</b><Link href="/help">Help centre</Link><Link href="/legal/terms">Terms</Link><Link href="/legal/privacy-policy">Privacy</Link></div><div><b>Account</b><Link href="/login">Client login</Link><Link href="/signup">Get started</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} GnóRate. All rights reserved.</span><span>Ireland · Commercial energy</span></div></div></footer>
   </main>;
 }
 
