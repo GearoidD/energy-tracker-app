@@ -98,7 +98,15 @@ function normaliseSnapshot(parsed, sources, requestId, searchRequests) {
 
 export async function GET(request) {
   if (!authorised(request)) return json({ error: "Unauthorized" }, 401);
-  if (!process.env.ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY is not configured in Vercel." }, 500);
+  const rawAnthropicKey = process.env.ANTHROPIC_API_KEY || "";
+  const anthropicKey = rawAnthropicKey.trim();
+  const keyDiagnostic = {
+    detected: Boolean(rawAnthropicKey),
+    valid_prefix: anthropicKey.startsWith("sk-ant-"),
+    length: anthropicKey.length,
+    whitespace_trimmed: rawAnthropicKey !== anthropicKey,
+  };
+  if (!anthropicKey) return json({ error: "ANTHROPIC_API_KEY is not configured in Vercel.", diagnostic: keyDiagnostic }, 500);
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel." }, 500);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -118,7 +126,7 @@ export async function GET(request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "x-api-key": anthropicKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
@@ -148,6 +156,13 @@ export async function GET(request) {
       error: "Anthropic API returned an error; the previous successful snapshot remains live.",
       status: response.status,
       detail: payload?.error?.message || payload?.error?.type || "Unknown Anthropic error",
+      request_id: response.headers.get("request-id") || payload?.request_id || null,
+      diagnostic: {
+        ...keyDiagnostic,
+        endpoint: "api.anthropic.com/v1/messages",
+        model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
+        anthropic_error_type: payload?.error?.type || null,
+      },
     }, 502);
   }
 
