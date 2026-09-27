@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import https from "node:https";
 
@@ -99,17 +98,13 @@ function normaliseSnapshot(parsed, sources, requestId, searchRequests) {
 }
 
 export async function runMarketScan() {
-  // TEMPORARY PASS 7T RAW TRACE TEST ONLY. Revoke this key immediately after testing.
-  const rawAnthropicKey = "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";
-  const anthropicKey = rawAnthropicKey.trim();
+  const anthropicKey = (process.env.ANTHROPIC_API_KEY || "").trim();
   const keyDiagnostic = {
-    detected: Boolean(rawAnthropicKey),
+    detected: Boolean(anthropicKey),
     valid_prefix: anthropicKey.startsWith("sk-ant-"),
     length: anthropicKey.length,
-    whitespace_trimmed: rawAnthropicKey !== anthropicKey,
-    sha256: anthropicKey ? createHash("sha256").update(anthropicKey, "utf8").digest("hex") : null,
   };
-  if (!anthropicKey) return json({ error: "Temporary hard-coded Anthropic test key is missing.", diagnostic: keyDiagnostic }, 500);
+  if (!anthropicKey) return json({ error: "ANTHROPIC_API_KEY is not configured in Vercel.", diagnostic: keyDiagnostic }, 500);
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel." }, 500);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -174,7 +169,7 @@ export async function runMarketScan() {
     return json({
       error: "BUILD 7T · Anthropic API returned an error; the previous successful snapshot remains live.",
       status: anthropicResult.status,
-      detail: `${payload?.error?.message || payload?.error?.type || "Unknown Anthropic error"} · VERCEL KEY SHA256=${keyDiagnostic.sha256 || "NONE"}`,
+      detail: payload?.error?.message || payload?.error?.type || "Unknown Anthropic error",
       request_id: anthropicResult.headers?.["request-id"] || payload?.request_id || null,
       raw_anthropic_status: anthropicResult.status,
       raw_anthropic_headers: anthropicResult.headers || {},
