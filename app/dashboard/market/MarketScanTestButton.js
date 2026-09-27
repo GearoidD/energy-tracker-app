@@ -40,7 +40,12 @@ export default function MarketScanTestButton() {
     {result && <div style={{marginTop:10,fontSize:12,lineHeight:1.5,color:result.ok?"var(--teal)":"#b42318",maxWidth:760}}>
       <div>{result.message}</div>
       {result.diagnostic && <div style={{marginTop:8,color:"var(--muted)"}}>
-        Key detected: {result.diagnostic.detected ? "Yes" : "No"} · Prefix valid: {result.diagnostic.valid_prefix ? "Yes" : "No"} · Length: {result.diagnostic.length ?? "—"} · Whitespace trimmed: {result.diagnostic.whitespace_trimmed ? "Yes" : "No"} · Model: {result.diagnostic.model || "—"} · Endpoint: {result.diagnostic.endpoint || "—"}<br/>SHA-256 fingerprint: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.sha256 || "—"}</span>
+        Key detected: {result.diagnostic.detected ? "Yes" : "No"} · Prefix valid: {result.diagnostic.valid_prefix ? "Yes" : "No"} · Length: {result.diagnostic.length ?? "—"} · Whitespace trimmed: {result.diagnostic.whitespace_trimmed ? "Yes" : "No"} · Model: {result.diagnostic.model || "—"} · Endpoint: {result.diagnostic.endpoint || "—"}<br/>
+        HTTP status: {result.diagnostic.anthropic_http_status ?? "—"} · Error type: {result.diagnostic.anthropic_error_type || "—"}<br/>
+        Anthropic request ID: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_request_id_header || result.diagnostic.anthropic_request_id_body || "—"}</span><br/>
+        Request ID header: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_request_id_header || "—"}</span> · Body: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_request_id_body || "—"}</span><br/>
+        Anthropic org: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_organization_id || "—"}</span> · Workspace: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_workspace_id || "—"}</span><br/>
+        SHA-256 fingerprint: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.sha256 || "—"}</span>
       </div>}
     </div>}
   </div>;
