@@ -6,58 +6,55 @@ import { useRouter } from "next/navigation";
 export default function MarketScanTestButton() {
   const router = useRouter();
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState(null);
+  const [message, setMessage] = useState(null);
 
   async function runScan() {
     setRunning(true);
-    setResult(null);
+    setMessage(null);
     try {
-      const response = await fetch("/api/market-intelligence/test", { method: "POST" });
-      const body = await response.json().catch(() => ({}));
-      const serverBuild = response.headers.get("x-gnorate-build") || "UNKNOWN";
-      const serverKeyHash = response.headers.get("x-gnorate-key-sha256") || "MISSING";
-      if (!response.ok) {
-        setResult({
-          ok: false,
-          message: [`BUILD ${serverBuild}`, body.error, body.detail, body.request_id && `REQUEST ID=${body.request_id}`, `SERVER KEY SHA256=${serverKeyHash}`].filter(Boolean).join(" · ") || `Scan failed (${response.status}).`,
-          diagnostic: body.diagnostic || null,
-          rawStatus: body.raw_anthropic_status ?? null,
-          rawHeaders: body.raw_anthropic_headers || null,
-          rawBody: body.raw_anthropic_body ?? null,
-          fullBody: body,
-        });
+      const res = await fetch("/api/admin/run-market-scan", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ ok: false, text: data.error || "Couldn't run the scan." });
         return;
       }
-      setResult({ ok: true, message: `BUILD ${serverBuild} · SERVER KEY SHA256=${serverKeyHash} · ${body.skipped ? (body.reason || "Today\'s snapshot already exists.") : `Market snapshot saved for ${body.snapshot_date || "today"}.`} ${body.diagnostic?.sha256 ? `· VERCEL KEY SHA256=${body.diagnostic.sha256}` : ""}`, diagnostic: body.diagnostic || null });
+      setMessage({
+        ok: true,
+        text: data.skipped ? data.reason : `Snapshot saved for ${data.snapshot_date}.`,
+      });
       router.refresh();
-    } catch (error) {
-      setResult({ ok: false, message: error?.message || "Unable to run the market scan." });
+    } catch (e) {
+      setMessage({ ok: false, text: e.message });
     } finally {
       setRunning(false);
     }
   }
 
-  return <div style={{marginTop:16}}>
-    <button type="button" onClick={runScan} disabled={running} style={{border:0,borderRadius:10,padding:"11px 16px",fontWeight:800,cursor:running?"wait":"pointer",background:"var(--teal)",color:"white",opacity:running?.7:1}}>
-      {running ? "Running live market scan…" : "Run Market Intelligence"}
-    </button>
-    {result && <div style={{marginTop:10,fontSize:12,lineHeight:1.5,color:result.ok?"var(--teal)":"#b42318",maxWidth:760}}>
-      <div>{result.message}</div>
-      {!result.ok && <div style={{marginTop:10,padding:12,border:"1px solid #f0c7c2",borderRadius:8,background:"#fff7f6",color:"#7a271a",fontFamily:"monospace",fontSize:11,whiteSpace:"pre-wrap",wordBreak:"break-all"}}>
-        <strong>RAW ANTHROPIC TRACE</strong>{"\n"}
-        HTTP STATUS: {result.rawStatus ?? "—"}{"\n"}
-        REQUEST ID: {result.diagnostic?.anthropic_request_id_header || result.diagnostic?.anthropic_request_id_body || result.fullBody?.request_id || "—"}{"\n"}
-        HEADERS: {result.rawHeaders ? JSON.stringify(result.rawHeaders, null, 2) : "—"}{"\n"}
-        BODY: {result.rawBody || "—"}
-      </div>}
-      {result.diagnostic && <div style={{marginTop:8,color:"var(--muted)"}}>
-        Key detected: {result.diagnostic.detected ? "Yes" : "No"} · Prefix valid: {result.diagnostic.valid_prefix ? "Yes" : "No"} · Length: {result.diagnostic.length ?? "—"} · Whitespace trimmed: {result.diagnostic.whitespace_trimmed ? "Yes" : "No"} · Model: {result.diagnostic.model || "—"} · Endpoint: {result.diagnostic.endpoint || "—"}<br/>
-        HTTP status: {result.diagnostic.anthropic_http_status ?? "—"} · Error type: {result.diagnostic.anthropic_error_type || "—"}<br/>
-        Anthropic request ID: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_request_id_header || result.diagnostic.anthropic_request_id_body || "—"}</span><br/>
-        Request ID header: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_request_id_header || "—"}</span> · Body: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_request_id_body || "—"}</span><br/>
-        Anthropic org: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_organization_id || "—"}</span> · Workspace: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.anthropic_workspace_id || "—"}</span><br/>
-        SHA-256 fingerprint: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.sha256 || "—"}</span>
-      </div>}
-    </div>}
-  </div>;
+  return (
+    <div style={{ marginTop: 16 }}>
+      <button
+        type="button"
+        onClick={runScan}
+        disabled={running}
+        style={{
+          border: "none",
+          borderRadius: 8,
+          padding: "9px 16px",
+          fontWeight: 600,
+          fontSize: 13,
+          cursor: running ? "wait" : "pointer",
+          background: "var(--teal)",
+          color: "#ffffff",
+          opacity: running ? 0.7 : 1,
+        }}
+      >
+        {running ? "Running…" : "Refresh market data now"}
+      </button>
+      {message && (
+        <div style={{ marginTop: 10, fontSize: 12.5, color: message.ok ? "var(--teal)" : "var(--red)" }}>
+          {message.text}
+        </div>
+      )}
+    </div>
+  );
 }

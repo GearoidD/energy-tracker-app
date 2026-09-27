@@ -1,24 +1,133 @@
 import { NextResponse } from "next/server";
-import { createHash } from "node:crypto";
-import { createClient } from "@/lib/supabase/server";
-import { runMarketScan } from "@/app/api/cron/market-intelligence/route";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function POST() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "You must be signed in to run the test scan." }, { status: 401 });
+function authorised(request) {
+  const secret = process.env.CRON_SECRET;
+  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
+}
 
-  // Diagnostic is added as an HTTP response header, independent of Anthropic's
-  // response body, so an upstream 401 cannot overwrite or hide it.
-  const key = (process.env.ANTHROPIC_API_KEY || "").trim();
-  const fingerprint = key ? createHash("sha256").update(key, "utf8").digest("hex") : "NONE";
+function extractJsonObject(text) {
+  const cleaned = (text || "").replace(/```json|```/gi, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start === -1 || end === -1) return null;
+  try {
+    return JSON.parse(cleaned.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
 
-  const response = await runMarketScan();
-  response.headers.set("x-gnorate-build", "7T");
-  response.headers.set("x-gnorate-key-sha256", fingerprint);
-  return response;
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function runMarketScan() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 500 });
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured." }, { status: 500 });
+  }
+
+  const admin = createAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: existing } = await admin
+    .from("market_snapshots")
+    .select("id")
+    .eq("snapshot_date", today)
+    .maybeSingle();
+  if (existing) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Today's snapshot already exists." });
+  }
+
+  const prompt = `Today is ${today}. Provide a brief Irish commercial energy market snapshot using only information you're confident about. Never invent current market figures - set anything you can't support to null, and keep pressure_score at 50 with pressure_label "Stable" when current evidence is unavailable.
+
+Respond with ONLY a single compact JSON object, no other text, using exactly these keys: sem_day_ahead_eur_mwh, sem_change_7d_pct, gas_eur_mwh, gas_change_7d_pct, brent_usd_bbl, brent_change_7d_pct, carbon_eur_t, carbon_change_7d_pct, eur_usd, pressure_score, pressure_label (must be "Low", "Stable", "Elevated" or "High"), narrative (under 80 words, must state this is not a retail-price forecast), sources (up to 5 objects with name, url, as_of).`;
+
+  let claudeRes;
+  try {
+    claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 1500,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+  } catch (e) {
+    return NextResponse.json({ error: "Couldn't reach Anthropic: " + e.message }, { status: 502 });
+  }
+
+  const claudeData = await claudeRes.json();
+  if (!claudeRes.ok) {
+    return NextResponse.json(
+      { error: claudeData?.error?.message || "Anthropic returned an error", previous_snapshot_retained: true },
+      { status: 502 }
+    );
+  }
+
+  const textBlock = claudeData.content?.find((c) => c.type === "text");
+  const parsed = textBlock ? extractJsonObject(textBlock.text) : null;
+  if (!parsed) {
+    return NextResponse.json(
+      { error: "Couldn't parse a market snapshot from the response", previous_snapshot_retained: true },
+      { status: 502 }
+    );
+  }
+
+  const score = numberOrNull(parsed.pressure_score);
+  const validLabels = new Set(["Low", "Stable", "Elevated", "High"]);
+
+  const row = {
+    snapshot_date: today,
+    sem_day_ahead_eur_mwh: numberOrNull(parsed.sem_day_ahead_eur_mwh),
+    sem_change_7d_pct: numberOrNull(parsed.sem_change_7d_pct),
+    gas_eur_mwh: numberOrNull(parsed.gas_eur_mwh),
+    gas_change_7d_pct: numberOrNull(parsed.gas_change_7d_pct),
+    brent_usd_bbl: numberOrNull(parsed.brent_usd_bbl),
+    brent_change_7d_pct: numberOrNull(parsed.brent_change_7d_pct),
+    carbon_eur_t: numberOrNull(parsed.carbon_eur_t),
+    carbon_change_7d_pct: numberOrNull(parsed.carbon_change_7d_pct),
+    eur_usd: numberOrNull(parsed.eur_usd),
+    pressure_score: Math.max(0, Math.min(100, score ?? 50)),
+    pressure_label: validLabels.has(parsed.pressure_label) ? parsed.pressure_label : "Stable",
+    narrative:
+      typeof parsed.narrative === "string"
+        ? parsed.narrative.slice(0, 1600)
+        : "Market evidence was incomplete today. This is not a retail-price forecast.",
+    source_meta: {
+      sources: Array.isArray(parsed.sources) ? parsed.sources.slice(0, 5) : [],
+      generated_at: new Date().toISOString(),
+    },
+  };
+
+  const { error } = await admin.from("market_snapshots").insert(row);
+  if (error) {
+    return NextResponse.json({ error: error.message, previous_snapshot_retained: true }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, snapshot_date: row.snapshot_date });
+}
+
+export async function GET(request) {
+  if (!authorised(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return runMarketScan();
+}
+
+export async function POST(request) {
+  if (!authorised(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return runMarketScan();
 }
