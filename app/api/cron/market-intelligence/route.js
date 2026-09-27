@@ -128,6 +128,9 @@ export async function GET(request) {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${anthropicKey}`,
         "anthropic-version": "2023-06-01",
+        ...(process.env.ANTHROPIC_WORKSPACE_ID
+          ? { "anthropic-workspace-id": process.env.ANTHROPIC_WORKSPACE_ID.trim() }
+          : {}),
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
@@ -161,6 +164,7 @@ export async function GET(request) {
         ...keyDiagnostic,
         endpoint: "api.anthropic.com/v1/messages",
         auth_method: "authorization_bearer",
+        workspace_id_configured: Boolean(process.env.ANTHROPIC_WORKSPACE_ID?.trim()),
         model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
         anthropic_error_type: payload?.error?.type || null,
       },
