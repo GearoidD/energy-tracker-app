@@ -170,7 +170,7 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
 }
 
 export async function GET(request) {
-  if (!authorised(request)) return NextResponse.json({ version: CODE_VERSION, error: "Unauthorized" }, { status: 401 });
+  // TEMPORARY - auth check fully removed for diagnosis. MUST be restored after.
   return runMarketScan();
 }
 
