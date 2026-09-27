@@ -17,7 +17,7 @@ export default function MarketScanTestButton() {
       if (!response.ok) {
         setResult({
           ok: false,
-          message: [body.error, body.detail, body.stop_reason && `stop reason: ${body.stop_reason}`, body.request_id && `request: ${body.request_id}`].filter(Boolean).join(" · ") || `Scan failed (${response.status}).`,
+          message: [body.error, body.detail, body.stop_reason && `stop reason: ${body.stop_reason}`, body.request_id && `request: ${body.request_id}`, body.diagnostic && `KEY CHECK: detected=${body.diagnostic.detected ? "YES" : "NO"}, prefix=${body.diagnostic.valid_prefix ? "VALID" : "INVALID"}, length=${body.diagnostic.length ?? "—"}, trimmed=${body.diagnostic.whitespace_trimmed ? "YES" : "NO"}, env=${body.diagnostic.environment || "—"}, model=${body.diagnostic.model || "—"}`].filter(Boolean).join(" · ") || `Scan failed (${response.status}).`,
           diagnostic: body.diagnostic || null,
         });
         return;
