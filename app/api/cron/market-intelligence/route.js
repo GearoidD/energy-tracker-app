@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import https from "node:https";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,36 +122,59 @@ export async function runMarketScan() {
     .maybeSingle();
   if (existing) return json({ ok: true, skipped: true, reason: "Today's shared market snapshot already exists.", diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
 
-  let response;
+  const requestBody = JSON.stringify({
+    model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
+    max_tokens: 4096,
+    messages: [{
+      role: "user",
+      content: `Today is ${today}. Create a safe GnóRate Irish commercial-energy market snapshot using only information you can support without live web tools. IMPORTANT: never invent current market numbers or claim live research. Set any current market figure you cannot verify to null. Keep pressure_score at 50 and pressure_label Stable when current evidence is unavailable.\n\nBe extremely concise and return ONLY one compact valid JSON object.\n\nJSON keys exactly: sem_day_ahead_eur_mwh, sem_change_7d_pct, gas_eur_mwh, gas_change_7d_pct, brent_usd_bbl, brent_change_7d_pct, carbon_eur_t, carbon_change_7d_pct, eur_usd, pressure_score, pressure_label, narrative, sources. pressure_label must be Low, Stable, Elevated or High. narrative must be <=80 words and state this is not a retail-price forecast. sources must contain at most 5 objects with name, url and as_of. Weight verified electricity and gas most heavily, then carbon, oil and FX. Supplier hedging means retail prices can lag wholesale markets. OUTPUT JSON ONLY.`,
+    }],
+  });
+
+  // Use Node's native HTTPS transport instead of Next/Vercel fetch instrumentation.
+  // This mirrors the successful curl request as closely as possible.
+  let anthropicResult;
   try {
-    response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
-        max_tokens: 4096,
-        messages: [{
-          role: "user",
-          content: `Today is ${today}. Create a safe GnóRate Irish commercial-energy market snapshot using only information you can support without live web tools. IMPORTANT: never invent current market numbers or claim live research. Set any current market figure you cannot verify to null. Keep pressure_score at 50 and pressure_label Stable when current evidence is unavailable.\n\nBe extremely concise and return ONLY one compact valid JSON object.\n\nJSON keys exactly: sem_day_ahead_eur_mwh, sem_change_7d_pct, gas_eur_mwh, gas_change_7d_pct, brent_usd_bbl, brent_change_7d_pct, carbon_eur_t, carbon_change_7d_pct, eur_usd, pressure_score, pressure_label, narrative, sources. pressure_label must be Low, Stable, Elevated or High. narrative must be <=80 words and state this is not a retail-price forecast. sources must contain at most 5 objects with name, url and as_of. Weight verified electricity and gas most heavily, then carbon, oil and FX. Supplier hedging means retail prices can lag wholesale markets. OUTPUT JSON ONLY.`,
-        }],
-      }),
-      cache: "no-store",
+    anthropicResult = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: "api.anthropic.com",
+        port: 443,
+        path: "/v1/messages",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(requestBody),
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+      }, (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => { body += chunk; });
+        res.on("end", () => resolve({
+          ok: (res.statusCode || 500) >= 200 && (res.statusCode || 500) < 300,
+          status: res.statusCode || 500,
+          headers: res.headers,
+          body,
+        }));
+      });
+      req.setTimeout(55000, () => req.destroy(new Error("Anthropic request timed out")));
+      req.on("error", reject);
+      req.write(requestBody);
+      req.end();
     });
   } catch (error) {
-    return json({ error: "Daily Anthropic request failed; yesterday's snapshot remains available.", detail: error?.message || String(error) }, 502);
+    return json({ error: "BUILD 7Q · Daily Anthropic HTTPS request failed; yesterday's snapshot remains available.", detail: error?.message || String(error) }, 502);
   }
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
+  let payload = {};
+  try { payload = JSON.parse(anthropicResult.body || "{}"); } catch {}
+  if (!anthropicResult.ok) {
     return json({
-      error: "BUILD 7P · Anthropic API returned an error; the previous successful snapshot remains live.",
-      status: response.status,
+      error: "BUILD 7Q · Anthropic API returned an error; the previous successful snapshot remains live.",
+      status: anthropicResult.status,
       detail: `${payload?.error?.message || payload?.error?.type || "Unknown Anthropic error"} · VERCEL KEY SHA256=${keyDiagnostic.sha256 || "NONE"}`,
-      request_id: response.headers.get("request-id") || payload?.request_id || null,
+      request_id: anthropicResult.headers?.["request-id"] || payload?.request_id || null,
       diagnostic: {
         ...keyDiagnostic,
         endpoint: "api.anthropic.com/v1/messages",
@@ -182,7 +206,7 @@ export async function runMarketScan() {
   const { error } = await admin.from("market_snapshots").insert(row);
   if (error) return json({ error: error.message, previous_snapshot_retained: true }, 500);
 
-  return json({ ok: true, build: "7P", snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests, diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
+  return json({ ok: true, build: "7Q", snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests, diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
 }
 
 
