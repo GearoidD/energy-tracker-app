@@ -78,3 +78,9 @@ Before accepting customer data or charging for GnóRate:
 ### Financial wording
 
 “Rate opportunity” is deliberately used for unit-rate-only comparisons. It is not a guaranteed saving and may exclude standing charges, capacity charges, levies, VAT and contract fees. A figure should only be labelled as a projected saving once the complete comparable annual cost is modelled.
+
+## Renewal decision controls
+
+GnóRate separates indicative rate opportunities from supplier quote decisions. Account-specific quote offers are stored in `quote_offers` and compare annual unit cost + standing charge + explicitly quoted annual capacity/other charges. VAT, levies and consumption changes are not silently treated as savings. Users should verify the supplier contract before approval.
+
+For production, apply the complete baseline schema (or equivalent migrations), verify RLS with at least two isolated test companies, configure cron authentication, and run a clean install/build in CI before deployment.

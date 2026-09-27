@@ -100,3 +100,36 @@ create policy rate_queue_submit on rate_scan_queue for insert to authenticated w
 
 comment on column benchmarks.source_type is 'Provenance category, e.g. supplier_quote, broker, regulator, comparison_site, team_entry.';
 comment on table master_rates is 'Admin-confirmed market reference rates. Never describe unreviewed rate_scan_queue rows as verified.';
+
+-- Commercial renewal workflow additions
+alter table accounts add column if not exists renewal_owner uuid references auth.users(id) on delete set null;
+alter table accounts add column if not exists renewal_target_date date;
+alter table master_rates add column if not exists source text not null default 'admin_verified';
+alter table master_rates add column if not exists submitted_by uuid references auth.users(id) on delete set null;
+alter table master_rates add column if not exists submitted_by_company uuid references companies(id) on delete set null;
+
+create table if not exists quote_offers (
+  id uuid primary key default gen_random_uuid(), company_id uuid not null references companies(id) on delete cascade,
+  account_id uuid references accounts(id) on delete cascade, supplier_name text not null, fuel_type text not null,
+  tariff_band text, unit_rate_cents numeric not null, standing_charge_cents numeric,
+  capacity_charge_annual numeric, other_annual_charges numeric, contract_length_months integer, valid_until date,
+  source_text text, status text not null default 'received' check(status in ('received','shortlisted','approved','rejected')),
+  submitted_by uuid references auth.users(id) on delete set null, created_at timestamptz not null default now()
+);
+create index if not exists quote_offers_company_idx on quote_offers(company_id);
+create index if not exists quote_offers_account_idx on quote_offers(account_id);
+alter table quote_offers enable row level security;
+create policy quote_offers_company on quote_offers for all to authenticated using(public.is_company_member(company_id)) with check(public.is_company_member(company_id));
+
+create table if not exists activity_log (
+  id uuid primary key default gen_random_uuid(), company_id uuid not null references companies(id) on delete cascade,
+  account_id uuid references accounts(id) on delete cascade, actor_id uuid references auth.users(id) on delete set null,
+  event_type text not null, detail text, created_at timestamptz not null default now()
+);
+create index if not exists activity_company_idx on activity_log(company_id,created_at desc);
+alter table activity_log enable row level security;
+create policy activity_company on activity_log for select to authenticated using(public.is_company_member(company_id));
+create policy activity_insert on activity_log for insert to authenticated with check(public.is_company_member(company_id));
+
+comment on table quote_offers is 'Account-specific supplier offers used for whole-cost renewal comparison and approval.';
+comment on column quote_offers.capacity_charge_annual is 'Annual euro amount, kept separate from unit rate so projected savings are not overstated.';

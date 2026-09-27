@@ -14,7 +14,7 @@ export async function POST(request) {
 
   const { data: profile } = await supabase.from("profiles").select("active_company_id").eq("id", user.id).maybeSingle();
 
-  const { quoteText } = await request.json();
+  const { quoteText, accountId } = await request.json();
   if (!quoteText || quoteText.trim().length < 20) {
     return NextResponse.json({ error: "Paste the full quote text first" }, { status: 400 });
   }
@@ -27,12 +27,14 @@ For EACH distinct rate offer found, extract:
 - tariff_band: the specific classification if stated (e.g. "SBU", "MBU", "FVT", "DG1", "DG5") - null if not stated
 - unit_rate_cents: the per-kWh rate, converted to CENTS (e.g. €0.09923/kWh becomes 9.923)
 - standing_charge_cents: the per-day standing charge, converted to CENTS (e.g. €0.4610/day becomes 46.10)
+- capacity_charge_annual: annual capacity/MIC charge in EURO if explicitly stated, otherwise 0
+- other_annual_charges: other fixed annual charges in EURO if explicitly stated, otherwise 0
 - contract_length_months: if stated, otherwise null
 - valid_until: if a validity/expiry date is stated, in YYYY-MM-DD format, otherwise null
 - notes: any other relevant detail in one short sentence (exit fees, conditions, meter/GPRN numbers mentioned) - otherwise null
 
 Respond with ONLY a JSON array, no other text, no markdown fences:
-[{"provider": "...", "fuel_type": "...", "tariff_band": "...", "unit_rate_cents": 0, "standing_charge_cents": 0, "contract_length_months": null, "valid_until": null, "notes": "..."}]
+[{"provider": "...", "fuel_type": "...", "tariff_band": "...", "unit_rate_cents": 0, "standing_charge_cents": 0, "capacity_charge_annual": 0, "other_annual_charges": 0, "contract_length_months": null, "valid_until": null, "notes": "..."}]
 
 Quote text:
 ${quoteText}`;
@@ -110,6 +112,22 @@ ${quoteText}`;
     const { error: insertError } = await admin.from("master_rates").insert(rows);
     if (insertError) {
       return NextResponse.json({ error: `Extraction worked, but saving failed: ${insertError.message}` }, { status: 500 });
+    }
+
+    if (accountId && profile?.active_company_id) {
+      const { data: account } = await supabase.from("accounts").select("id").eq("id", accountId).eq("company_id", profile.active_company_id).maybeSingle();
+      if (!account) return NextResponse.json({ error: "The selected account is not available in this workspace." }, { status: 403 });
+      const offerRows = extracted.map((r) => ({
+        company_id: profile.active_company_id, account_id: accountId, supplier_name: r.provider?.trim() || "Unknown supplier",
+        fuel_type: r.fuel_type || "electricity", tariff_band: r.tariff_band || null, unit_rate_cents: r.unit_rate_cents,
+        standing_charge_cents: r.standing_charge_cents ?? null, capacity_charge_annual: r.capacity_charge_annual || 0,
+        other_annual_charges: r.other_annual_charges || 0, contract_length_months: r.contract_length_months || null,
+        valid_until: r.valid_until || null, source_text: quoteText.slice(0, 12000), submitted_by: user.id
+      }));
+      const { error: offerError } = await supabase.from("quote_offers").insert(offerRows);
+      if (offerError) return NextResponse.json({ error: `Rates were saved, but the account quote comparison failed: ${offerError.message}` }, { status: 500 });
+      await supabase.from("accounts").update({ renewal_status: "quote_requested" }).eq("id", accountId);
+      await supabase.from("activity_log").insert({ company_id: profile.active_company_id, account_id: accountId, actor_id: user.id, event_type: "quote_received", detail: `${offerRows.length} supplier quote option(s) captured` });
     }
 
     return NextResponse.json({ added: rows.length, rates: extracted });

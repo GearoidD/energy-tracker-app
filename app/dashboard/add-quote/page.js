@@ -13,6 +13,11 @@ export default async function AddQuotePage() {
 
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase.from("profiles").select("active_company_id").eq("id", user.id).maybeSingle();
+  const { data: accounts } = profile?.active_company_id
+    ? await supabase.from("accounts").select("id,name,location,fuel_type,usage,rate,standing_charge").eq("company_id", profile.active_company_id).order("name")
+    : { data: [] };
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", padding: "40px 24px", fontFamily: "DM Sans, sans-serif" }}>
       <style dangerouslySetInnerHTML={{ __html: `@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');` }} />
@@ -33,7 +38,7 @@ export default async function AddQuotePage() {
           used across every account's comparison, not just yours.
         </p>
 
-        <AddQuoteForm />
+        <AddQuoteForm accounts={accounts || []} />
       </div>
     </div>
   );
