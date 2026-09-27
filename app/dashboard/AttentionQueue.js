@@ -141,10 +141,14 @@ function AttentionQueueInner({ companyId, companyName }) {
       issueGroups[key].items.push({ account: a, location: a.location || "No location set", detail });
     };
 
-    if (status === "overdue" && !beingHandled) {
-      addTo("Contract end date passed — confirm current supplier terms", "var(--red)", 0, `${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? "" : "s"} past the recorded end date`);
-    } else if (status === "urgent" && !beingHandled) {
-      addTo("Contract ends within 30 days", "var(--red)", 1, `${daysLeft} day(s) until the recorded end date`);
+    if (status === "overdue" && renewalStatus !== "renewed") {
+      addTo("Contract end date passed — confirm current supplier terms", "var(--red)", 0, `${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? "" : "s"} past the recorded end date${beingHandled ? ` · ${renewalStatus === "quote_requested" ? "quote requested" : "switching"}` : ""}`);
+    } else if (status === "urgent" && renewalStatus !== "renewed") {
+      addTo("Contract ends within 30 days", "var(--red)", 1, `${daysLeft} day(s) until the recorded end date${beingHandled ? ` · ${renewalStatus === "quote_requested" ? "quote requested" : "switching"}` : ""}`);
+    } else if (daysLeft !== null && daysLeft > 30 && daysLeft <= 60 && renewalStatus !== "renewed") {
+      addTo("Renewal action due within 60 days", "var(--amber)", 2, `${daysLeft} days until the recorded end date.`);
+    } else if (beingHandled) {
+      addTo("Renewal in progress — follow-up required", "var(--amber)", 2.2, renewalStatus === "quote_requested" ? "Quote requested — compare and progress the renewal." : "Supplier switch is in progress — verify completion.");
     }
     const latest = readingSummaries[a.id]?.[0];
     if (latest?.confidence === "low") {
@@ -173,7 +177,7 @@ function AttentionQueueInner({ companyId, companyName }) {
       ` }} />
       <div className="gn-section-summary"><strong>{totalAccounts}</strong><span>{criticalOnly ? "accounts with a contract date passed or due within 30 days" : `${urgentAccounts} urgent · ${checkAccounts} other accounts to check · ${totalIssues} flagged items`}</span></div>
       <p style={{ maxWidth: 900, margin: "-12px 0 20px", color: "var(--muted)", fontSize: 12, lineHeight: 1.6 }}>
-        An account is flagged only when its contract has ended or ends within 30 days and renewal is not marked as underway, a bill shows a rate increase of 5% or more, or bill details were read with low confidence. Old or missing bills, incomplete account details, and renewals more than 30 days away are shown as information instead.
+        Urgent accounts are out of contract or within 30 days of renewal. Accounts 31–60 days from renewal, active quote/switch workflows, unresolved rate increases and low-confidence bill details are shown as actions to check. Renewals 61–90 days away remain upcoming rather than urgent.
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>

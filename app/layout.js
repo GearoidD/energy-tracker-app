@@ -4,6 +4,11 @@ export const metadata = {
   metadataBase: new URL("https://www.wattpryce.com"),
   title: "GnóRate",
   description: "Know before your contract renews.",
+  applicationName: "GnóRate",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
+  },
   openGraph: {
     title: "GnóRate",
     description: "Track every energy contract, read bills automatically, and know whether to renew or switch — before it's too late.",

@@ -213,9 +213,15 @@ function gasTariffFor(acc) {
 
 function attentionLevelFor(a) {
   const renewalStatus = a.renewal_status || "not_started";
-  const beingHandled = renewalStatus === "quote_requested" || renewalStatus === "switching";
+  const renewalActive = renewalStatus === "quote_requested" || renewalStatus === "switching";
+  const renewalComplete = renewalStatus === "renewed";
+  const d = a.daysLeft;
 
-  if ((a.status === "overdue" || a.status === "urgent") && !beingHandled) return "urgent";
+  // Contract timing always drives urgency. An active quote/switch is still work in progress,
+  // so it remains visible instead of being flattened to “non urgent”.
+  if (!renewalComplete && d !== null && (d < 0 || d <= 30)) return "urgent";
+  if (!renewalComplete && d !== null && d <= 60) return "check";
+  if (renewalActive) return "check";
   if (a.lowConfidenceBill || (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (a.rateChange.reviewStatus || "unreviewed") === "unreviewed")) return "check";
   return "none";
 }
@@ -1025,10 +1031,10 @@ function drawGnReportMark(doc, x, y, size = 10) {
 function gnReportTableStyles() {
   const c = GNORATE_REPORT;
   return {
-    theme: "grid",
-    headStyles: { fillColor: c.deep, textColor: c.white, font: "helvetica", fontSize: 8, fontStyle: "bold", cellPadding: 3.2, lineColor: c.deep },
-    bodyStyles: { font: "helvetica", fontSize: 8, textColor: c.ink, cellPadding: 3.2, lineColor: c.border, lineWidth: 0.15 },
-    alternateRowStyles: { fillColor: c.pale },
+    theme: "plain",
+    headStyles: { fillColor: c.deep, textColor: c.white, font: "helvetica", fontSize: 7.6, fontStyle: "bold", cellPadding: 3.5, lineColor: c.deep, lineWidth: 0 },
+    bodyStyles: { font: "helvetica", fontSize: 7.8, textColor: c.ink, cellPadding: 3.5, lineColor: c.border, lineWidth: { bottom: 0.18 } },
+    alternateRowStyles: { fillColor: [249, 251, 251] },
     margin: { top: 25, bottom: 22, left: 14, right: 14 },
   };
 }
@@ -1179,7 +1185,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     y,
     pageWidth,
     eyebrow: "Portfolio pulse",
-    title: summaryStats.needAttention ? `${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? " needs" : "s need"} a review` : "No urgent account actions",
+    title: summaryStats.needAttention ? `${summaryStats.needAttention} account${summaryStats.needAttention === 1 ? " needs" : "s need"} a review` : "Portfolio currently on track",
     detail: `${summaryStats.criticalCount} urgent  ·  ${summaryStats.reviewCount} checks  ·  ${summaryStats.total - summaryStats.needAttention} not currently flagged`,
     value: `${summaryStats.renewingSoon90} renewing soon`,
   }) + 9;
@@ -2320,7 +2326,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         const [newest, prev] = ratedReadings;
         if (prev.rate) {
           const pct = ((newest.rate - prev.rate) / prev.rate) * 100;
-          rateChange = { pct, from: prev.rate, to: newest.rate, fromDate: prev.reading_date, toDate: newest.reading_date };
+          rateChange = { pct, from: prev.rate, to: newest.rate, fromDate: prev.reading_date, toDate: newest.reading_date, readingId: newest.id, reviewStatus: newest.rate_review_status || "unreviewed" };
         }
       }
 
@@ -2460,21 +2466,25 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       const beingHandled = status === "quote_requested" || status === "switching";
       const statusSuffix = beingHandled ? ` — ${RENEWAL_STATUS_META[status].label}` : "";
 
-      if ((a.status === "overdue" || a.status === "urgent") && !beingHandled) {
+      if ((a.status === "overdue" || a.status === "urgent") && status !== "renewed") {
         items.push({
           id: `${a.id}-contract`,
           account: a,
           severity: a.status === "overdue" ? 0 : 1,
           color: "var(--red)",
           groupLabel: a.status === "overdue" ? "Contract end date passed — confirm current supplier terms" : "Contract ends within 30 days",
-          detail: a.status === "overdue" ? `${Math.abs(a.daysLeft)} day${Math.abs(a.daysLeft) === 1 ? "" : "s"} past the recorded end date` : `${a.daysLeft} day${a.daysLeft === 1 ? "" : "s"} until the recorded end date`,
+          detail: `${a.status === "overdue" ? `${Math.abs(a.daysLeft)} day${Math.abs(a.daysLeft) === 1 ? "" : "s"} past the recorded end date` : `${a.daysLeft} day${a.daysLeft === 1 ? "" : "s"} until the recorded end date`}${statusSuffix}`,
         });
+      } else if (a.daysLeft !== null && a.daysLeft > 30 && a.daysLeft <= 60 && status !== "renewed") {
+        items.push({ id: `${a.id}-renewal-action`, account: a, severity: 2, color: "var(--amber)", groupLabel: "Renewal action due within 60 days", detail: `${a.daysLeft} days until contract end${statusSuffix}. Next: ${renewalNextStep(a)}.` });
+      } else if (beingHandled) {
+        items.push({ id: `${a.id}-renewal-progress`, account: a, severity: 2.2, color: "var(--amber)", groupLabel: "Renewal in progress — follow-up required", detail: `${RENEWAL_STATUS_META[status].label}. Next: ${renewalNextStep(a)}.` });
       }
       const latest = readingSummaries[a.id]?.[0];
       if (latest?.confidence === "low") {
         items.push({ id: `${a.id}-lowconf`, account: a, severity: 3, color: "var(--amber)", groupLabel: "Bill reading needs a quick check", detail: "Compare the recorded details with the original bill." });
       }
-      if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) {
+      if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (a.rateChange.reviewStatus || "unreviewed") === "unreviewed") {
         items.push({
           id: `${a.id}-ratejump`,
           account: a,
@@ -2837,7 +2847,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString("en-IE")} kWh`}><em>{month.usage ? Math.round(month.usage).toLocaleString("en-IE") : "-"}</em><div className="gn-bar-track"><i style={{ height: month.usage ? `${Math.max(5, (month.usage / max) * 100)}%` : "0%" }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
             </article>
           </div>
-          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("accounts")}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "No urgent account actions"} <span aria-hidden="true">→</span></Link><Link href={sectionHref("accounts")}>View all accounts <span aria-hidden="true">→</span></Link></div>
+          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("accounts")}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "Portfolio currently on track"} <span aria-hidden="true">→</span></Link><Link href={sectionHref("accounts")}>View all accounts <span aria-hidden="true">→</span></Link></div>
           <div className="gn-task-grid">
             <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Contracts ending within 30 days, rate rises of 5%+, or bill details to verify</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
               {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
