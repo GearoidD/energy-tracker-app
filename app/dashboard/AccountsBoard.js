@@ -1865,7 +1865,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     let result = await applyCompanyScope(
       supabase
         .from("readings")
-        .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, rate_review_status, rate_reviewed_at, created_at")
+        .select("id, account_id, reading_date, billing_period_start, billing_period_end, rate, usage, standing_charge, total_cost, source, confidence, rate_review_status, rate_reviewed_at, created_at")
         .order("reading_date", { ascending: false, nullsFirst: false })
     );
 
@@ -2389,10 +2389,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       const latestReading = readingSummaries[a.id]?.[0];
       const currentRate = latestReading?.rate ?? a.rate;
       const comparison = marketComparisonFor({ ...a, rate: currentRate }, benchmarks, masterRates);
-      const usageNum = parseFloat(a.usage);
+      const preliminaryCost = annualCostDetail({ ...a, rate: currentRate }, readingSummaries[a.id]);
+      const usageNum = Number(preliminaryCost.usage);
       const rateNum = parseFloat(currentRate);
       const saving =
-        comparison && !isNaN(usageNum) && !isNaN(rateNum)
+        comparison && Number.isFinite(usageNum) && !isNaN(rateNum)
           ? ((rateNum - comparison.rate) / 100) * usageNum
           : null;
       const confidence = accountConfidence(a, latestReading);
@@ -2408,7 +2409,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         }
       }
 
-      const costDetail = annualCostDetail({ ...a, rate: currentRate }, readingSummaries[a.id]);
+      const costDetail = preliminaryCost;
       return { ...a, rate: currentRate, daysLeft, status, saving, cost: costDetail.projected, costDetail, comparison, confidence, lowConfidenceBill, rateChange };
     });
   }, [accounts, benchmarks, masterRates, readingSummaries]);
@@ -3822,10 +3823,10 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   <div className="gn-account-info-cell"><small>Supplier <em>Saved detail</em></small><strong>{a.provider || "Not recorded"}</strong>{isExpanded && !a.provider && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add supplier</button>}</div>
                   <div className="gn-account-info-cell"><small>Current unit rate <em>From saved details or bill</em></small><strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong>{isExpanded && !a.rate && <button type="button" onClick={() => setUploadingFor(a.id)}>Add rate from bill</button>}</div>
                   <div className="gn-account-info-cell"><small>Standing charge <em>Daily supplier charge</em></small><strong>{a.standing_charge ? `${Number(a.standing_charge).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/day` : "Not recorded"}</strong>{isExpanded && !a.standing_charge && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add standing charge</button>}</div>
-                  <div className="gn-account-info-cell"><small>Annual usage on account <em>Saved account figure</em></small><strong>{a.usage ? `${Number(a.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong>{isExpanded && !a.usage && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add annual usage</button>}</div>
+                  <div className="gn-account-info-cell"><small>Projected annual usage <em>{a.costDetail?.usageEstimate?.source === "bills" ? "Calculated from bill periods" : a.costDetail?.usageEstimate?.source === "historical-bills" ? "Estimated from historical bill dates" : "Saved account figure"}</em></small><strong>{a.costDetail?.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong><span>{a.costDetail?.usageEstimate?.detail || "Existing bills use their bill month as a seasonal proxy; exact billing periods improve confidence."}</span>{isExpanded && !a.costDetail?.usage && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add annual usage</button>}</div>
                   <div className="gn-account-info-cell"><small>Latest bill on file <em>Reading date</em></small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong>{isExpanded && (!readingSummaries[a.id]?.[0]?.reading_date || a.confidence.missingBill) && <button type="button" onClick={() => setUploadingFor(a.id)}>{readingSummaries[a.id]?.[0]?.reading_date ? "Add newer bill" : "Upload first bill"}</button>}</div>
                   <div className="gn-account-info-cell"><small>Contract end date <em>Saved detail</em></small><strong>{formatAccountDate(a.contract_end)}</strong>{isExpanded && !a.contract_end && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add end date</button>}</div>
-                  <div className="gn-account-info-cell gn-account-estimate"><small>Projected annual energy cost <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>Transparent projection from annual usage and saved tariff components; open the account for the calculation basis.</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>{isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
+                  <div className="gn-account-info-cell gn-account-estimate"><small>Projected annual energy cost <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>Transparent projection from annual usage and saved tariff components; open the account for the calculation basis.</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>{isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>{a.costDetail.usageEstimate?.method} · {a.costDetail.usageEstimate?.coverageDays || 0} days covered · {a.costDetail.usageEstimate?.billCount || 0} bills used · usage confidence {a.costDetail.usageEstimate?.confidence || 0}%</span><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
                   <div className="gn-account-status-detail" style={{ borderColor: `${overall.color}44` }}><strong style={{ color: overall.color }}>{overall.label}</strong><span>{accountStatusDetail(a)}</span></div>
                 </div>
 

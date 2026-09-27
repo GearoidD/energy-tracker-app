@@ -30,7 +30,7 @@ create table accounts (
 );
 create table readings (
   id uuid primary key default gen_random_uuid(), account_id uuid not null references accounts(id) on delete cascade,
-  company_id uuid not null references companies(id) on delete cascade, reading_date date, usage numeric, rate numeric, standing_charge numeric,
+  company_id uuid not null references companies(id) on delete cascade, reading_date date, billing_period_start date, billing_period_end date, usage numeric, rate numeric, standing_charge numeric,
   total_cost numeric, source text not null default 'manual', confidence text check (confidence in ('low','medium','high') or confidence is null),
   rate_review_status text not null default 'unreviewed' check (rate_review_status in ('unreviewed','confirmed','corrected','dismissed')),
   rate_reviewed_at timestamptz, rate_reviewed_by uuid references auth.users(id) on delete set null,

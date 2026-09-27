@@ -690,7 +690,11 @@ export default function UploadReading({
           account_id: finalAccountId,
           company_id: companyId,
           reading_date:
-            extracted.reading_date || null,
+            extracted.billing_period_end || extracted.reading_date || null,
+          billing_period_start:
+            extracted.billing_period_start || null,
+          billing_period_end:
+            extracted.billing_period_end || extracted.reading_date || null,
           usage:
             extracted.usage || null,
           rate:
@@ -1632,6 +1636,13 @@ export default function UploadReading({
                 }}
               >
                 <label
+                  style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "var(--muted)" }}
+                >
+                  Billing period start date
+                  <input type="date" style={inputStyle} value={extracted.billing_period_start || ""} onChange={set("billing_period_start")} />
+                </label>
+
+                <label
                   style={{
                     display: "flex",
                     flexDirection:
@@ -1649,12 +1660,10 @@ export default function UploadReading({
                     type="date"
                     style={inputStyle}
                     value={
-                      extracted.reading_date ||
+                      extracted.billing_period_end || extracted.reading_date ||
                       ""
                     }
-                    onChange={set(
-                      "reading_date"
-                    )}
+                    onChange={(e) => setExtracted((f) => ({ ...f, billing_period_end: e.target.value, reading_date: e.target.value }))}
                   />
                 </label>
 

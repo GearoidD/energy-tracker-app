@@ -245,6 +245,7 @@ Never guess a number.
 If a field is not clearly visible, return null.
 
 Pay particular attention to:
+- Billing period start date
 - Billing period end date
 - kWh usage
 - Unit rates
@@ -268,6 +269,8 @@ Do not include comments.
 Use exactly this structure:
 
 {
+  "billing_period_start": "YYYY-MM-DD or null",
+  "billing_period_end": "YYYY-MM-DD or null",
   "reading_date": "YYYY-MM-DD or null",
   "usage": number or null,
   "rate": number or null,
@@ -288,8 +291,14 @@ Use exactly this structure:
 
 FIELD RULES:
 
+billing_period_start:
+The BILLING PERIOD START DATE. Return null if it is not clearly shown.
+
+billing_period_end:
+The BILLING PERIOD END DATE. Return null if it is not clearly shown.
+
 reading_date:
-The BILLING PERIOD END DATE.
+For backwards compatibility, return the same BILLING PERIOD END DATE as billing_period_end.
 Do not use the invoice date unless it is also clearly the billing period end date.
 
 usage:
@@ -528,7 +537,17 @@ Return null when it cannot be read confidently.
      */
 
     const normalised = {
+      billing_period_start:
+        extracted.billing_period_start ??
+        null,
+
+      billing_period_end:
+        extracted.billing_period_end ??
+        extracted.reading_date ??
+        null,
+
       reading_date:
+        extracted.billing_period_end ??
         extracted.reading_date ??
         null,
 
