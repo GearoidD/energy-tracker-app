@@ -157,7 +157,7 @@ export async function GET(request) {
     return json({
       error: "Anthropic API returned an error; the previous successful snapshot remains live.",
       status: response.status,
-      detail: payload?.error?.message || payload?.error?.type || "Unknown Anthropic error",
+      detail: `${payload?.error?.message || payload?.error?.type || "Unknown Anthropic error"} · VERCEL KEY SHA256=${keyDiagnostic.sha256 || "NONE"}`,
       request_id: response.headers.get("request-id") || payload?.request_id || null,
       diagnostic: {
         ...keyDiagnostic,
