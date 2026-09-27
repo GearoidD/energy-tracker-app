@@ -14,15 +14,17 @@ export default function MarketScanTestButton() {
     try {
       const response = await fetch("/api/market-intelligence/test", { method: "POST" });
       const body = await response.json().catch(() => ({}));
+      const serverBuild = response.headers.get("x-gnorate-build") || "UNKNOWN";
+      const serverKeyHash = response.headers.get("x-gnorate-key-sha256") || "MISSING";
       if (!response.ok) {
         setResult({
           ok: false,
-          message: ["BUILD 7N", body.error, body.detail, body.diagnostic?.sha256 && `VERCEL KEY SHA256=${body.diagnostic.sha256}`, body.stop_reason && `stop reason: ${body.stop_reason}`, body.request_id && `request: ${body.request_id}`].filter(Boolean).join(" · ") || `Scan failed (${response.status}).`,
+          message: [`BUILD ${serverBuild}`, body.error, body.detail, `SERVER KEY SHA256=${serverKeyHash}`, body.diagnostic?.sha256 && `BODY KEY SHA256=${body.diagnostic.sha256}`, body.stop_reason && `stop reason: ${body.stop_reason}`, body.request_id && `request: ${body.request_id}`].filter(Boolean).join(" · ") || `Scan failed (${response.status}).`,
           diagnostic: body.diagnostic || null,
         });
         return;
       }
-      setResult({ ok: true, message: `BUILD 7N · ${body.skipped ? (body.reason || "Today\'s snapshot already exists.") : `Market snapshot saved for ${body.snapshot_date || "today"}.`} ${body.diagnostic?.sha256 ? `· VERCEL KEY SHA256=${body.diagnostic.sha256}` : ""}`, diagnostic: body.diagnostic || null });
+      setResult({ ok: true, message: `BUILD ${serverBuild} · SERVER KEY SHA256=${serverKeyHash} · ${body.skipped ? (body.reason || "Today\'s snapshot already exists.") : `Market snapshot saved for ${body.snapshot_date || "today"}.`} ${body.diagnostic?.sha256 ? `· VERCEL KEY SHA256=${body.diagnostic.sha256}` : ""}`, diagnostic: body.diagnostic || null });
       router.refresh();
     } catch (error) {
       setResult({ ok: false, message: error?.message || "Unable to run the market scan." });
