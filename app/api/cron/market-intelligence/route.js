@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -131,7 +130,6 @@ export async function GET(request) {
           name: "web_search",
           max_uses: 1,
           allowed_callers: ["direct"],
-          user_location: { type: "approximate", country: "IE", timezone: "Europe/Dublin" },
         }],
         messages: [{
           role: "user",
@@ -175,31 +173,4 @@ export async function GET(request) {
   if (error) return json({ error: error.message, previous_snapshot_retained: true }, 500);
 
   return json({ ok: true, snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests });
-}
-
-
-// Temporary authenticated first-scan trigger. It delegates to the exact same GET
-// handler used by Vercel Cron, so this does not create a second market pipeline.
-// Once the first snapshot is confirmed, this POST route and its UI button can be removed.
-export async function POST(request) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return json({ error: "You must be signed in to GnóRate to run the first scan." }, 401);
-
-  const { data: membership } = await supabase
-    .from("company_members")
-    .select("role")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) return json({ error: "No company membership found for this user." }, 403);
-
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return json({ error: "CRON_SECRET is not configured in Vercel." }, 500);
-
-  const internalRequest = new Request(request.url, {
-    method: "GET",
-    headers: { authorization: `Bearer ${secret}` },
-  });
-  return GET(internalRequest);
 }
