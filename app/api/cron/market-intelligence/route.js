@@ -5,6 +5,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+// Unique marker - if this string is NOT in the response you see live,
+// the deployed code is definitely not this version.
+const CODE_VERSION = "MKT-V9-DIRECT";
+
 function authorised(request) {
   const secret = process.env.CRON_SECRET;
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
@@ -28,12 +32,21 @@ function numberOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function keyDiagnostic() {
+  const key = process.env.ANTHROPIC_API_KEY || "";
+  return {
+    length: key.length,
+    starts_with: key.slice(0, 12),
+    ends_with: key.slice(-6),
+  };
+}
+
 async function runMarketScan() {
   try {
     return await runMarketScanInner();
   } catch (e) {
     return NextResponse.json(
-      { error: "Uncaught error: " + (e?.message || String(e)), stack: e?.stack || null },
+      { version: CODE_VERSION, error: "Uncaught error: " + (e?.message || String(e)), stack: e?.stack || null, key_diagnostic: keyDiagnostic() },
       { status: 500 }
     );
   }
@@ -41,10 +54,10 @@ async function runMarketScan() {
 
 async function runMarketScanInner() {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 500 });
+    return NextResponse.json({ version: CODE_VERSION, error: "ANTHROPIC_API_KEY is not configured.", key_diagnostic: keyDiagnostic() }, { status: 500 });
   }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured." }, { status: 500 });
+    return NextResponse.json({ version: CODE_VERSION, error: "SUPABASE_SERVICE_ROLE_KEY is not configured." }, { status: 500 });
   }
 
   const admin = createAdminClient();
@@ -56,7 +69,7 @@ async function runMarketScanInner() {
     .eq("snapshot_date", today)
     .maybeSingle();
   if (existing) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "Today's snapshot already exists." });
+    return NextResponse.json({ version: CODE_VERSION, ok: true, skipped: true, reason: "Today's snapshot already exists." });
   }
 
   const prompt = `Today is ${today}. Provide a brief Irish commercial energy market snapshot using only information you're confident about. Never invent current market figures - set anything you can't support to null, and keep pressure_score at 50 with pressure_label "Stable" when current evidence is unavailable.
@@ -79,20 +92,19 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
       }),
     });
   } catch (e) {
-    return NextResponse.json({ error: "Couldn't reach Anthropic: " + e.message }, { status: 502 });
+    return NextResponse.json({ version: CODE_VERSION, error: "Couldn't reach Anthropic: " + e.message, key_diagnostic: keyDiagnostic() }, { status: 502 });
   }
 
   const claudeData = await claudeRes.json();
   if (!claudeRes.ok) {
     return NextResponse.json(
       {
+        version: CODE_VERSION,
         error: claudeData?.error?.message || "Anthropic returned an error",
+        anthropic_status: claudeRes.status,
+        anthropic_raw: claudeData,
         previous_snapshot_retained: true,
-        key_diagnostic: {
-          length: (process.env.ANTHROPIC_API_KEY || "").length,
-          starts_with: (process.env.ANTHROPIC_API_KEY || "").slice(0, 12),
-          ends_with: (process.env.ANTHROPIC_API_KEY || "").slice(-6),
-        },
+        key_diagnostic: keyDiagnostic(),
       },
       { status: 502 }
     );
@@ -102,7 +114,7 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
   const parsed = textBlock ? extractJsonObject(textBlock.text) : null;
   if (!parsed) {
     return NextResponse.json(
-      { error: "Couldn't parse a market snapshot from the response", previous_snapshot_retained: true },
+      { version: CODE_VERSION, error: "Couldn't parse a market snapshot from the response", previous_snapshot_retained: true },
       { status: 502 }
     );
   }
@@ -135,18 +147,18 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
 
   const { error } = await admin.from("market_snapshots").insert(row);
   if (error) {
-    return NextResponse.json({ error: error.message, previous_snapshot_retained: true }, { status: 500 });
+    return NextResponse.json({ version: CODE_VERSION, error: error.message, previous_snapshot_retained: true }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, snapshot_date: row.snapshot_date });
+  return NextResponse.json({ version: CODE_VERSION, ok: true, snapshot_date: row.snapshot_date });
 }
 
 export async function GET(request) {
-  if (!authorised(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!authorised(request)) return NextResponse.json({ version: CODE_VERSION, error: "Unauthorized" }, { status: 401 });
   return runMarketScan();
 }
 
 export async function POST(request) {
-  if (!authorised(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!authorised(request)) return NextResponse.json({ version: CODE_VERSION, error: "Unauthorized" }, { status: 401 });
   return runMarketScan();
 }

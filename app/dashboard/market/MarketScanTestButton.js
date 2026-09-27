@@ -16,9 +16,13 @@ export default function MarketScanTestButton() {
       const data = await res.json();
       if (!res.ok) {
         const keyInfo = data.key_diagnostic
-          ? `\n\nKey seen by this route: length ${data.key_diagnostic.length}, starts "${data.key_diagnostic.starts_with}", ends "${data.key_diagnostic.ends_with}"`
+          ? `\nKey seen by this route: length ${data.key_diagnostic.length}, starts "${data.key_diagnostic.starts_with}", ends "${data.key_diagnostic.ends_with}"`
           : "";
-        setMessage({ ok: false, text: (data.error || "Couldn't run the scan.") + keyInfo + (data.stack ? "\n\n" + data.stack : "") });
+        const rawInfo = data.anthropic_raw ? `\n\nRaw Anthropic response:\n${JSON.stringify(data.anthropic_raw, null, 2)}` : "";
+        setMessage({
+          ok: false,
+          text: `[${data.version || "NO VERSION - old code still deployed"}] ${data.error || "Couldn't run the scan."}${keyInfo}${rawInfo}${data.stack ? "\n\n" + data.stack : ""}`,
+        });
         return;
       }
       setMessage({
