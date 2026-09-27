@@ -126,7 +126,7 @@ export async function GET(request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
+        "Authorization": `Bearer ${anthropicKey}`,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
@@ -160,6 +160,7 @@ export async function GET(request) {
       diagnostic: {
         ...keyDiagnostic,
         endpoint: "api.anthropic.com/v1/messages",
+        auth_method: "authorization_bearer",
         model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
         anthropic_error_type: payload?.error?.type || null,
       },
