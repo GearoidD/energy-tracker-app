@@ -1,29 +1,20 @@
-# GnóRate — Anthropic Market Intelligence setup
+# GnóRate Daily Market Intelligence
 
-The code is already wired. No Anthropic key is stored in this project.
+GnóRate now uses one centrally scheduled market-intelligence job. Customers do not trigger Anthropic.
 
-## Vercel environment variables
-Add these in Vercel → Project → Settings → Environment Variables:
+## Required Vercel environment variables
+- `ANTHROPIC_API_KEY`
+- `CRON_SECRET`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- existing Supabase public variables
 
-- `ANTHROPIC_API_KEY` — your Anthropic API key (server only; never use NEXT_PUBLIC_)
-- `CRON_SECRET` — a long random secret used to protect the scheduled route
-- `SUPABASE_SERVICE_ROLE_KEY` — existing Supabase service role key used by trusted server jobs
-- `NEXT_PUBLIC_SUPABASE_URL` — existing value
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — existing value
-- `ANTHROPIC_MARKET_MODEL` — optional; defaults to `claude-sonnet-5`
+Optional: `ANTHROPIC_MARKET_MODEL` (defaults to `claude-sonnet-5`).
 
-Redeploy after adding/changing environment variables.
-
-## Daily schedule
+## Schedule
 `vercel.json` calls `/api/cron/market-intelligence` daily at 06:15 UTC.
 
-## First test
-After deployment, sign into GnóRate and open Market Intelligence. Click **Run live market scan**. The button calls an authenticated server route; your Anthropic and Supabase service-role keys never reach the browser.
+## Cost / call control
+The route is idempotent by date: if today's `market_snapshots` row already exists, a retry exits before calling Anthropic. Each scheduled run makes one Anthropic Messages API request and allows at most one Anthropic web-search execution. If Anthropic returns `pause_turn`, an API error, or unusable output, GnóRate does not make a continuation call and leaves the previous successful snapshot live.
 
-A successful run upserts today's row into `public.market_snapshots`. Refreshing the Market Intelligence page will show the snapshot and source links.
-
-## Failure messages
-The route now reports common setup failures explicitly, including missing `ANTHROPIC_API_KEY`, missing service-role key, Anthropic API errors, invalid model/web-search access, invalid JSON, and Supabase write errors.
-
-## Data integrity
-Claude is instructed to use `null` rather than inventing an unverified market figure. The market-pressure score is a directional procurement signal and is not represented as a retail-price forecast.
+## Customer experience
+There is no manual "Run live market scan" button or public run endpoint. The Market Intelligence page reads the latest shared snapshot from Supabase.

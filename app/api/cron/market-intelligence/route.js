@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const json = (body, status = 200) => NextResponse.json(body, { status });
 
@@ -11,16 +12,59 @@ function authorised(request) {
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
 }
 
-function extractText(payload) {
+function textBlocks(payload) {
   return (payload?.content || [])
-    .filter((block) => block?.type === "text")
-    .map((block) => block.text || "")
-    .join("\n")
-    .replace(/```json|```/gi, "")
-    .trim();
+    .filter((block) => block?.type === "text" && typeof block.text === "string")
+    .map((block) => block.text.trim())
+    .filter(Boolean);
 }
 
-function normaliseSnapshot(parsed) {
+function extractJsonObject(payload) {
+  const blocks = textBlocks(payload);
+  // Prefer a text block that is already a complete JSON object.
+  for (let i = blocks.length - 1; i >= 0; i -= 1) {
+    const clean = blocks[i].replace(/```json|```/gi, "").trim();
+    try {
+      const parsed = JSON.parse(clean);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  // Fall back to extracting the outermost object from all final text blocks.
+  const joined = blocks.join("\n").replace(/```json|```/gi, "").trim();
+  const start = joined.indexOf("{");
+  const end = joined.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try { return JSON.parse(joined.slice(start, end + 1)); } catch {}
+  }
+  return null;
+}
+
+function extractSources(payload, parsed) {
+  const seen = new Set();
+  const out = [];
+  const add = (name, url, asOf = null) => {
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push({ name: name || "Source", url, as_of: asOf || null });
+  };
+
+  for (const block of payload?.content || []) {
+    if (block?.type === "text") {
+      for (const citation of block.citations || []) {
+        add(citation?.title, citation?.url);
+      }
+    }
+    if (block?.type === "web_search_tool_result" && Array.isArray(block.content)) {
+      for (const result of block.content) {
+        if (result?.type === "web_search_result") add(result.title, result.url, result.page_age);
+      }
+    }
+  }
+  for (const source of parsed?.sources || []) add(source?.name, source?.url, source?.as_of);
+  return out.slice(0, 12);
+}
+
+function normaliseSnapshot(parsed, sources, requestId, searchRequests) {
   const numberOrNull = (value) => {
     if (value === null || value === undefined || value === "") return null;
     const n = Number(value);
@@ -41,13 +85,13 @@ function normaliseSnapshot(parsed) {
     eur_usd: numberOrNull(parsed.eur_usd),
     pressure_score: Math.max(0, Math.min(100, score ?? 50)),
     pressure_label: labels.has(parsed.pressure_label) ? parsed.pressure_label : "Stable",
-    narrative: typeof parsed.narrative === "string" ? parsed.narrative.slice(0, 1400) : null,
+    narrative: typeof parsed.narrative === "string" ? parsed.narrative.slice(0, 1600) : "Market evidence was incomplete today. GnóRate has kept the directional signal close to neutral. This is not a retail-price forecast.",
     source_meta: {
-      sources: Array.isArray(parsed.sources)
-        ? parsed.sources.filter((s) => s?.url && s?.name).slice(0, 12)
-        : [],
-      method: "Anthropic daily sourced market scan; directional procurement signal, not a retail-price forecast",
+      sources,
+      method: "One scheduled Anthropic Messages API request per day, with at most one server-side web search; directional procurement signal, not a retail-price forecast",
       generated_at: new Date().toISOString(),
+      anthropic_request_id: requestId || null,
+      web_search_requests: searchRequests ?? null,
     },
   };
 }
@@ -56,6 +100,17 @@ export async function GET(request) {
   if (!authorised(request)) return json({ error: "Unauthorized" }, 401);
   if (!process.env.ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY is not configured in Vercel." }, 500);
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel." }, 500);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const admin = createAdminClient();
+
+  // Idempotency: a retry of today's cron must not spend another Claude call if today is already stored.
+  const { data: existing } = await admin
+    .from("market_snapshots")
+    .select("id,snapshot_date")
+    .eq("snapshot_date", today)
+    .maybeSingle();
+  if (existing) return json({ ok: true, skipped: true, reason: "Today's shared market snapshot already exists." });
 
   let response;
   try {
@@ -68,42 +123,55 @@ export async function GET(request) {
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
-        max_tokens: 1600,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 8 }],
+        max_tokens: 2200,
+        // One Messages API request and at most one web-search execution per day.
+        tools: [{
+          type: "web_search_20250305",
+          name: "web_search",
+          max_uses: 1,
+          allowed_callers: ["direct"],
+          user_location: { type: "approximate", country: "IE", timezone: "Europe/Dublin" },
+        }],
         messages: [{
           role: "user",
-          content: `Create today's evidence-led Irish commercial energy market snapshot. Use current web search. Prioritise primary/reputable sources: SEMOpx for Single Electricity Market day-ahead power; recognised European TTF gas market sources; reputable market sources for Brent crude, EU ETS carbon and EUR/USD.\n\nReturn ONLY one valid JSON object, with no markdown before or after it. Never invent a price or percentage. Use null where a figure or seven-day comparison cannot be verified. Use world affairs only to explain verified market movements; do not allow news alone to determine the numeric pressure score.\n\nRequired shape:\n{\n  "sem_day_ahead_eur_mwh": number|null,\n  "sem_change_7d_pct": number|null,\n  "gas_eur_mwh": number|null,\n  "gas_change_7d_pct": number|null,\n  "brent_usd_bbl": number|null,\n  "brent_change_7d_pct": number|null,\n  "carbon_eur_t": number|null,\n  "carbon_change_7d_pct": number|null,\n  "eur_usd": number|null,\n  "pressure_score": number,\n  "pressure_label": "Low"|"Stable"|"Elevated"|"High",\n  "narrative": "maximum 110 words; explain the evidence and explicitly state that this is not a retail-price forecast",\n  "sources": [{"name":"string","url":"https://...","as_of":"YYYY-MM-DD"}]\n}\n\nScore 0-100. Weight verified electricity and gas direction/magnitude most heavily, with smaller influence from carbon, oil and FX. If important values are missing, keep the score closer to 50 and say evidence is incomplete. Retail supplier prices can lag wholesale markets because of hedging.`,
+          content: `Today is ${today}. Produce the single daily GnóRate Irish commercial-energy market snapshot. You have ONE web search available, so make one broad search that gathers the strongest current evidence you can for Irish SEM day-ahead electricity, European/TTF gas, Brent crude, EU ETS carbon, EUR/USD and major energy-market drivers. Prioritise primary or reputable market sources.\n\nReturn a final JSON object even if some values cannot be verified. Never invent a market price or percentage: use null. World affairs may explain verified movements but must not manufacture numeric market data. Keep pressure_score near 50 when evidence is incomplete.\n\nRequired JSON shape:\n{\n  "sem_day_ahead_eur_mwh": number|null,\n  "sem_change_7d_pct": number|null,\n  "gas_eur_mwh": number|null,\n  "gas_change_7d_pct": number|null,\n  "brent_usd_bbl": number|null,\n  "brent_change_7d_pct": number|null,\n  "carbon_eur_t": number|null,\n  "carbon_change_7d_pct": number|null,\n  "eur_usd": number|null,\n  "pressure_score": number,\n  "pressure_label": "Low"|"Stable"|"Elevated"|"High",\n  "narrative": "maximum 130 words; explain today's evidence and explicitly say this is not a retail-price forecast",\n  "sources": [{"name":"string","url":"https://...","as_of":"YYYY-MM-DD"}]\n}\n\nWeight verified electricity and gas most heavily, then carbon, oil and FX. Supplier hedging means retail prices can lag wholesale markets. Your final text must contain the JSON object.`,
         }],
       }),
       cache: "no-store",
     });
   } catch (error) {
-    return json({ error: "Anthropic request failed", detail: error?.message || String(error) }, 502);
+    return json({ error: "Daily Anthropic request failed; yesterday's snapshot remains available.", detail: error?.message || String(error) }, 502);
   }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     return json({
-      error: "Anthropic API returned an error",
+      error: "Anthropic API returned an error; the previous successful snapshot remains live.",
       status: response.status,
       detail: payload?.error?.message || payload?.error?.type || "Unknown Anthropic error",
     }, 502);
   }
 
-  const block = extractText(payload);
-  if (!block) return json({ error: "Anthropic returned no final market snapshot text." }, 502);
-
-  let parsed;
-  try {
-    parsed = JSON.parse(block);
-  } catch {
-    return json({ error: "Anthropic market snapshot was not valid JSON.", preview: block.slice(0, 500) }, 502);
+  // We deliberately do not continue pause_turn: that would create a second Claude API request.
+  if (payload?.stop_reason === "pause_turn") {
+    return json({ error: "Daily research did not finish within the single-call limit; previous snapshot retained.", stop_reason: "pause_turn" }, 502);
   }
 
-  const row = normaliseSnapshot(parsed);
-  const admin = createAdminClient();
-  const { error } = await admin.from("market_snapshots").upsert(row, { onConflict: "snapshot_date" });
-  if (error) return json({ error: error.message, migration_required: true }, 500);
+  const parsed = extractJsonObject(payload);
+  if (!parsed) {
+    return json({
+      error: "Anthropic did not return a parseable final market snapshot; previous snapshot retained.",
+      stop_reason: payload?.stop_reason || null,
+      text_blocks: textBlocks(payload).length,
+      request_id: payload?.id || null,
+    }, 502);
+  }
 
-  return json({ ok: true, snapshot: row, anthropic_request_id: payload.id || null });
+  const sources = extractSources(payload, parsed);
+  const searchRequests = payload?.usage?.server_tool_use?.web_search_requests ?? null;
+  const row = normaliseSnapshot(parsed, sources, payload?.id, searchRequests);
+  const { error } = await admin.from("market_snapshots").insert(row);
+  if (error) return json({ error: error.message, previous_snapshot_retained: true }, 500);
+
+  return json({ ok: true, snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests });
 }
