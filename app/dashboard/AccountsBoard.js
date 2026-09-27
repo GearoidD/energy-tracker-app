@@ -1491,13 +1491,13 @@ function generateSavingsReport(enrichedAccounts, summaryStats, companyName) {
   doc.save(`gnorate-savings-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
-function generateUsageCostReport(enrichedAccounts, readingSummaries, companyName) {
+function generateUsageCostReport(enrichedAccounts, readingSummaries, companyName, rangeMonths = 12) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const { green, ink: dark, muted, pale: lightBg } = GNORATE_REPORT;
   const now = new Date();
-  const firstMonth = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  const months = Array.from({ length: 12 }, (_, index) => {
+  const firstMonth = new Date(now.getFullYear(), now.getMonth() - rangeMonths + 1, 1);
+  const months = Array.from({ length: rangeMonths }, (_, index) => {
     const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
     return { key, label: date.toLocaleDateString("en-IE", { month: "short", year: "2-digit" }), billCount: 0, usage: 0, usageCount: 0, actualCost: 0, actualCostCount: 0, estimatedCost: 0, estimatedCostCount: 0 };
@@ -1555,7 +1555,7 @@ function generateUsageCostReport(enrichedAccounts, readingSummaries, companyName
   const accountsWithRecords = Object.values(byAccount).filter((record) => record.billCount > 0).length;
 
   drawGnReportHeader(doc, "Usage & cost report", companyName);
-  let y = drawGnReportSectionHeading(doc, "Last 12 months at a glance", 52, `${months[0].label}–${months[months.length - 1].label} · dated reading records only`);
+  let y = drawGnReportSectionHeading(doc, `Last ${rangeMonths} months at a glance`, 52, `${months[0].label}–${months[months.length - 1].label} · dated reading records only`);
   const cardW = (pageWidth - 28 - 3 * 6) / 4;
   const cardH = 31;
   const cards = [
@@ -1610,7 +1610,7 @@ function generateUsageCostReport(enrichedAccounts, readingSummaries, companyName
   y = doc.lastAutoTable.finalY + 12;
 
   if (y > 230) { doc.addPage(); y = 28; }
-  y = drawGnReportSectionHeading(doc, "By account", y, "Every account with a dated reading in the last 12 months, ranked by recorded and estimated costs");
+  y = drawGnReportSectionHeading(doc, "By account", y, `Accounts with a dated reading in the last ${rangeMonths} months, ranked by recorded and estimated costs`);
   const accountRows = enrichedAccounts
     .filter((account) => byAccount[account.id]?.billCount > 0)
     .sort((a, b) => (byAccount[b.id].actualCost + byAccount[b.id].estimatedCost) - (byAccount[a.id].actualCost + byAccount[a.id].estimatedCost))
@@ -1666,9 +1666,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const [filterLocation, setFilterLocation] = useState(lockedLocation || "all");
   const [usageRangeMonths, setUsageRangeMonths] = useState(12);
   const [usageMetric, setUsageMetric] = useState("usage");
+  const [reportRangeMonths, setReportRangeMonths] = useState(12);
   const [usageLocation, setUsageLocation] = useState("all");
   const [usageAccount, setUsageAccount] = useState("all");
   const [usageFuel, setUsageFuel] = useState("all");
+  const [usageSearch, setUsageSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [locationOverflowOpen, setLocationOverflowOpen] = useState(false);
   const [locationSearchText, setLocationSearchText] = useState("");
@@ -2439,15 +2441,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const usageLocations = useMemo(() => [...new Set(enrichedAll.map((account) => account.location).filter(Boolean))].sort(), [enrichedAll]);
   const usageFilterAccounts = useMemo(() => enrichedAll.filter((account) =>
     (usageLocation === "all" || account.location === usageLocation) &&
-    (usageFuel === "all" || (account.fuel_type || "electricity") === usageFuel)
-  ), [enrichedAll, usageLocation, usageFuel]);
+    (usageFuel === "all" || (account.fuel_type || "electricity") === usageFuel) &&
+    (!usageSearch.trim() || [account.name, account.location, account.provider, account.account_number].some((value) => String(value || "").toLowerCase().includes(usageSearch.trim().toLowerCase())))
+  ), [enrichedAll, usageLocation, usageFuel, usageSearch]);
   const usageWindow = useMemo(() => {
     const now = new Date();
     const firstMonth = new Date(now.getFullYear(), now.getMonth() - usageRangeMonths + 1, 1);
     const points = Array.from({ length: usageRangeMonths }, (_, index) => {
       const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      return { key, label: date.toLocaleDateString("en-IE", { month: "short", year: usageRangeMonths > 6 ? "2-digit" : undefined }), usage: 0, cost: 0, billCount: 0, usageRecordCount: 0, costRecordCount: 0, actualCostCount: 0, estimatedCostCount: 0, accounts: new Set() };
+      return { key, label: date.toLocaleDateString("en-IE", { month: "short", year: usageRangeMonths > 6 ? "2-digit" : undefined }), usage: 0, cost: 0, actualCost: 0, estimatedCost: 0, billCount: 0, usageRecordCount: 0, costRecordCount: 0, actualCostCount: 0, estimatedCostCount: 0, accounts: new Set() };
     });
     const byMonth = Object.fromEntries(points.map((point) => [point.key, point]));
     const includedIds = new Set(usageFilterAccounts.filter((account) => usageAccount === "all" || account.id === usageAccount).map((account) => account.id));
@@ -2495,10 +2498,12 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           byAccount[accountId].costRecordCount += 1;
           costRecordCount += 1;
           if (hasInvoiceTotal) {
+            point.actualCost += invoiceTotal;
             point.actualCostCount += 1;
             byAccount[accountId].actualCostCount += 1;
             actualCostCount += 1;
           } else {
+            point.estimatedCost += estimatedTotal;
             point.estimatedCostCount += 1;
             byAccount[accountId].estimatedCostCount += 1;
             estimatedCostCount += 1;
@@ -2506,7 +2511,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         }
       });
     });
-    const monthly = points.map((point) => ({ ...point, accounts: point.accounts.size, usage: point.usageRecordCount ? Math.round(point.usage) : null, cost: point.costRecordCount ? Math.round(point.cost * 100) / 100 : null }));
+    const monthly = points.map((point) => ({ ...point, accounts: point.accounts.size, usage: point.usageRecordCount ? Math.round(point.usage) : null, cost: point.costRecordCount ? Math.round(point.cost * 100) / 100 : null, actualCost: point.actualCostCount ? Math.round(point.actualCost * 100) / 100 : null, estimatedCost: point.estimatedCostCount ? Math.round(point.estimatedCost * 100) / 100 : null }));
     const totalUsage = monthly.reduce((sum, point) => sum + (point.usage || 0), 0);
     const totalCost = monthly.reduce((sum, point) => sum + (point.cost || 0), 0);
     return { monthly, byAccount, billCount, usageRecordCount, totalUsage, costRecordCount, actualCostCount, estimatedCostCount, totalCost };
@@ -2747,8 +2752,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           <div className="gn-usage-filters">
             <label>Location<select value={usageLocation} onChange={(e) => { setUsageLocation(e.target.value); setUsageAccount("all"); }}><option value="all">All locations</option>{usageLocations.map((location) => <option key={location} value={location}>{location}</option>)}</select></label>
             <label>Utility<select value={usageFuel} onChange={(e) => { setUsageFuel(e.target.value); setUsageAccount("all"); }}><option value="all">All utilities</option><option value="electricity">Electricity</option><option value="gas">Gas</option></select></label>
+            <label>Find a site or meter<input type="search" value={usageSearch} onChange={(e) => { setUsageSearch(e.target.value); setUsageAccount("all"); }} placeholder="Site name, MPRN or GPRN" /></label>
             <label>Account<select value={usageAccount} onChange={(e) => setUsageAccount(e.target.value)}><option value="all">All matching accounts</option>{usageFilterAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
-            {(usageLocation !== "all" || usageFuel !== "all" || usageAccount !== "all" || usageRangeMonths !== 12 || usageMetric !== "usage") && <button className="gn-usage-clear" type="button" onClick={() => { setUsageLocation("all"); setUsageFuel("all"); setUsageAccount("all"); setUsageRangeMonths(12); setUsageMetric("usage"); }}>Clear filters and date range</button>}
+            {(usageLocation !== "all" || usageFuel !== "all" || usageAccount !== "all" || usageSearch || usageRangeMonths !== 12 || usageMetric !== "usage") && <button className="gn-usage-clear" type="button" onClick={() => { setUsageLocation("all"); setUsageFuel("all"); setUsageAccount("all"); setUsageSearch(""); setUsageRangeMonths(12); setUsageMetric("usage"); }}>Clear filters and date range</button>}
           </div>
           <div className="gn-usage-stats">
             <div><span>{usageMetric === "usage" ? "Recorded usage in period" : "Cost represented in period"}</span><strong>{usageMetric === "usage" ? (usageWindow.usageRecordCount ? `${usageWindow.totalUsage.toLocaleString("en-IE")} kWh` : "—") : (usageWindow.costRecordCount ? fmtMoney(usageWindow.totalCost) : "—")}</strong></div>
@@ -2766,10 +2772,14 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   <Tooltip content={(props) => {
                     if (!props.active || !props.payload?.length) return null;
                     const point = props.payload[0].payload;
-                    const value = usageMetric === "cost" ? (point.cost === null ? "No cost data available" : `${fmtMoney(point.cost)} bill cost`) : (point.usage === null ? "No usage figure on file" : `${point.usage.toLocaleString("en-IE")} kWh recorded`);
-                    return <div style={{ padding: "9px 11px", border: "1px solid #dce6df", borderRadius: 8, background: "#fff", boxShadow: "0 5px 16px #143d2b18", fontSize: 11 }}><strong style={{ display: "block", marginBottom: 4, color: "#173b2d" }}>{point.label} · {point.key}</strong><span>{value}</span><small style={{ display: "block", marginTop: 3, color: "#71847b" }}>{point.billCount} dated record{point.billCount === 1 ? "" : "s"} · {usageMetric === "cost" ? `${point.actualCostCount} actual totals, ${point.estimatedCostCount} estimates` : `${point.usageRecordCount} with usage`}</small></div>;
+                    const value = usageMetric === "cost" ? (point.cost === null ? "No cost data available" : `${fmtMoney(point.cost)} combined cost`) : (point.usage === null ? "No usage figure on file" : `${point.usage.toLocaleString("en-IE")} kWh recorded`);
+                    return <div style={{ padding: "9px 11px", border: "1px solid #dce6df", borderRadius: 8, background: "#fff", boxShadow: "0 5px 16px #143d2b18", fontSize: 11 }}><strong style={{ display: "block", marginBottom: 4, color: "#173b2d" }}>{point.label} · {point.key}</strong><span>{value}</span>{usageMetric === "cost" && <small style={{ display: "block", marginTop: 4, color: "#53685d" }}>Invoice totals: {point.actualCost === null ? "—" : fmtMoney(point.actualCost)}<br/>Estimates: {point.estimatedCost === null ? "—" : fmtMoney(point.estimatedCost)}</small>}<small style={{ display: "block", marginTop: 3, color: "#71847b" }}>{point.billCount} dated record{point.billCount === 1 ? "" : "s"} · {usageMetric === "cost" ? `${point.actualCostCount} invoice totals, ${point.estimatedCostCount} estimates` : `${point.usageRecordCount} with usage`}</small></div>;
                   }} />
-                  <Bar dataKey={usageMetric} name={usageMetric === "cost" ? "Bill cost" : "Recorded usage"} fill={usageMetric === "cost" ? "#087b59" : "#0b9569"} radius={[5, 5, 0, 0]} maxBarSize={38} />
+                  {usageMetric === "cost" ? <>
+                    <Legend verticalAlign="bottom" height={28} wrapperStyle={{ fontSize: 10, color: "#61756a" }} />
+                    <Bar dataKey="actualCost" name="Invoice totals" stackId="cost" fill="#087b59" radius={[0, 0, 0, 0]} maxBarSize={38} />
+                    <Bar dataKey="estimatedCost" name="Estimated cost" stackId="cost" fill="#77cba6" radius={[5, 5, 0, 0]} maxBarSize={38} />
+                  </> : <Bar dataKey="usage" name="Recorded usage" fill="#0b9569" radius={[5, 5, 0, 0]} maxBarSize={38} />}
                 </BarChart>
               </ResponsiveContainer>
               <p className="gn-usage-data-note">Blank months mean no matching figure is on file, not zero {usageMetric === "cost" ? "cost" : "usage"}. Values are grouped by reading date. {usageMetric === "cost" ? "Actual invoice totals are used when available; estimates use recorded rate × usage plus up to 30 days of standing charge." : "No gaps are filled with estimates."}</p>
@@ -2813,7 +2823,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         </section>
       )}
 
-      {section === "reports" && <section className="gn-action-grid"><button onClick={() => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries)}><FileText size={20}/><b>Portfolio report</b><span>See portfolio data coverage, spend trends, renewals and account-by-account actions.</span><strong>Download PDF →</strong></button><button onClick={() => generateUsageCostReport(enrichedAll, readingSummaries, companyName)}><Activity size={20}/><b>Usage &amp; cost report</b><span>Compare monthly kWh, actual invoice totals and clearly marked cost estimates.</span><strong>Download PDF →</strong></button><button onClick={() => generateSavingsReport(enrichedAll, summaryStats, companyName)}><TrendingDown size={20}/><b>Savings report</b><span>Review annual usage, compared rates, renewal progress and indicative savings.</span><strong>Download PDF →</strong></button><button onClick={() => exportAccountsExcel(accounts)}><Download size={20}/><b>Account data</b><span>Export the account register for checking or sharing.</span><strong>Export Excel →</strong></button><button onClick={() => setShowOverview(true)}><BarChart3 size={20}/><b>Portfolio overview</b><span>Explore a chart view of your current data.</span><strong>Open overview →</strong></button></section>}
+      {section === "reports" && <>
+        <div className="gn-report-settings"><div><strong>Choose a report</strong><span>PDFs include {combinedMode ? "the visible companies’" : "the active company’s"} data. Missing figures remain clearly marked.</span></div><label>Usage report period<select value={reportRangeMonths} onChange={(event) => setReportRangeMonths(Number(event.target.value))}><option value={6}>Last 6 months</option><option value={12}>Last 12 months</option><option value={24}>Last 24 months</option></select></label></div>
+        <section className="gn-action-grid">
+          <button onClick={() => generatePortfolioReport(enrichedAll, summaryStats, attentionGroups, companyName, readingSummaries)}><FileText size={20}/><b>Portfolio report</b><span>See account coverage, spend trends, renewals and actions that may need review.</span><strong>Download PDF →</strong></button>
+          <button onClick={() => generateUsageCostReport(enrichedAll, readingSummaries, companyName, reportRangeMonths)}><Activity size={20}/><b>Usage &amp; cost report</b><span>Compare monthly kWh with invoice totals and separately labelled estimates for the selected period.</span><strong>Download {reportRangeMonths}-month PDF →</strong></button>
+          <button onClick={() => generateSavingsReport(enrichedAll, summaryStats, companyName)}><TrendingDown size={20}/><b>Savings report</b><span>Review rate comparisons, renewal progress and indicative annual savings.</span><strong>Download PDF →</strong></button>
+          <button onClick={() => exportAccountsExcel(accounts)}><Download size={20}/><b>Account data</b><span>Export the account register for checking or sharing.</span><strong>Export Excel →</strong></button>
+          <button onClick={() => setShowOverview(true)}><BarChart3 size={20}/><b>Portfolio overview</b><span>Explore your current portfolio data before downloading a report.</span><strong>Open overview →</strong></button>
+        </section>
+      </>}
 
       {section === "settings" && <section className="gn-settings-grid"><article className="gn-card"><div className="gn-settings-icon"><Building2 size={20}/></div><h2>Company workspace</h2><p>{companyName || "Set up a company workspace"}</p><span>Company data, accounts and utility records are shared with your invited team members.</span><button onClick={() => router.push("/dashboard/all-companies")}>Manage companies →</button></article><article className="gn-card"><div className="gn-settings-icon"><Users size={20}/></div><h2>Team access</h2><p>Invite colleagues and manage membership.</p><span>Team access follows the active company selected in the header.</span><button onClick={() => window.dispatchEvent(new Event("gnorate:open-team"))}>Manage team →</button></article><article className="gn-card"><div className="gn-settings-icon"><BarChart3 size={20}/></div><h2>Market benchmarks</h2><p>Review benchmark rates for your account categories.</p><span>Current comparisons use account details alongside available Irish tariff data.</span><button onClick={() => setShowBenchmarks(true)}>Open benchmarks →</button></article></section>}
 
