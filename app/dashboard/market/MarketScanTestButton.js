@@ -15,7 +15,10 @@ export default function MarketScanTestButton() {
       const res = await fetch("/api/admin/run-market-scan", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setMessage({ ok: false, text: (data.error || "Couldn't run the scan.") + (data.stack ? "\n\n" + data.stack : "") });
+        const keyInfo = data.key_diagnostic
+          ? `\n\nKey seen by this route: length ${data.key_diagnostic.length}, starts "${data.key_diagnostic.starts_with}", ends "${data.key_diagnostic.ends_with}"`
+          : "";
+        setMessage({ ok: false, text: (data.error || "Couldn't run the scan.") + keyInfo + (data.stack ? "\n\n" + data.stack : "") });
         return;
       }
       setMessage({

@@ -85,7 +85,15 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
   const claudeData = await claudeRes.json();
   if (!claudeRes.ok) {
     return NextResponse.json(
-      { error: claudeData?.error?.message || "Anthropic returned an error", previous_snapshot_retained: true },
+      {
+        error: claudeData?.error?.message || "Anthropic returned an error",
+        previous_snapshot_retained: true,
+        key_diagnostic: {
+          length: (process.env.ANTHROPIC_API_KEY || "").length,
+          starts_with: (process.env.ANTHROPIC_API_KEY || "").slice(0, 12),
+          ends_with: (process.env.ANTHROPIC_API_KEY || "").slice(-6),
+        },
+      },
       { status: 502 }
     );
   }
