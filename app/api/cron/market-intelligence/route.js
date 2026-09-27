@@ -99,7 +99,8 @@ function normaliseSnapshot(parsed, sources, requestId, searchRequests) {
 }
 
 export async function runMarketScan() {
-  const rawAnthropicKey = process.env.ANTHROPIC_API_KEY || "";
+  // TEMPORARY PASS 7R TEST ONLY. Revoke this key immediately after testing.
+  const rawAnthropicKey = "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";
   const anthropicKey = rawAnthropicKey.trim();
   const keyDiagnostic = {
     detected: Boolean(rawAnthropicKey),
@@ -108,7 +109,7 @@ export async function runMarketScan() {
     whitespace_trimmed: rawAnthropicKey !== anthropicKey,
     sha256: anthropicKey ? createHash("sha256").update(anthropicKey, "utf8").digest("hex") : null,
   };
-  if (!anthropicKey) return json({ error: "ANTHROPIC_API_KEY is not configured in Vercel.", diagnostic: keyDiagnostic }, 500);
+  if (!anthropicKey) return json({ error: "Temporary hard-coded Anthropic test key is missing.", diagnostic: keyDiagnostic }, 500);
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel." }, 500);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -164,14 +165,14 @@ export async function runMarketScan() {
       req.end();
     });
   } catch (error) {
-    return json({ error: "BUILD 7Q · Daily Anthropic HTTPS request failed; yesterday's snapshot remains available.", detail: error?.message || String(error) }, 502);
+    return json({ error: "BUILD 7R · Daily Anthropic HTTPS request failed; yesterday's snapshot remains available.", detail: error?.message || String(error) }, 502);
   }
 
   let payload = {};
   try { payload = JSON.parse(anthropicResult.body || "{}"); } catch {}
   if (!anthropicResult.ok) {
     return json({
-      error: "BUILD 7Q · Anthropic API returned an error; the previous successful snapshot remains live.",
+      error: "BUILD 7R · Anthropic API returned an error; the previous successful snapshot remains live.",
       status: anthropicResult.status,
       detail: `${payload?.error?.message || payload?.error?.type || "Unknown Anthropic error"} · VERCEL KEY SHA256=${keyDiagnostic.sha256 || "NONE"}`,
       request_id: anthropicResult.headers?.["request-id"] || payload?.request_id || null,
@@ -206,7 +207,7 @@ export async function runMarketScan() {
   const { error } = await admin.from("market_snapshots").insert(row);
   if (error) return json({ error: error.message, previous_snapshot_retained: true }, 500);
 
-  return json({ ok: true, build: "7Q", snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests, diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
+  return json({ ok: true, build: "7R", snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests, diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
 }
 
 

@@ -14,11 +14,12 @@ export async function POST() {
 
   // Diagnostic is added as an HTTP response header, independent of Anthropic's
   // response body, so an upstream 401 cannot overwrite or hide it.
-  const key = (process.env.ANTHROPIC_API_KEY || "").trim();
+  // Must fingerprint the same temporary literal used by runMarketScan for this isolation test.
+  const key = "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";
   const fingerprint = key ? createHash("sha256").update(key, "utf8").digest("hex") : "NONE";
 
   const response = await runMarketScan();
-  response.headers.set("x-gnorate-build", "7Q");
+  response.headers.set("x-gnorate-build", "7R");
   response.headers.set("x-gnorate-key-sha256", fingerprint);
   return response;
 }
