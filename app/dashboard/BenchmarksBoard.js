@@ -32,6 +32,8 @@ function BenchmarkForm({ initial, onSave, onCancel }) {
       typical_rate: "",
       typical_standing_charge: "",
       source_note: "",
+      source_type: "team_entry",
+      source_date: new Date().toISOString().slice(0, 10),
     }
   );
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -76,6 +78,10 @@ function BenchmarkForm({ initial, onSave, onCancel }) {
           <Field label="Typical standing charge (c/day)">
             <input type="number" step="0.01" style={inputStyle} value={form.typical_standing_charge} onChange={set("typical_standing_charge")} placeholder="Optional" />
           </Field>
+          <Field label="Source type">
+            <select style={inputStyle} value={form.source_type || "team_entry"} onChange={set("source_type")}><option value="supplier_quote">Supplier quote</option><option value="broker">Broker</option><option value="regulator">Published / regulator</option><option value="comparison_site">Comparison source</option><option value="team_entry">Team entry</option></select>
+          </Field>
+          <Field label="Source date"><input type="date" style={inputStyle} value={form.source_date || ""} onChange={set("source_date")} /></Field>
           <div style={{ gridColumn: "1 / -1" }}>
             <Field label="Source / note">
               <input style={inputStyle} value={form.source_note} onChange={set("source_note")} placeholder="e.g. Quote from Energia, July 2026" />
@@ -134,6 +140,8 @@ export default function BenchmarksBoard({ companyId, onClose }) {
       typical_rate: form.typical_rate,
       typical_standing_charge: form.typical_standing_charge || null,
       source_note: form.source_note || null,
+      source_type: form.source_type || "team_entry",
+      source_date: form.source_date || null,
       updated_at: new Date().toISOString(),
     };
     let res;
@@ -208,6 +216,7 @@ export default function BenchmarksBoard({ companyId, onClose }) {
                     {b.typical_rate}c/kWh{b.typical_standing_charge ? ` · ${b.typical_standing_charge}c/day standing` : ""}
                     {b.source_note ? ` · ${b.source_note}` : ""}
                   </div>
+                  <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>Source: {(b.source_type || "team_entry").replaceAll("_", " ")}{b.source_date ? ` · ${new Date(b.source_date + "T00:00:00").toLocaleDateString("en-IE")}` : " · date not recorded"}</div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => { setEditing(b); setShowForm(true); }} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: 6, color: "var(--muted)", cursor: "pointer" }}>

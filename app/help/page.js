@@ -67,7 +67,7 @@ export default function HelpPage() {
         <h2 style={h2}>Reading the dashboard</h2>
         <p style={p}>
           The <strong style={strong}>stat row</strong> at the top shows how many accounts you're tracking, how many are
-          renewing within 90 days, your total potential savings per year, and your estimated annual spend — the last two
+          renewing within 90 days, your total rate opportunity per year, and your estimated annual spend — the last two
           only appear once there's real data to calculate them from.
         </p>
         <p style={p}>

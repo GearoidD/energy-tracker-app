@@ -27,6 +27,21 @@ function daysUntil(dateStr) {
   return Math.round((end - today) / 86400000);
 }
 
+function renewalNextStep(account) {
+  const status = account.renewal_status || "not_started";
+  if (status === "switching") return "Verify switch";
+  if (status === "quote_requested") return "Compare quotes";
+  if (status === "renewed") return "Renewal complete";
+  const d = account.daysLeft;
+  if (d === null) return "Add contract date";
+  if (d < 0) return "Confirm current terms";
+  if (d <= 14) return "Approve / switch now";
+  if (d <= 30) return "Compare & approve";
+  if (d <= 60) return "Request quotes";
+  if (d <= 90) return "Review usage & market";
+  return "Plan renewal";
+}
+
 function statusOf(daysLeft) {
   if (daysLeft === null) return "unknown";
   if (daysLeft < 0) return "overdue";
@@ -227,7 +242,7 @@ function overallStatusFor(a) {
   if (a.confidence.missingBill) {
     return { label: "Bill data may be out of date", color: "var(--muted)" };
   }
-  if (!a.provider || !a.rate || !a.usage || !a.contract_end) {
+  if (!a.provider || !a.rate || !a.usage || !a.contract_end || !a.standing_charge || !a.location || !a.account_number) {
     return { label: "Account details incomplete", color: "var(--muted)" };
   }
   return { label: "On track", color: "var(--green)" };
@@ -253,12 +268,58 @@ function accountStatusDetail(a) {
   }
   if (a.confidence.score < 50 && a.confidence.reasons.length) return "Some account details are not recorded yet: " + a.confidence.reasons.join("; ") + ".";
   const missing = [];
+  if (!a.location) missing.push("site location");
+  if (!a.account_number) missing.push(a.fuel_type === "gas" ? "GPRN" : "MPRN");
   if (!a.provider) missing.push("supplier");
   if (!a.rate) missing.push("current rate");
   if (!a.usage) missing.push("annual usage");
   if (!a.contract_end) missing.push("contract end date");
+  if (!a.standing_charge) missing.push("standing charge");
   if (missing.length) return "Not recorded: " + missing.join(", ") + ". Add these details to improve comparisons.";
   return a.contract_end ? "Contract currently recorded through " + new Date(a.contract_end + "T00:00:00").toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" }) + "." : "No current account issue flagged from the information on file.";
+}
+
+function accountNextSteps(a) {
+  const steps = [];
+  const renewalStatus = a.renewal_status || "not_started";
+  const renewalInProgress = renewalStatus === "quote_requested" || renewalStatus === "switching";
+
+  if ((a.status === "overdue" || a.status === "urgent") && !renewalInProgress) {
+    steps.push({ kind: "action", action: "renewal", title: a.status === "overdue" ? "Confirm the current contract" : "Review the upcoming renewal", detail: a.status === "overdue" ? "The recorded end date has passed. Confirm the current terms with the supplier, then update the renewal stage." : `The contract ends in ${a.daysLeft} days. Decide whether to request a quote or begin a supplier change.`, button: "Update renewal stage" });
+  }
+  if (a.daysLeft !== null && a.daysLeft > 30 && a.daysLeft <= HORIZON_DAYS && !renewalInProgress) {
+    steps.push({ kind: "info", action: "renewal", title: "Contract renewal coming up", detail: `The contract ends in ${a.daysLeft} days. Plan to review supplier options before the end date.`, button: "View renewal stage" });
+  }
+  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) {
+    steps.push({ kind: "check", action: "history", title: "Check the recorded rate increase", detail: `The rate changed ${a.rateChange.pct.toFixed(1)}% between saved bills. Compare the entries in History with your bill.`, button: "Review bill history" });
+  }
+  if (a.lowConfidenceBill) {
+    steps.push({ kind: "check", action: "upload", title: "Verify bill details", detail: "Some bill details were uncertain. Upload a clearer copy or check the saved figures against the original bill.", button: "Upload a clearer bill" });
+  }
+  if (a.confidence.missingBill) {
+    steps.push({ kind: "info", action: "upload", title: "Bill information may be out of date", detail: a.confidence.daysSinceLastReading != null ? `The latest saved bill is ${a.confidence.daysSinceLastReading} days old. Billing cycles vary; add a newer bill when you receive one.` : "No bill is saved yet. Add one when available to record usage and confirm the current rate.", button: "Upload a bill" });
+  }
+  const missing = [];
+  if (!a.location) missing.push("site location");
+  if (!a.account_number) missing.push(a.fuel_type === "gas" ? "GPRN" : "MPRN");
+  if (!a.provider) missing.push("supplier");
+  if (!a.rate) missing.push("current rate");
+  if (!a.usage) missing.push("annual usage");
+  if (!a.contract_end) missing.push("contract end date");
+  if (!a.standing_charge) missing.push("standing charge");
+  if (missing.length) {
+    steps.push({ kind: "info", action: "edit", title: "Some account details are missing", detail: `Add ${missing.join(", ")} to improve rate comparisons, renewal reminders and spend estimates.`, button: "Complete account details" });
+  }
+  if (!a.comparison || a.comparison.source === "estimated") {
+    steps.push({ kind: "info", action: "market", title: a.comparison ? "Market figure is an estimate" : "No market comparison is saved", detail: "Review available rates and request a supplier quote before making a switching decision. Any savings shown are indicative.", button: "Review rates and quotes" });
+  }
+  if (renewalInProgress) {
+    steps.push({ kind: "info", action: "renewal", title: "Renewal marked as in progress", detail: `Current stage: ${RENEWAL_STATUS_META[renewalStatus].label}. Update this when the supplier process changes.`, button: "Update renewal stage" });
+  }
+  if (!steps.length) {
+    steps.push({ kind: "info", action: null, title: "No action currently flagged", detail: "This is a status summary based on the information saved in GnóRate. Review it when you receive a new bill or supplier update.", button: null });
+  }
+  return steps;
 }
 
 function formatAccountDate(dateStr) {
@@ -1074,7 +1135,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
     { label: "Total accounts", value: String(summaryStats.total), accent: teal, small: false },
     { label: "Need attention", value: String(summaryStats.needAttention), accent: summaryStats.needAttention > 0 ? amber : green, small: false },
     { label: "Est. annual spend", value: spendValue, accent: teal, small: !summaryStats.hasAnyCost },
-    { label: "Potential rate savings", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: green, small: false },
+    { label: "Rate opportunity", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: green, small: false },
   ];
   cards.forEach((card, i) => {
     const x = 14 + i * (cardW + 6);
@@ -2342,6 +2403,19 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     };
   }, [enrichedAll, readingSummaries]);
 
+  const portfolioReadiness = useMemo(() => {
+    if (!enrichedAll.length) return { score: 0, missing: [] };
+    const checks = [
+      ["supplier", (a) => Boolean(a.provider)], ["contract end date", (a) => Boolean(a.contract_end)],
+      ["current unit rate", (a) => Number(a.rate) > 0], ["annual usage", (a) => Number(a.usage) > 0],
+      ["standing charge", (a) => Number(a.standing_charge) > 0], ["location", (a) => Boolean(a.location)],
+      ["meter point", (a) => Boolean(a.account_number)], ["recent bill", (a) => !a.confidence?.missingBill],
+    ];
+    let complete = 0;
+    const missing = checks.map(([label, test]) => { const count = enrichedAll.filter((a) => !test(a)).length; complete += enrichedAll.length - count; return { label, count }; }).filter((item) => item.count > 0).sort((a,b) => b.count-a.count);
+    return { score: Math.round((complete / (enrichedAll.length * checks.length)) * 100), missing };
+  }, [enrichedAll]);
+
   const attentionItems = useMemo(() => {
     const items = [];
     enrichedAll.forEach((a) => {
@@ -2706,9 +2780,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             </div>
             <div className="gn-welcome-orb" aria-hidden="true" />
           </div>
+          {summaryStats.total > 0 && portfolioReadiness.score < 100 && <section className="gn-readiness-card" aria-label="Portfolio setup readiness">
+            <div className="gn-readiness-copy"><span>PORTFOLIO READINESS</span><strong>{portfolioReadiness.score}% ready for reliable renewal decisions</strong><p>Complete missing data to improve rate comparisons, reminders and reporting confidence.</p><div className="gn-readiness-missing">{portfolioReadiness.missing.slice(0,4).map((item) => <span key={item.label}><b>{item.count}</b> missing {item.label}</span>)}</div></div>
+            <div className="gn-readiness-score"><strong>{portfolioReadiness.score}%</strong><span>complete</span><div><i style={{width:`${portfolioReadiness.score}%`}} /></div><Link href={sectionHref("accounts")}>Complete account data →</Link></div>
+          </section>}
           <div className="gn-kpis">
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Estimated annual spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></Link>
-            <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Potential rate savings</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Unit-rate estimate; excludes other bill charges" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
+            <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Rate opportunity</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Unit-rate estimate; excludes other bill charges" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></Link>
             <Link href={sectionHref("savings")} className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
           </div>
@@ -2728,7 +2806,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
             </article>
             <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Renewal timeline</h2><p>Dates in the next 120 days; past dates stay here until the record is updated</p></div><Link href={sectionHref("renewals")} className="gn-card-link">View all →</Link></div>
-              {dashboardRenewals.length ? <div className="gn-task-list">{dashboardRenewals.map((account) => <button key={account.id} onClick={() => openDashboardAccount(account)}><span className="gn-task-date">{account.daysLeft < 0 ? `${Math.abs(account.daysLeft)}d` : `${account.daysLeft}d`}</span><span><b>{account.name}</b><small>{account.provider || "Supplier not set"} · {account.daysLeft < 0 ? "contract end date passed" : `ends in ${account.daysLeft} days`}</small></span><strong>{["quote_requested", "switching"].includes(account.renewal_status || "not_started") ? "In progress" : account.daysLeft < 0 ? "Needs update" : account.daysLeft <= 30 ? "Start soon" : "Plan ahead"}</strong></button>)}</div> : <div className="gn-task-empty">No contracts are due in the next 120 days.</div>}
+              {dashboardRenewals.length ? <div className="gn-task-list">{dashboardRenewals.map((account) => <button key={account.id} onClick={() => openDashboardAccount(account)}><span className="gn-task-date">{account.daysLeft < 0 ? `${Math.abs(account.daysLeft)}d` : `${account.daysLeft}d`}</span><span><b>{account.name}</b><small>{account.provider || "Supplier not set"} · {account.daysLeft < 0 ? "contract end date passed" : `ends in ${account.daysLeft} days`}</small></span><strong>{renewalNextStep(account)}</strong></button>)}</div> : <div className="gn-task-empty">No contracts are due in the next 120 days.</div>}
             </article>
           </div>
         </section>
@@ -3444,7 +3522,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
 
             const a = item.account;
             const overall = overallStatusFor(a);
+            const nextSteps = accountNextSteps(a);
             const isExpanded = expandedId === a.id;
+            const openAccountTab = async (tab) => {
+              if (expandedId !== a.id) await toggleReadings(a.id);
+              setExpandedTab(tab);
+              if (tab === "details") requestAnimationFrame(() => {
+                const renewalControl = document.getElementById(`renewal-status-${a.id}`);
+                renewalControl?.scrollIntoView({ block: "center", behavior: "smooth" });
+                renewalControl?.focus();
+              });
+            };
             return (
               <div
                 key={a.id}
@@ -3552,7 +3640,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     aria-expanded={isExpanded}
                     onClick={(e) => { e.stopPropagation(); toggleReadings(a.id); }}
                   >
-                    {isExpanded ? "Hide details" : "View details"}
+                    {isExpanded ? "Hide details" : overall.label === "On track" ? "View details" : "View next steps"}
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setUploadingFor(a.id); }}
@@ -3598,14 +3686,26 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                 </div>
 
                 <div className="gn-account-info-grid">
-                  <div><small>Supplier</small><strong>{a.provider || "Not recorded"}</strong></div>
-                  <div><small>Current unit rate</small><strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong></div>
-                  <div><small>Annual usage on account</small><strong>{a.usage ? `${Number(a.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong></div>
-                  <div><small>Latest bill on file</small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong></div>
-                  <div><small>Contract end date</small><strong>{formatAccountDate(a.contract_end)}</strong></div>
-                  <div className="gn-account-estimate"><small>Estimated annual spend</small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong></div>
+                  <div className="gn-account-info-cell"><small>Supplier <em>Saved detail</em></small><strong>{a.provider || "Not recorded"}</strong>{isExpanded && !a.provider && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add supplier</button>}</div>
+                  <div className="gn-account-info-cell"><small>Current unit rate <em>From saved details or bill</em></small><strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong>{isExpanded && !a.rate && <button type="button" onClick={() => setUploadingFor(a.id)}>Add rate from bill</button>}</div>
+                  <div className="gn-account-info-cell"><small>Standing charge <em>Daily supplier charge</em></small><strong>{a.standing_charge ? `${Number(a.standing_charge).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/day` : "Not recorded"}</strong>{isExpanded && !a.standing_charge && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add standing charge</button>}</div>
+                  <div className="gn-account-info-cell"><small>Annual usage on account <em>Saved account figure</em></small><strong>{a.usage ? `${Number(a.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong>{isExpanded && !a.usage && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add annual usage</button>}</div>
+                  <div className="gn-account-info-cell"><small>Latest bill on file <em>Reading date</em></small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong>{isExpanded && (!readingSummaries[a.id]?.[0]?.reading_date || a.confidence.missingBill) && <button type="button" onClick={() => setUploadingFor(a.id)}>{readingSummaries[a.id]?.[0]?.reading_date ? "Add newer bill" : "Upload first bill"}</button>}</div>
+                  <div className="gn-account-info-cell"><small>Contract end date <em>Saved detail</em></small><strong>{formatAccountDate(a.contract_end)}</strong>{isExpanded && !a.contract_end && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add end date</button>}</div>
+                  <div className="gn-account-info-cell gn-account-estimate"><small>Estimated annual spend <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>Use supplier bills or quotes to confirm full costs.</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>
                   <div className="gn-account-status-detail" style={{ borderColor: `${overall.color}44` }}><strong style={{ color: overall.color }}>{overall.label}</strong><span>{accountStatusDetail(a)}</span></div>
                 </div>
+
+                {isExpanded && <section className="gn-account-next-steps" aria-label={`Next steps for ${a.name}`}>
+                  <div className="gn-account-next-heading"><strong>What you can do next</strong><span>{nextSteps.some((step) => step.kind === "action") ? "Action required" : nextSteps.some((step) => step.kind === "check") ? "Check recommended" : nextSteps.some((step) => step.action) ? "Information and options" : "Information only"}</span><button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Edit account details</button></div>
+                  {nextSteps.map((step, index) => <div key={`${step.title}-${index}`} className={`gn-account-next-item is-${step.kind}`}><span className="gn-account-next-copy"><strong>{step.title}</strong><small>{step.detail}</small></span>{step.button && <button type="button" onClick={() => {
+                    if (step.action === "upload") setUploadingFor(a.id);
+                    if (step.action === "edit") { setEditing(a); setShowForm(true); }
+                    if (step.action === "history") void openAccountTab("history");
+                    if (step.action === "market") { void openAccountTab("market"); pullMarketRate(a); }
+                    if (step.action === "renewal") void openAccountTab("details");
+                  }}>{step.button}</button>}</div>)}
+                </section>}
 
                 {isExpanded && (
                   <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
@@ -3652,7 +3752,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         {a.fuel_type !== "gas" && a.mic_kva ? ` · MIC ${a.mic_kva} kVA` : ""}
                       </span>
                       <span
-                        title={a.confidence.reasons.join(" · ") || "All key data present and recent"}
+                        title={`Completeness indicator based on saved account fields and bill freshness. ${a.confidence.reasons.join(" · ") || "No missing account fields or old bills flagged."} This is not a bill accuracy score.`}
                         style={{
                           fontSize: 9,
                           fontWeight: 600,
@@ -3663,7 +3763,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                           cursor: "help",
                         }}
                       >
-                        DATA {a.confidence.score}%
+                        DATA COMPLETENESS {a.confidence.score}%
                       </span>
                       {gasTariffFor(a) && (
                         <span
@@ -3674,6 +3774,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         </span>
                       )}
                     </div>
+                    {gasTariffFor(a) && <div className="gn-account-info-note"><strong>Information only:</strong> {gasTariffFor(a)} tariff is calculated from annual usage and supply point capacity (SPC) to match the relevant gas rates.</div>}
 
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 11.5, color: "var(--muted)", fontFamily: "'IBM Plex Mono', monospace" }}>
@@ -3698,6 +3799,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
                       <span style={{ fontSize: 12, color: "var(--muted)" }}>Renewal status:</span>
                       <select
+                        id={`renewal-status-${a.id}`}
                         value={a.renewal_status || "not_started"}
                         onChange={(e) => {
                           if (e.target.value === "renewed") {
@@ -3725,34 +3827,6 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         ))}
                       </select>
                     </div>
-
-                    {(a.confidence.missingBill || a.lowConfidenceBill || a.status === "overdue" || a.status === "urgent" || (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD)) && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
-                        {a.confidence.missingBill && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12 }}>
-                            <Activity size={13} />
-                            {a.confidence.daysSinceLastReading
-                              ? `Information: latest bill is ${a.confidence.daysSinceLastReading} days old. Billing cycles vary, so check whether a newer bill is expected.`
-                              : "Information: no bill is on file yet. Upload one when available to record usage and rates."}
-                          </div>
-                        )}
-                        {a.lowConfidenceBill && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--amber)", fontSize: 12.5 }}>
-                            <AlertTriangle size={13} /> Bill details need checking against the original bill.
-                          </div>
-                        )}
-                        {a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--amber)", fontSize: 12.5 }}>
-                            <AlertTriangle size={13} /> Recorded rate rose {a.rateChange.pct.toFixed(1)}% between bills ({a.rateChange.from}c → {a.rateChange.to}c/kWh). Check the latest bill.
-                          </div>
-                        )}
-                        {(a.status === "overdue" || a.status === "urgent") && !["quote_requested", "switching"].includes(a.renewal_status || "not_started") && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--red)", fontSize: 12.5 }}>
-                            <AlertTriangle size={13} /> {a.status === "overdue" ? "Contract end date has passed — confirm the current terms with the supplier." : `Contract ends in ${a.daysLeft} days — start reviewing renewal options.`}
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     </>
                     )}
@@ -4061,6 +4135,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                                 <span style={{ color: "var(--muted)", fontSize: 10 }}>{r.source}</span>
                                 <button
                                   onClick={() => deleteReading(r.id, a.id)}
+                                  aria-label={`Delete reading from ${r.reading_date || "undated bill"}`}
+                                  title="Delete this reading"
                                   style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 2, display: "flex" }}
                                 >
                                   <Trash2 size={12} />

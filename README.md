@@ -62,3 +62,19 @@ multiple companies using the same database.
 The client portal includes a portfolio dashboard, an account register, rate comparisons, usage and bill history, renewals, savings opportunities, report exports, and workspace settings. These views reuse the existing Supabase account and reading data.
 
 The overview only shows spend estimates when enough bill history exists, and charts display a clear empty state until readings are available.
+
+## Production readiness checklist
+
+Before accepting customer data or charging for GnóRate:
+
+1. Run `supabase/schema.sql` on a fresh Supabase project (or convert it into versioned migrations for an existing project).
+2. Verify Row Level Security with two test companies: neither user should be able to read or mutate the other company's accounts, readings, notes, benchmarks, members or invites.
+3. Configure server-only secrets in the deployment environment; never expose service-role or AI provider keys to the browser.
+4. Configure and monitor the reminder, report and rate-scan cron routes. Confirm failures are logged and retried operationally.
+5. Treat `rate_scan_queue` as unverified. Only `master_rates` should be presented as admin-confirmed market reference data.
+6. Validate bill extraction against a representative sample before relying on it for financial decisions; low-confidence extractions must remain reviewable.
+7. Run `npm ci`, `npm run build`, lint/tests, and a browser smoke test from a clean checkout before each release.
+
+### Financial wording
+
+“Rate opportunity” is deliberately used for unit-rate-only comparisons. It is not a guaranteed saving and may exclude standing charges, capacity charges, levies, VAT and contract fees. A figure should only be labelled as a projected saving once the complete comparable annual cost is modelled.
