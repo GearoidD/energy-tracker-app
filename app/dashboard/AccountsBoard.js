@@ -216,7 +216,7 @@ function attentionLevelFor(a) {
   const beingHandled = renewalStatus === "quote_requested" || renewalStatus === "switching";
 
   if ((a.status === "overdue" || a.status === "urgent") && !beingHandled) return "urgent";
-  if (a.lowConfidenceBill || (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD)) return "check";
+  if (a.lowConfidenceBill || (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (a.rateChange.reviewStatus || "unreviewed") === "unreviewed")) return "check";
   return "none";
 }
 
@@ -227,7 +227,7 @@ function overallStatusFor(a) {
   if ((a.status === "overdue" || a.status === "urgent") && !beingHandled) {
     return { label: "Contract needs action", color: "var(--red)" };
   }
-  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) {
+  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (a.rateChange.reviewStatus || "unreviewed") === "unreviewed") {
     return { label: "Rate increase to check", color: "var(--amber)" };
   }
   if (a.lowConfidenceBill) {
@@ -256,7 +256,7 @@ function accountStatusDetail(a) {
       ? "Contract end date passed " + Math.abs(a.daysLeft) + " day" + (Math.abs(a.daysLeft) === 1 ? "" : "s") + " ago. Confirm the current terms with the supplier."
       : "Contract ends in " + a.daysLeft + " day" + (a.daysLeft === 1 ? "" : "s") + ". Start reviewing renewal options.";
   }
-  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) return "Recorded rate rose " + a.rateChange.pct.toFixed(1) + "% between bills (" + a.rateChange.from + "c to " + a.rateChange.to + "c/kWh). Check the latest bill to confirm the change.";
+  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (a.rateChange.reviewStatus || "unreviewed") === "unreviewed") return "Recorded rate rose " + a.rateChange.pct.toFixed(1) + "% between bills (" + a.rateChange.from + "c to " + a.rateChange.to + "c/kWh). Check the latest bill to confirm the change.";
   if (a.lowConfidenceBill) return "Some bill details could not be read confidently. Compare them with the original bill.";
   if (renewalStatus === "quote_requested") return "A renewal quote has been requested.";
   if (renewalStatus === "switching") return "A supplier change is in progress.";
@@ -290,8 +290,8 @@ function accountNextSteps(a) {
   if (a.daysLeft !== null && a.daysLeft > 30 && a.daysLeft <= HORIZON_DAYS && !renewalInProgress) {
     steps.push({ kind: "info", action: "renewal", title: "Contract renewal coming up", detail: `The contract ends in ${a.daysLeft} days. Plan to review supplier options before the end date.`, button: "View renewal stage" });
   }
-  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD) {
-    steps.push({ kind: "check", action: "history", title: "Check the recorded rate increase", detail: `The rate changed ${a.rateChange.pct.toFixed(1)}% between saved bills. Compare the entries in History with your bill.`, button: "Review bill history" });
+  if (a.rateChange && a.rateChange.pct >= RATE_JUMP_THRESHOLD && (a.rateChange.reviewStatus || "unreviewed") === "unreviewed") {
+    steps.push({ kind: "check", action: "confirm-rate", title: "Confirm the recorded rate increase", detail: `The latest bill rate changed ${a.rateChange.pct.toFixed(1)}% from ${a.rateChange.from}c to ${a.rateChange.to}c/kWh. Confirm it, correct it, or dismiss the alert after checking the bill.`, button: "Review & confirm rate" });
   }
   if (a.lowConfidenceBill) {
     steps.push({ kind: "check", action: "upload", title: "Verify bill details", detail: "Some bill details were uncertain. Upload a clearer copy or check the saved figures against the original bill.", button: "Upload a clearer bill" });
@@ -1770,6 +1770,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const [ratePullError, setRatePullError] = useState(null);
   const [showAccountNumbers, setShowAccountNumbers] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [rateReviewFor, setRateReviewFor] = useState(null);
+  const [rateCorrection, setRateCorrection] = useState("");
+  const [rateReviewSaving, setRateReviewSaving] = useState(false);
 
   useEffect(() => {
     setSearch(currentSearchTerm);
@@ -1827,7 +1830,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const loadReadingSummaries = useCallback(async () => {
     let query = supabase
       .from("readings")
-      .select("account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at")
+      .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, rate_review_status, rate_reviewed_at, created_at")
       .order("reading_date", { ascending: false, nullsFirst: false });
     query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
     const { data } = await query;
@@ -2144,6 +2147,40 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     setAddingReadingFor(null);
     refetchReadings(accountId);
     loadReadingSummaries();
+  };
+
+
+  const reviewDetectedRate = async (account, decision) => {
+    const change = account?.rateChange;
+    if (!change?.readingId) return;
+    const corrected = parseFloat(rateCorrection);
+    if (decision === "corrected" && (!Number.isFinite(corrected) || corrected <= 0)) {
+      alert("Enter the correct unit rate before saving.");
+      return;
+    }
+    setRateReviewSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const trustedRate = decision === "corrected" ? corrected : Number(change.to);
+    const reviewedAt = new Date().toISOString();
+    const readingUpdate = {
+      rate_review_status: decision,
+      rate_reviewed_at: reviewedAt,
+      rate_reviewed_by: user?.id || null,
+      ...(decision === "corrected" ? { rate: trustedRate, confidence: "high" } : {}),
+    };
+    const { error: readingError } = await supabase.from("readings").update(readingUpdate).eq("id", change.readingId);
+    if (readingError) { alert("Couldn't review the rate: " + readingError.message); setRateReviewSaving(false); return; }
+    if (decision !== "dismissed") {
+      const { error: accountError } = await supabase.from("accounts").update({ rate: trustedRate, updated_at: reviewedAt }).eq("id", account.id);
+      if (accountError) { alert("The bill was reviewed, but the account rate couldn't be updated: " + accountError.message); }
+    }
+    await supabase.from("activity_log").insert({
+      company_id: account.company_id || companyId, account_id: account.id, actor_id: user?.id || null,
+      event_type: `rate_${decision}`,
+      detail: decision === "dismissed" ? `Reviewed ${change.from}c → ${change.to}c/kWh rate alert and dismissed it without changing the account rate.` : decision === "corrected" ? `Corrected detected bill rate from ${change.to}c to ${trustedRate}c/kWh and updated the trusted account rate.` : `Confirmed detected bill rate increase from ${change.from}c to ${change.to}c/kWh and updated the trusted account rate.`,
+    });
+    setRateReviewFor(null); setRateCorrection(""); setRateReviewSaving(false);
+    await Promise.all([loadAccounts(), loadReadingSummaries(), refetchReadings(account.id), loadActivity()]);
   };
 
   const loadAccounts = useCallback(async () => {
@@ -3702,6 +3739,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                     if (step.action === "upload") setUploadingFor(a.id);
                     if (step.action === "edit") { setEditing(a); setShowForm(true); }
                     if (step.action === "history") void openAccountTab("history");
+                    if (step.action === "confirm-rate") { setRateReviewFor(a); setRateCorrection(String(a.rateChange?.to ?? "")); }
                     if (step.action === "market") { void openAccountTab("market"); pullMarketRate(a); }
                     if (step.action === "renewal") void openAccountTab("details");
                   }}>{step.button}</button>}</div>)}
@@ -4297,6 +4335,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       )}
 
       {showOverview && (
+        {rateReviewFor && <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.55)", zIndex:1000, display:"grid", placeItems:"center", padding:20 }} onClick={() => !rateReviewSaving && setRateReviewFor(null)}><div style={{ width:"min(520px,100%)", background:"var(--panel)", border:"1px solid var(--border-light)", borderRadius:14, padding:22, boxShadow:"0 24px 70px rgba(0,0,0,.28)" }} onClick={(e)=>e.stopPropagation()}><div style={{fontSize:11,fontWeight:800,letterSpacing:".08em",textTransform:"uppercase",color:"var(--amber)",marginBottom:7}}>Rate change detected</div><h2 style={{margin:"0 0 8px",fontSize:21}}>Confirm the latest unit rate</h2><p style={{margin:"0 0 16px",color:"var(--muted)",fontSize:13,lineHeight:1.55}}>The latest saved bill for <strong style={{color:"var(--text)"}}>{rateReviewFor.name}</strong> changed from <strong>{rateReviewFor.rateChange?.from}c</strong> to <strong>{rateReviewFor.rateChange?.to}c/kWh</strong>. Check the original bill, then choose how GnóRate should treat it.</p><label style={{display:"block",fontSize:12,fontWeight:700,marginBottom:6}}>Correct rate, if the detected figure is wrong</label><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}><input type="number" step="0.01" min="0" value={rateCorrection} onChange={(e)=>setRateCorrection(e.target.value)} style={{flex:1,background:"var(--bg)",border:"1px solid var(--border)",borderRadius:7,padding:"10px 11px",color:"var(--text)",fontSize:16}}/><span style={{fontSize:12,color:"var(--muted)"}}>c/kWh</span></div><div style={{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 12px",fontSize:11.5,color:"var(--muted)",lineHeight:1.5,marginBottom:16}}>Confirm updates the trusted account rate to the detected bill rate. Correct updates both the bill record and account rate. Dismiss records that you reviewed the alert but leaves the account rate unchanged. Every choice is added to activity history.</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}><button disabled={rateReviewSaving} onClick={()=>reviewDetectedRate(rateReviewFor,"dismissed")} style={{padding:"8px 11px",border:"1px solid var(--border)",borderRadius:7,background:"none",color:"var(--muted)",cursor:"pointer"}}>Dismiss alert</button><button disabled={rateReviewSaving} onClick={()=>reviewDetectedRate(rateReviewFor,"corrected")} style={{padding:"8px 11px",border:"1px solid var(--border-light)",borderRadius:7,background:"var(--bg)",color:"var(--text)",fontWeight:700,cursor:"pointer"}}>Save correction</button><button disabled={rateReviewSaving} onClick={()=>reviewDetectedRate(rateReviewFor,"confirmed")} style={{padding:"8px 12px",border:0,borderRadius:7,background:"var(--teal)",color:"white",fontWeight:800,cursor:"pointer"}}>{rateReviewSaving?"Saving…":"Confirm detected rate"}</button></div></div></div>}
         <CompanyOverview accounts={accounts} readingSummaries={readingSummaries} onClose={() => setShowOverview(false)} />
       )}
 

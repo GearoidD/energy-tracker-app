@@ -32,6 +32,8 @@ create table readings (
   id uuid primary key default gen_random_uuid(), account_id uuid not null references accounts(id) on delete cascade,
   company_id uuid not null references companies(id) on delete cascade, reading_date date, usage numeric, rate numeric, standing_charge numeric,
   total_cost numeric, source text not null default 'manual', confidence text check (confidence in ('low','medium','high') or confidence is null),
+  rate_review_status text not null default 'unreviewed' check (rate_review_status in ('unreviewed','confirmed','corrected','dismissed')),
+  rate_reviewed_at timestamptz, rate_reviewed_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
   constraint readings_account_date_unique unique(account_id,reading_date)
 );
@@ -133,3 +135,5 @@ create policy activity_insert on activity_log for insert to authenticated with c
 
 comment on table quote_offers is 'Account-specific supplier offers used for whole-cost renewal comparison and approval.';
 comment on column quote_offers.capacity_charge_annual is 'Annual euro amount, kept separate from unit rate so projected savings are not overstated.';
+
+comment on column readings.rate_review_status is 'Review state for a detected bill-rate change. Confirm/correct/dismiss prevents the same alert from repeatedly returning.';

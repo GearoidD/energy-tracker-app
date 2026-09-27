@@ -132,7 +132,7 @@ function AttentionQueueInner({ companyId, companyName }) {
       const [newest, prev] = ratedReadings;
       if (prev.rate) {
         const pct = ((newest.rate - prev.rate) / prev.rate) * 100;
-        rateChange = { pct, from: prev.rate, to: newest.rate };
+        rateChange = { pct, from: prev.rate, to: newest.rate, readingId: newest.id, reviewStatus: newest.rate_review_status || "unreviewed" };
       }
     }
 
@@ -150,8 +150,8 @@ function AttentionQueueInner({ companyId, companyName }) {
     if (latest?.confidence === "low") {
       addTo("Bill details need checking against the original bill", "var(--amber)", 3, "Some details could not be read confidently.");
     }
-    if (rateChange && rateChange.pct >= RATE_JUMP_THRESHOLD) {
-      addTo("Rate increase recorded on latest bill", "var(--amber)", 1.5, `Recorded rate rose ${rateChange.pct.toFixed(1)}% (${rateChange.from}c → ${rateChange.to}c). Check the latest bill.`);
+    if (rateChange && rateChange.pct >= RATE_JUMP_THRESHOLD && (rateChange.reviewStatus || "unreviewed") === "unreviewed") {
+      addTo("Rate increase recorded on latest bill", "var(--amber)", 1.5, `Recorded rate rose ${rateChange.pct.toFixed(1)}% (${rateChange.from}c → ${rateChange.to}c). Review and confirm the latest bill rate.`);
     }
   });
 
