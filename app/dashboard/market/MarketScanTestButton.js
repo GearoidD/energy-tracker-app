@@ -22,7 +22,7 @@ export default function MarketScanTestButton() {
         });
         return;
       }
-      setResult({ ok: true, message: body.skipped ? (body.reason || "Today's snapshot already exists.") : `Market snapshot saved for ${body.snapshot_date || "today"}.` });
+      setResult({ ok: true, message: body.skipped ? (body.reason || "Today's snapshot already exists.") : `Market snapshot saved for ${body.snapshot_date || "today"}.`, diagnostic: body.diagnostic || null });
       router.refresh();
     } catch (error) {
       setResult({ ok: false, message: error?.message || "Unable to run the market scan." });
@@ -38,7 +38,7 @@ export default function MarketScanTestButton() {
     {result && <div style={{marginTop:10,fontSize:12,lineHeight:1.5,color:result.ok?"var(--teal)":"#b42318",maxWidth:760}}>
       <div>{result.message}</div>
       {result.diagnostic && <div style={{marginTop:8,color:"var(--muted)"}}>
-        Key detected: {result.diagnostic.detected ? "Yes" : "No"} · Prefix valid: {result.diagnostic.valid_prefix ? "Yes" : "No"} · Length: {result.diagnostic.length ?? "—"} · Whitespace trimmed: {result.diagnostic.whitespace_trimmed ? "Yes" : "No"} · Model: {result.diagnostic.model || "—"} · Endpoint: {result.diagnostic.endpoint || "—"}
+        Key detected: {result.diagnostic.detected ? "Yes" : "No"} · Prefix valid: {result.diagnostic.valid_prefix ? "Yes" : "No"} · Length: {result.diagnostic.length ?? "—"} · Whitespace trimmed: {result.diagnostic.whitespace_trimmed ? "Yes" : "No"} · Model: {result.diagnostic.model || "—"} · Endpoint: {result.diagnostic.endpoint || "—"}<br/>SHA-256 fingerprint: <span style={{fontFamily:"monospace",wordBreak:"break-all"}}>{result.diagnostic.sha256 || "—"}</span>
       </div>}
     </div>}
   </div>;

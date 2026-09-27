@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -105,6 +106,7 @@ export async function GET(request) {
     valid_prefix: anthropicKey.startsWith("sk-ant-"),
     length: anthropicKey.length,
     whitespace_trimmed: rawAnthropicKey !== anthropicKey,
+    sha256: anthropicKey ? createHash("sha256").update(anthropicKey, "utf8").digest("hex") : null,
   };
   if (!anthropicKey) return json({ error: "ANTHROPIC_API_KEY is not configured in Vercel.", diagnostic: keyDiagnostic }, 500);
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel." }, 500);
@@ -118,7 +120,7 @@ export async function GET(request) {
     .select("id,snapshot_date")
     .eq("snapshot_date", today)
     .maybeSingle();
-  if (existing) return json({ ok: true, skipped: true, reason: "Today's shared market snapshot already exists." });
+  if (existing) return json({ ok: true, skipped: true, reason: "Today's shared market snapshot already exists.", diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
 
   let response;
   try {
@@ -188,5 +190,5 @@ export async function GET(request) {
   const { error } = await admin.from("market_snapshots").insert(row);
   if (error) return json({ error: error.message, previous_snapshot_retained: true }, 500);
 
-  return json({ ok: true, snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests });
+  return json({ ok: true, snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests, diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
 }
