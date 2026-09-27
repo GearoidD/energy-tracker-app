@@ -15,9 +15,7 @@ export default function MarketScanTestButton() {
       const res = await fetch("/api/admin/run-market-scan", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        const keyInfo = data.key_diagnostic
-          ? `\nKey seen by this route: length ${data.key_diagnostic.length}, starts "${data.key_diagnostic.starts_with}", ends "${data.key_diagnostic.ends_with}"`
-          : "";
+        const keyInfo = data.key_length_only !== undefined ? `\nKey length seen by this route: ${data.key_length_only}` : "";
         const rawInfo = data.anthropic_raw ? `\n\nRaw Anthropic response:\n${JSON.stringify(data.anthropic_raw, null, 2)}` : "";
         setMessage({
           ok: false,

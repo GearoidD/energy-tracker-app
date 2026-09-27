@@ -46,7 +46,7 @@ async function runMarketScan() {
     return await runMarketScanInner();
   } catch (e) {
     return NextResponse.json(
-      { version: CODE_VERSION, error: "Uncaught error: " + (e?.message || String(e)), stack: e?.stack || null, key_diagnostic: keyDiagnostic() },
+      { version: CODE_VERSION, error: "Uncaught error: " + (e?.message || String(e)), stack: e?.stack || null, key_length_only: (process.env.ANTHROPIC_API_KEY || "").length },
       { status: 500 }
     );
   }
@@ -54,7 +54,7 @@ async function runMarketScan() {
 
 async function runMarketScanInner() {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ version: CODE_VERSION, error: "ANTHROPIC_API_KEY is not configured.", key_diagnostic: keyDiagnostic() }, { status: 500 });
+    return NextResponse.json({ version: CODE_VERSION, error: "ANTHROPIC_API_KEY is not configured.", key_length_only: (process.env.ANTHROPIC_API_KEY || "").length }, { status: 500 });
   }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ version: CODE_VERSION, error: "SUPABASE_SERVICE_ROLE_KEY is not configured." }, { status: 500 });
@@ -92,7 +92,7 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
       }),
     });
   } catch (e) {
-    return NextResponse.json({ version: CODE_VERSION, error: "Couldn't reach Anthropic: " + e.message, key_diagnostic: keyDiagnostic() }, { status: 502 });
+    return NextResponse.json({ version: CODE_VERSION, error: "Couldn't reach Anthropic: " + e.message, key_length_only: (process.env.ANTHROPIC_API_KEY || "").length }, { status: 502 });
   }
 
   const claudeData = await claudeRes.json();
@@ -104,7 +104,7 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
         anthropic_status: claudeRes.status,
         anthropic_raw: claudeData,
         previous_snapshot_retained: true,
-        key_diagnostic: keyDiagnostic(),
+        key_length_only: (process.env.ANTHROPIC_API_KEY || "").length,
       },
       { status: 502 }
     );
