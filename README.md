@@ -84,3 +84,6 @@ Before accepting customer data or charging for GnóRate:
 GnóRate separates indicative rate opportunities from supplier quote decisions. Account-specific quote offers are stored in `quote_offers` and compare annual unit cost + standing charge + explicitly quoted annual capacity/other charges. VAT, levies and consumption changes are not silently treated as savings. Users should verify the supplier contract before approval.
 
 For production, apply the complete baseline schema (or equivalent migrations), verify RLS with at least two isolated test companies, configure cron authentication, and run a clean install/build in CI before deployment.
+
+## Procurement platform additions
+Pass 5 adds a transparent projected-cost engine, procurement/RFQ schema, quote acceptance audit fields and daily sourced market intelligence. Apply `supabase/migration-procurement-market.sql` before enabling those database-backed features. See `IMPROVEMENT-PASS-5.md` for deployment and commercial-boundary notes.

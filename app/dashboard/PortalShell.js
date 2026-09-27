@@ -2,19 +2,20 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Activity, BarChart3, Building2, CircleDollarSign, Gauge, LayoutDashboard, ListChecks, Settings, Zap } from "lucide-react";
+import { Activity, BarChart3, Building2, CircleDollarSign, Gauge, LayoutDashboard, ListChecks, Settings, Zap, TrendingUp } from "lucide-react";
 import GnoRateLogo from "../GnoRateLogo";
 
 const groups = [
   ["Your business", [["overview", "Dashboard", LayoutDashboard], ["accounts", "Accounts", Building2], ["usage", "Usage and bills", Activity]]],
   ["Keep on track", [["renewals", "Renewals", Gauge], ["attention", "Needs attention", ListChecks]]],
-  ["Reduce costs", [["rates", "Compare rates", Zap], ["savings", "Savings", CircleDollarSign]]],
+  ["Reduce costs", [["market", "Market intelligence", TrendingUp], ["rates", "Compare rates", Zap], ["savings", "Savings", CircleDollarSign]]],
   ["Manage", [["reports", "Reports", BarChart3], ["settings", "Settings", Settings]]],
 ];
 
 const copy = {
   overview: ["Dashboard", "Your utility contracts at a glance."],
   accounts: ["Accounts", "Every site, supplier, contract and bill in one place."],
+  market: ["Market intelligence", "Daily sourced signals for Irish commercial energy procurement."],
   rates: ["Compare rates", "See whether an available tariff may cost less."],
   usage: ["Usage and bills", "See recorded usage and bills by account, location and month."],
   renewals: ["Renewals", "See which contracts are ending and what needs a follow-up."],
@@ -34,7 +35,7 @@ export default function PortalShell({ children, header, companyName, sectionOver
   return <div className="portal-layout">
     <aside className="portal-sidebar">
       <Link href={sectionHref("overview")} className="portal-brand"><GnoRateLogo tone="light" size={36}/></Link>
-      {groups.map(([group, links]) => <div key={group}><div className="portal-nav-label">{group}</div><nav className="portal-nav">{links.map(([id, label, Icon]) => <Link key={id} href={id === "attention" ? "/dashboard/attention" : sectionHref(id)} className={activeItem === id ? "active" : ""}><Icon size={17}/>{label}</Link>)}</nav></div>)}
+      {groups.map(([group, links]) => <div key={group}><div className="portal-nav-label">{group}</div><nav className="portal-nav">{links.map(([id, label, Icon]) => <Link key={id} href={id === "attention" ? "/dashboard/attention" : id === "market" ? "/dashboard/market" : sectionHref(id)} className={activeItem === id ? "active" : ""}><Icon size={17}/>{label}</Link>)}</nav></div>)}
       <div className="portal-sidebar-foot">Irish by name. Built for business.<br/>Commercial utility intelligence</div>
     </aside>
     <main className="portal-main">{header}<div className="portal-content"><div className="portal-heading"><div><div className="portal-kicker">{companyName || "GnóRate client portal"}</div><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</div></main>

@@ -14,6 +14,7 @@ import autoTable from "jspdf-autotable";
 import UploadReading from "./UploadReading";
 import ImportAccounts from "./ImportAccounts";
 import { comparableMeterPoint, meterPointIssue, normalizeMeterPoint } from "@/lib/meter-points";
+import { projectedAnnualCost } from "@/lib/cost-engine";
 import BenchmarksBoard from "./BenchmarksBoard";
 import CompanyOverview from "./CompanyOverview";
 
@@ -406,37 +407,11 @@ function marketComparisonFor(acc, benchmarks, masterRates = []) {
 }
 
 function estimatedAnnualSpend(acc, readings) {
-  const rated = (readings || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
+  return projectedAnnualCost(acc, readings).projected;
+}
 
-  // Fewer than 5 real bills isn't a reliable enough basis to extrapolate a full year's spend -
-  // especially with seasonal usage swings. Show nothing rather than a misleading number.
-  if (rated.length < 5) return null;
-
-  const sorted = [...rated].sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
-  const first = new Date(sorted[0].reading_date);
-  const last = new Date(sorted[sorted.length - 1].reading_date);
-  const daySpan = Math.max((last - first) / 86400000, 30);
-  const scaleFactor = 365 / daySpan;
-
-  const hasInvoiceTotal = (r) => r.total_cost !== null && r.total_cost !== undefined && Number.isFinite(parseFloat(r.total_cost));
-  if (sorted.every(hasInvoiceTotal)) {
-    // Invoice totals already include standing charges and other bill items.
-    return sorted.reduce((sum, r) => sum + parseFloat(r.total_cost), 0) * scaleFactor;
-  }
-
-  // Use an actual invoice total where one was captured. For older/incomplete
-  // records, estimate that period from the recorded unit rate and usage.
-  const recordedPeriodCost = sorted.reduce((sum, r) => {
-    if (hasInvoiceTotal(r)) {
-      return sum + parseFloat(r.total_cost);
-    }
-    return sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage);
-  }, 0);
-  const standing = parseFloat(acc.standing_charge) || 0;
-  const estimatedBillShare = sorted.filter((r) => !hasInvoiceTotal(r)).length / sorted.length;
-  const annualStandingEstimate = (standing / 100) * 365 * estimatedBillShare;
-
-  return recordedPeriodCost * scaleFactor + annualStandingEstimate;
+function annualCostDetail(acc, readings, quote = null) {
+  return projectedAnnualCost(acc, readings, quote);
 }
 
 function annualSaving(acc) {
@@ -1140,7 +1115,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
   const cards = [
     { label: "Total accounts", value: String(summaryStats.total), accent: teal, small: false },
     { label: "Need attention", value: String(summaryStats.needAttention), accent: summaryStats.needAttention > 0 ? amber : green, small: false },
-    { label: "Est. annual spend", value: spendValue, accent: teal, small: !summaryStats.hasAnyCost },
+    { label: "Projected annual cost", value: spendValue, accent: teal, small: !summaryStats.hasAnyCost },
     { label: "Rate opportunity", value: summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "-", accent: green, small: false },
   ];
   cards.forEach((card, i) => {
@@ -1296,7 +1271,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
 
     autoTable(doc, {
       startY: y,
-      head: [["Account", "Est. annual spend"]],
+      head: [["Account", "Projected annual cost"]],
       body: spendByAccount.map((a) => [a.name, fmtMoney(a.cost)]),
       ...gnReportTableStyles(),
       columnStyles: { 1: { halign: "right" } },
@@ -1393,7 +1368,7 @@ function generatePortfolioReport(enrichedAccounts, summaryStats, attentionGroups
 
     autoTable(doc, {
       startY: y,
-      head: [["Location", "Accounts", "Need attention", "Est. annual spend"]],
+      head: [["Location", "Accounts", "Need attention", "Projected annual cost"]],
       body: locationRows.map(([loc, d]) => [loc, String(d.total), d.attention > 0 ? String(d.attention) : "-", d.spend > 0 ? fmtMoney(d.spend) : "Needs more data"]),
       ...gnReportTableStyles(),
       margin: { top: 25, bottom: 22, left: 14, right: 14 },
@@ -1750,7 +1725,7 @@ function RenewalCommandCenter({ accounts, quoteOffers, onRenewalStatus, onQuoteS
             <div><div style={{fontSize:10.5,color:"var(--muted)",fontWeight:700,marginBottom:5}}>CURRENT ANNUAL BASIS</div><strong style={{fontSize:14}}>{currentCost?fmtMoney(currentCost):"Needs usage/rate data"}</strong><div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>Energy + recorded standing charge</div></div>
           </div>
           <div style={{marginTop:11,paddingTop:10,borderTop:"1px solid var(--border)"}}>
-            {offers.length===0 ? <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}><span style={{fontSize:12,color:"var(--muted)"}}>No account-specific supplier quotes captured yet.</span><button onClick={onAddQuote} style={{background:"none",border:"1px solid var(--border)",color:"var(--teal)",borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:11.5}}>Add quote</button></div> : <div style={{display:"grid",gap:6}}>{offers.map((q,i)=>{const cost=projectedQuoteAnnualCost(a,q);const diff=currentCost&&cost?currentCost-cost:null;return <div key={q.id} style={{display:"grid",gridTemplateColumns:"1.2fr .7fr .9fr .8fr",gap:10,alignItems:"center",background:i===0?"var(--bg)":"transparent",borderRadius:7,padding:"8px 9px"}}><div><strong style={{fontSize:12.5}}>{q.supplier_name}</strong><div style={{fontSize:10.5,color:"var(--muted)"}}>{q.contract_length_months?`${q.contract_length_months} months · `:""}{q.valid_until?`valid to ${q.valid_until}`:"validity not recorded"}</div></div><div style={{fontSize:12}}><strong>{q.unit_rate_cents}c</strong>/kWh<div style={{fontSize:10.5,color:"var(--muted)"}}>{q.standing_charge_cents??"—"}c/day</div></div><div><strong style={{fontSize:12.5}}>{cost?fmtMoney(cost):"—"}</strong><div style={{fontSize:10.5,color:diff>0?"var(--green)":"var(--muted)"}}>{diff!=null?(diff>0?`${fmtMoney(diff)} below current`:`${fmtMoney(Math.abs(diff))} above current`):"Projected annual cost"}</div></div><select value={q.status||"received"} onChange={e=>onQuoteStatus(q,e.target.value)} style={{background:"var(--panel)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",fontSize:11.5}}><option value="received">Received</option><option value="shortlisted">Shortlist</option><option value="approved">Approve</option><option value="rejected">Reject</option></select></div>})}</div>}
+            {offers.length===0 ? <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}><span style={{fontSize:12,color:"var(--muted)"}}>No account-specific supplier quotes captured yet.</span><button onClick={onAddQuote} style={{background:"none",border:"1px solid var(--border)",color:"var(--teal)",borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:11.5}}>Add quote</button></div> : <div style={{display:"grid",gap:6}}>{offers.map((q,i)=>{const cost=projectedQuoteAnnualCost(a,q);const diff=currentCost&&cost?currentCost-cost:null;return <div key={q.id} style={{display:"grid",gridTemplateColumns:"1.2fr .7fr .9fr .8fr",gap:10,alignItems:"center",background:i===0?"var(--bg)":"transparent",borderRadius:7,padding:"8px 9px"}}><div><strong style={{fontSize:12.5}}>{q.supplier_name}</strong><div style={{fontSize:10.5,color:"var(--muted)"}}>{q.contract_length_months?`${q.contract_length_months} months · `:""}{q.valid_until?`valid to ${q.valid_until}`:"validity not recorded"}</div></div><div style={{fontSize:12}}><strong>{q.unit_rate_cents}c</strong>/kWh<div style={{fontSize:10.5,color:"var(--muted)"}}>{q.standing_charge_cents??"—"}c/day</div></div><div><strong style={{fontSize:12.5}}>{cost?fmtMoney(cost):"—"}</strong><div style={{fontSize:10.5,color:diff>0?"var(--green)":"var(--muted)"}}>{diff!=null?(diff>0?`${fmtMoney(diff)} below current`:`${fmtMoney(Math.abs(diff))} above current`):"Projected annual cost"}</div></div><select value={q.status||"received"} onChange={e=>onQuoteStatus(q,e.target.value)} style={{background:"var(--panel)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",fontSize:11.5}}><option value="received">Received</option><option value="shortlisted">Shortlist</option><option value="approved">Accept offer</option><option value="rejected">Reject</option></select></div>})}</div>}
           </div>
         </div>
       })}
@@ -1960,11 +1935,14 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   useEffect(() => { loadQuoteOffers(); }, [loadQuoteOffers]);
 
   const updateQuoteStatus = async (offer, status) => {
-    const { error } = await supabase.from("quote_offers").update({ status }).eq("id", offer.id);
-    if (error) { alert("Couldn't update quote: " + error.message); return; }
+    if (status === "approved" && !window.confirm(`Accept ${offer.supplier_name}'s offer and move this account to Switching?\n\nThis records the commercial decision in GnóRate. It does not replace any supplier contract/authority document unless the supplier's terms are attached and executed.`)) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const enhancedUpdate = status === "approved" ? { status, accepted_at: new Date().toISOString(), accepted_by: user?.id || null, authority_confirmed: true } : { status };
+    let result = await supabase.from("quote_offers").update(enhancedUpdate).eq("id", offer.id);
+    if (result.error && status === "approved") result = await supabase.from("quote_offers").update({ status }).eq("id", offer.id);
+    if (result.error) { alert("Couldn't update quote: " + result.error.message); return; }
     const account = accounts.find(a => a.id === offer.account_id);
     if (status === "approved" && account) await supabase.from("accounts").update({ renewal_status: "switching" }).eq("id", account.id);
-    const { data: { user } } = await supabase.auth.getUser();
     if (account) await supabase.from("activity_log").insert({ company_id: account.company_id || companyId, account_id: account.id, actor_id: user?.id || null, event_type: `quote_${status}`, detail: `${offer.supplier_name} quote marked ${status}.` });
     await Promise.all([loadQuoteOffers(), loadAccounts(), loadActivity?.()]);
   };
@@ -2430,7 +2408,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         }
       }
 
-      return { ...a, rate: currentRate, daysLeft, status, saving, cost: estimatedAnnualSpend(a, readingSummaries[a.id]), comparison, confidence, lowConfidenceBill, rateChange };
+      const costDetail = annualCostDetail({ ...a, rate: currentRate }, readingSummaries[a.id]);
+      return { ...a, rate: currentRate, daysLeft, status, saving, cost: costDetail.projected, costDetail, comparison, confidence, lowConfidenceBill, rateChange };
     });
   }, [accounts, benchmarks, masterRates, readingSummaries]);
 
@@ -2905,7 +2884,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               const needsCheck = companyAccounts.filter((account) => attentionLevelFor(account) !== "none").length;
               return <article className="gn-company-overview-card" key={id}>
                 <h3>{companiesById?.[id] || "Company"}</h3>
-                <div className="gn-company-overview-stats"><div><span>Accounts</span><strong>{companyAccounts.length}</strong></div><div><span>Items to check</span><strong>{needsCheck}</strong></div><div><span>Estimated annual spend</span><strong>{companySpend > 0 ? fmtMoney(companySpend) : "Not available"}</strong></div></div>
+                <div className="gn-company-overview-stats"><div><span>Accounts</span><strong>{companyAccounts.length}</strong></div><div><span>Items to check</span><strong>{needsCheck}</strong></div><div><span>Projected annual energy cost</span><strong>{companySpend > 0 ? fmtMoney(companySpend) : "Not available"}</strong></div></div>
                 <button type="button" onClick={() => switchToCompany(id)}>Open this company’s dashboard →</button>
               </article>;
             })}</div>
@@ -2932,7 +2911,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             <div className="gn-readiness-score"><strong>{portfolioReadiness.score}%</strong><span>complete</span><div><i style={{width:`${portfolioReadiness.score}%`}} /></div><Link href={sectionHref("accounts")}>Complete account data →</Link></div>
           </section>}
           <div className="gn-kpis">
-            <Link href={sectionHref("accounts")} className="gn-kpi"><span>Estimated annual spend</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></Link>
+            <Link href={sectionHref("accounts")} className="gn-kpi"><span>Projected annual energy cost</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></Link>
             <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Rate opportunity</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Unit-rate estimate; excludes other bill charges" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></Link>
             <Link href={sectionHref("savings")} className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
@@ -3248,7 +3227,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               >
                 {summaryStats.hasAnyCost ? (
                   <>
-                    <strong style={{ color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</strong> est. annual spend
+                    <strong style={{ color: "var(--text)" }}>{fmtMoney(summaryStats.totalSpend)}</strong> projected annual cost
                   </>
                 ) : summaryStats.partialBillCount > 0 ? (
                   "Needs more data"
@@ -3846,7 +3825,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   <div className="gn-account-info-cell"><small>Annual usage on account <em>Saved account figure</em></small><strong>{a.usage ? `${Number(a.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong>{isExpanded && !a.usage && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add annual usage</button>}</div>
                   <div className="gn-account-info-cell"><small>Latest bill on file <em>Reading date</em></small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong>{isExpanded && (!readingSummaries[a.id]?.[0]?.reading_date || a.confidence.missingBill) && <button type="button" onClick={() => setUploadingFor(a.id)}>{readingSummaries[a.id]?.[0]?.reading_date ? "Add newer bill" : "Upload first bill"}</button>}</div>
                   <div className="gn-account-info-cell"><small>Contract end date <em>Saved detail</em></small><strong>{formatAccountDate(a.contract_end)}</strong>{isExpanded && !a.contract_end && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add end date</button>}</div>
-                  <div className="gn-account-info-cell gn-account-estimate"><small>Estimated annual spend <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>Use supplier bills or quotes to confirm full costs.</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>
+                  <div className="gn-account-info-cell gn-account-estimate"><small>Projected annual energy cost <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>Transparent projection from annual usage and saved tariff components; open the account for the calculation basis.</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>{isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
                   <div className="gn-account-status-detail" style={{ borderColor: `${overall.color}44` }}><strong style={{ color: overall.color }}>{overall.label}</strong><span>{accountStatusDetail(a)}</span></div>
                 </div>
 
