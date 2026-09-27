@@ -53,6 +53,19 @@ async function runMarketScan() {
 }
 
 async function runMarketScanInner() {
+  // TEMPORARY DIAGNOSTIC - bypasses the real Anthropic call entirely.
+  // If this fake response ALSO loses fields, the problem has nothing to do with Anthropic at all.
+  return NextResponse.json(
+    {
+      version: CODE_VERSION,
+      error: "FAKE TEST ERROR - no Anthropic call was made",
+      test_field_one: "if you see this, fields survive",
+      test_field_two: 12345,
+      test_nested: { a: 1, b: 2 },
+    },
+    { status: 502 }
+  );
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ version: CODE_VERSION, error: "ANTHROPIC_API_KEY is not configured.", key_length_only: (process.env.ANTHROPIC_API_KEY || "").length }, { status: 500 });
   }
