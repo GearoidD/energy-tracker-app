@@ -29,6 +29,17 @@ function numberOrNull(value) {
 }
 
 async function runMarketScan() {
+  try {
+    return await runMarketScanInner();
+  } catch (e) {
+    return NextResponse.json(
+      { error: "Uncaught error: " + (e?.message || String(e)), stack: e?.stack || null },
+      { status: 500 }
+    );
+  }
+}
+
+async function runMarketScanInner() {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 500 });
   }

@@ -15,7 +15,7 @@ export default function MarketScanTestButton() {
       const res = await fetch("/api/admin/run-market-scan", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setMessage({ ok: false, text: data.error || "Couldn't run the scan." });
+        setMessage({ ok: false, text: (data.error || "Couldn't run the scan.") + (data.stack ? "\n\n" + data.stack : "") });
         return;
       }
       setMessage({
@@ -51,7 +51,7 @@ export default function MarketScanTestButton() {
         {running ? "Running…" : "Refresh market data now"}
       </button>
       {message && (
-        <div style={{ marginTop: 10, fontSize: 12.5, color: message.ok ? "var(--teal)" : "var(--red)" }}>
+        <div style={{ marginTop: 10, fontSize: 12.5, color: message.ok ? "var(--teal)" : "var(--red)", whiteSpace: "pre-wrap", fontFamily: message.ok ? "inherit" : "monospace" }}>
           {message.text}
         </div>
       )}
