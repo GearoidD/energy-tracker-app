@@ -97,8 +97,7 @@ function normaliseSnapshot(parsed, sources, requestId, searchRequests) {
   };
 }
 
-export async function GET(request) {
-  if (!authorised(request)) return json({ error: "Unauthorized" }, 401);
+export async function runMarketScan() {
   const rawAnthropicKey = process.env.ANTHROPIC_API_KEY || "";
   const anthropicKey = rawAnthropicKey.trim();
   const keyDiagnostic = {
@@ -191,4 +190,10 @@ export async function GET(request) {
   if (error) return json({ error: error.message, previous_snapshot_retained: true }, 500);
 
   return json({ ok: true, snapshot_date: row.snapshot_date, anthropic_request_id: payload?.id || null, web_search_requests: searchRequests, diagnostic: { ...keyDiagnostic, endpoint: "api.anthropic.com/v1/messages", auth_method: "x_api_key", model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5" } });
+}
+
+
+export async function GET(request) {
+  if (!authorised(request)) return json({ error: "Unauthorized" }, 401);
+  return runMarketScan();
 }
