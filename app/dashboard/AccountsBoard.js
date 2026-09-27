@@ -1714,6 +1714,50 @@ function generateUsageCostReport(enrichedAccounts, readingSummaries, companyName
   doc.save(`gnorate-usage-cost-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
+
+function projectedQuoteAnnualCost(account, offer) {
+  const usage = Number(account?.usage);
+  const rate = Number(offer?.unit_rate_cents);
+  if (!Number.isFinite(usage) || !Number.isFinite(rate)) return null;
+  const standing = Number(offer?.standing_charge_cents || 0) * 365 / 100;
+  return (usage * rate / 100) + standing + Number(offer?.capacity_charge_annual || 0) + Number(offer?.other_annual_charges || 0);
+}
+
+function RenewalCommandCenter({ accounts, quoteOffers, onRenewalStatus, onQuoteStatus, onOpenAccount, onAddQuote }) {
+  const pipeline = accounts
+    .filter((a) => a.renewal_status !== "renewed" && (a.daysLeft === null || a.daysLeft <= HORIZON_DAYS || ["quote_requested","switching"].includes(a.renewal_status)))
+    .sort((a,b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
+  const offersFor = (id) => (quoteOffers || []).filter((q) => q.account_id === id);
+  const stats = {
+    overdue: pipeline.filter(a => a.daysLeft !== null && a.daysLeft < 0).length,
+    d30: pipeline.filter(a => a.daysLeft !== null && a.daysLeft >= 0 && a.daysLeft <= 30).length,
+    d60: pipeline.filter(a => a.daysLeft > 30 && a.daysLeft <= 60).length,
+    quotes: (quoteOffers || []).filter(q => q.status !== "rejected").length,
+  };
+  return <section style={{marginBottom:22}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,marginBottom:14}}>
+      {[["Overdue",stats.overdue,"var(--red)"],["Due ≤30 days",stats.d30,"var(--red)"],["Due 31–60 days",stats.d60,"var(--amber)"],["Live quote options",stats.quotes,"var(--teal)"]].map(([label,value,color])=><div key={label} style={{background:"var(--panel)",border:"1px solid var(--border)",borderRadius:10,padding:"13px 15px"}}><div style={{fontSize:11,color:"var(--muted)",fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>{label}</div><div style={{fontSize:24,fontWeight:800,color,marginTop:3}}>{value}</div></div>)}
+    </div>
+    <div style={{background:"var(--panel)",border:"1px solid var(--border-light)",borderRadius:12,overflow:"hidden"}}>
+      <div style={{padding:"15px 17px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}><div><h2 style={{fontSize:16,margin:0,fontFamily:"'Manrope',sans-serif"}}>Renewal command centre</h2><p style={{fontSize:12,color:"var(--muted)",margin:"4px 0 0"}}>One place to move contracts from warning → quotes → decision → renewal.</p></div><button onClick={onAddQuote} style={{background:"var(--teal)",color:"#fff",border:0,borderRadius:7,padding:"8px 12px",fontWeight:700,cursor:"pointer"}}>+ Feed in a quote</button></div>
+      {pipeline.length===0 ? <div style={{padding:24,color:"var(--muted)",fontSize:13}}>No renewals currently need action.</div> : pipeline.map(a=>{
+        const offers=offersFor(a.id).sort((x,y)=>(projectedQuoteAnnualCost(a,x)??Infinity)-(projectedQuoteAnnualCost(a,y)??Infinity));
+        const currentCost = Number(a.cost) || (Number(a.usage)>0 && Number(a.rate)>0 ? Number(a.usage)*Number(a.rate)/100 + Number(a.standing_charge||0)*365/100 : null);
+        return <div key={a.id} style={{padding:"15px 17px",borderBottom:"1px solid var(--border)"}}>
+          <div style={{display:"grid",gridTemplateColumns:"minmax(220px,1.5fr) minmax(140px,.8fr) minmax(170px,1fr)",gap:14,alignItems:"start"}}>
+            <div><button onClick={()=>onOpenAccount(a)} style={{background:"none",border:0,padding:0,color:"var(--text)",fontWeight:800,fontSize:14,cursor:"pointer",textAlign:"left"}}>{a.name}</button><div style={{fontSize:11.5,color:"var(--muted)",marginTop:3}}>{a.location||"Location not set"} · {a.provider||"Supplier not set"} · {a.rate?`${a.rate}c/kWh`:"Rate missing"}</div><div style={{fontSize:12,marginTop:7,color:a.daysLeft!==null&&a.daysLeft<=30?"var(--red)":"var(--amber)",fontWeight:700}}>{a.daysLeft===null?"Contract date missing":a.daysLeft<0?`${Math.abs(a.daysLeft)} days overdue`:`${a.daysLeft} days remaining`} · {renewalNextStep(a)}</div></div>
+            <div><label style={{display:"block",fontSize:10.5,color:"var(--muted)",fontWeight:700,marginBottom:5}}>RENEWAL STAGE</label><select value={a.renewal_status||"not_started"} onChange={e=>onRenewalStatus(a.id,e.target.value)} style={{width:"100%",background:"var(--bg)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:6,padding:"7px 9px",fontSize:12}}><option value="not_started">Not started</option><option value="quote_requested">Quote requested</option><option value="switching">Switching</option><option value="renewed">Renewed</option></select></div>
+            <div><div style={{fontSize:10.5,color:"var(--muted)",fontWeight:700,marginBottom:5}}>CURRENT ANNUAL BASIS</div><strong style={{fontSize:14}}>{currentCost?fmtMoney(currentCost):"Needs usage/rate data"}</strong><div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>Energy + recorded standing charge</div></div>
+          </div>
+          <div style={{marginTop:11,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+            {offers.length===0 ? <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}><span style={{fontSize:12,color:"var(--muted)"}}>No account-specific supplier quotes captured yet.</span><button onClick={onAddQuote} style={{background:"none",border:"1px solid var(--border)",color:"var(--teal)",borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:11.5}}>Add quote</button></div> : <div style={{display:"grid",gap:6}}>{offers.map((q,i)=>{const cost=projectedQuoteAnnualCost(a,q);const diff=currentCost&&cost?currentCost-cost:null;return <div key={q.id} style={{display:"grid",gridTemplateColumns:"1.2fr .7fr .9fr .8fr",gap:10,alignItems:"center",background:i===0?"var(--bg)":"transparent",borderRadius:7,padding:"8px 9px"}}><div><strong style={{fontSize:12.5}}>{q.supplier_name}</strong><div style={{fontSize:10.5,color:"var(--muted)"}}>{q.contract_length_months?`${q.contract_length_months} months · `:""}{q.valid_until?`valid to ${q.valid_until}`:"validity not recorded"}</div></div><div style={{fontSize:12}}><strong>{q.unit_rate_cents}c</strong>/kWh<div style={{fontSize:10.5,color:"var(--muted)"}}>{q.standing_charge_cents??"—"}c/day</div></div><div><strong style={{fontSize:12.5}}>{cost?fmtMoney(cost):"—"}</strong><div style={{fontSize:10.5,color:diff>0?"var(--green)":"var(--muted)"}}>{diff!=null?(diff>0?`${fmtMoney(diff)} below current`:`${fmtMoney(Math.abs(diff))} above current`):"Projected annual cost"}</div></div><select value={q.status||"received"} onChange={e=>onQuoteStatus(q,e.target.value)} style={{background:"var(--panel)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:6,padding:"6px 8px",fontSize:11.5}}><option value="received">Received</option><option value="shortlisted">Shortlist</option><option value="approved">Approve</option><option value="rejected">Reject</option></select></div>})}</div>}
+          </div>
+        </div>
+      })}
+    </div>
+  </section>;
+}
+
 export default function AccountsBoard({ companyId, companyName, lockedLocation, companyIds, companiesById, section = "overview" }) {
   const combinedMode = Array.isArray(companyIds) && companyIds.length > 0;
   const sectionHref = (target) => combinedMode ? `/dashboard/all-companies?section=${target}` : `/dashboard?scope=company&section=${target}`;
@@ -1779,6 +1823,8 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const [rateReviewFor, setRateReviewFor] = useState(null);
   const [rateCorrection, setRateCorrection] = useState("");
   const [rateReviewSaving, setRateReviewSaving] = useState(false);
+  const [quoteOffers, setQuoteOffers] = useState([]);
+  const [quoteOffersAvailable, setQuoteOffersAvailable] = useState(true);
 
   useEffect(() => {
     setSearch(currentSearchTerm);
@@ -1896,6 +1942,32 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     const { data } = await supabase.from("suppliers").select("*").order("name");
     setSuppliers(data || []);
   }, []);
+
+  const loadQuoteOffers = useCallback(async () => {
+    let query = supabase.from("quote_offers").select("*").order("created_at", { ascending: false });
+    query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
+    const { data, error } = await query;
+    if (error) {
+      console.warn("Quote offers unavailable; run the current schema migration to enable full quote comparison:", error.message);
+      setQuoteOffersAvailable(false);
+      setQuoteOffers([]);
+      return;
+    }
+    setQuoteOffersAvailable(true);
+    setQuoteOffers(data || []);
+  }, [companyId, combinedMode, companyIds]);
+
+  useEffect(() => { loadQuoteOffers(); }, [loadQuoteOffers]);
+
+  const updateQuoteStatus = async (offer, status) => {
+    const { error } = await supabase.from("quote_offers").update({ status }).eq("id", offer.id);
+    if (error) { alert("Couldn't update quote: " + error.message); return; }
+    const account = accounts.find(a => a.id === offer.account_id);
+    if (status === "approved" && account) await supabase.from("accounts").update({ renewal_status: "switching" }).eq("id", account.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (account) await supabase.from("activity_log").insert({ company_id: account.company_id || companyId, account_id: account.id, actor_id: user?.id || null, event_type: `quote_${status}`, detail: `${offer.supplier_name} quote marked ${status}.` });
+    await Promise.all([loadQuoteOffers(), loadAccounts(), loadActivity?.()]);
+  };
 
   const loadActivity = useCallback(async () => {
     const scoped = (q) => (combinedMode ? q.in("company_id", companyIds) : q.eq("company_id", companyId));
@@ -3220,6 +3292,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           </div>
         </>
       ) : null}
+
+      {section === "renewals" && (
+        <>
+          {!quoteOffersAvailable && <div style={{marginBottom:12,padding:"10px 12px",border:"1px solid var(--amber)",borderRadius:8,color:"var(--muted)",fontSize:12}}>Renewal command centre is active. Multi-quote comparison will appear after the current <code>quote_offers</code> schema migration is applied; existing renewal tracking continues to work.</div>}
+          <RenewalCommandCenter accounts={enrichedAll} quoteOffers={quoteOffers} onRenewalStatus={updateRenewalStatus} onQuoteStatus={updateQuoteStatus} onOpenAccount={jumpToAccount} onAddQuote={()=>router.push("/dashboard/add-quote")} />
+        </>
+      )}
 
       {showAccountTable && (() => {
         const locations = [...new Set(accounts.map((a) => a.location).filter(Boolean))].sort();
