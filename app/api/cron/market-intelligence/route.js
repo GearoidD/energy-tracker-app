@@ -10,6 +10,9 @@ export const maxDuration = 60;
 const CODE_VERSION = "MKT-V9-DIRECT";
 
 function authorised(request) {
+  // TEMPORARY - allows direct browser testing via ?debug=1. Remove after diagnosing.
+  const url = new URL(request.url);
+  if (url.searchParams.get("debug") === "1") return true;
   const secret = process.env.CRON_SECRET;
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
 }
