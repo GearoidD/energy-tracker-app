@@ -19,7 +19,7 @@ export async function POST() {
   const fingerprint = key ? createHash("sha256").update(key, "utf8").digest("hex") : "NONE";
 
   const response = await runMarketScan();
-  response.headers.set("x-gnorate-build", "7S");
+  response.headers.set("x-gnorate-build", "7T");
   response.headers.set("x-gnorate-key-sha256", fingerprint);
   return response;
 }
