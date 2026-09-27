@@ -1832,19 +1832,47 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   };
 
   const [readingSummaries, setReadingSummaries] = useState({});
+  const [readingSummaryError, setReadingSummaryError] = useState(null);
+  const [rateReviewMigrationPending, setRateReviewMigrationPending] = useState(false);
 
   const loadReadingSummaries = useCallback(async () => {
-    let query = supabase
-      .from("readings")
-      .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, rate_review_status, rate_reviewed_at, created_at")
-      .order("reading_date", { ascending: false, nullsFirst: false });
-    query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
-    const { data } = await query;
+    const applyCompanyScope = (query) =>
+      combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
+
+    // Prefer the enhanced Pass-3 schema, but do not make historical bill visibility
+    // depend on the rate-review migration having been applied to Supabase yet.
+    let result = await applyCompanyScope(
+      supabase
+        .from("readings")
+        .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, rate_review_status, rate_reviewed_at, created_at")
+        .order("reading_date", { ascending: false, nullsFirst: false })
+    );
+
+    if (result.error) {
+      console.warn("Enhanced readings query failed; retrying with legacy schema:", result.error.message);
+      setRateReviewMigrationPending(true);
+      result = await applyCompanyScope(
+        supabase
+          .from("readings")
+          .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at")
+          .order("reading_date", { ascending: false, nullsFirst: false })
+      );
+    } else {
+      setRateReviewMigrationPending(false);
+    }
+
+    if (result.error) {
+      console.error("Could not load saved bill readings:", result.error.message);
+      setReadingSummaryError(result.error.message || "Saved bill records could not be loaded.");
+      return; // Keep the last known summaries; never convert a query failure into 'no bill saved'.
+    }
+
     const grouped = {};
-    (data || []).forEach((r) => {
+    (result.data || []).forEach((r) => {
       if (!grouped[r.account_id]) grouped[r.account_id] = [];
       grouped[r.account_id].push(r);
     });
+    setReadingSummaryError(null);
     setReadingSummaries(grouped);
   }, [companyId, combinedMode, companyIds]);
 
