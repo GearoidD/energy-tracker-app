@@ -123,7 +123,7 @@ export async function GET(request) {
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MARKET_MODEL || "claude-sonnet-5",
-        max_tokens: 2200,
+        max_tokens: 4096,
         // One Messages API request and at most one web-search execution per day.
         tools: [{
           type: "web_search_20250305",
@@ -133,7 +133,7 @@ export async function GET(request) {
         }],
         messages: [{
           role: "user",
-          content: `Today is ${today}. Produce the single daily GnóRate Irish commercial-energy market snapshot. You have ONE web search available, so make one broad search that gathers the strongest current evidence you can for Irish SEM day-ahead electricity, European/TTF gas, Brent crude, EU ETS carbon, EUR/USD and major energy-market drivers. Prioritise primary or reputable market sources.\n\nReturn a final JSON object even if some values cannot be verified. Never invent a market price or percentage: use null. World affairs may explain verified movements but must not manufacture numeric market data. Keep pressure_score near 50 when evidence is incomplete.\n\nRequired JSON shape:\n{\n  "sem_day_ahead_eur_mwh": number|null,\n  "sem_change_7d_pct": number|null,\n  "gas_eur_mwh": number|null,\n  "gas_change_7d_pct": number|null,\n  "brent_usd_bbl": number|null,\n  "brent_change_7d_pct": number|null,\n  "carbon_eur_t": number|null,\n  "carbon_change_7d_pct": number|null,\n  "eur_usd": number|null,\n  "pressure_score": number,\n  "pressure_label": "Low"|"Stable"|"Elevated"|"High",\n  "narrative": "maximum 130 words; explain today's evidence and explicitly say this is not a retail-price forecast",\n  "sources": [{"name":"string","url":"https://...","as_of":"YYYY-MM-DD"}]\n}\n\nWeight verified electricity and gas most heavily, then carbon, oil and FX. Supplier hedging means retail prices can lag wholesale markets. Your final text must contain the JSON object.`,
+          content: `Today is ${today}. Create today's GnóRate Irish commercial-energy market snapshot. Use at most ONE broad web search covering Irish SEM electricity, European/TTF gas, Brent, EU ETS carbon, EUR/USD and major current energy drivers. Prioritise primary/reputable sources.\n\nIMPORTANT: Be extremely concise. Do not write research notes, analysis, citations or prose before the final answer. After the search, immediately return ONLY one compact valid JSON object. Never invent numbers; use null when unverified. Keep pressure_score near 50 when evidence is incomplete.\n\nJSON keys exactly: sem_day_ahead_eur_mwh, sem_change_7d_pct, gas_eur_mwh, gas_change_7d_pct, brent_usd_bbl, brent_change_7d_pct, carbon_eur_t, carbon_change_7d_pct, eur_usd, pressure_score, pressure_label, narrative, sources. pressure_label must be Low, Stable, Elevated or High. narrative must be <=80 words and state this is not a retail-price forecast. sources must contain at most 5 objects with name, url and as_of. Weight verified electricity and gas most heavily, then carbon, oil and FX. Supplier hedging means retail prices can lag wholesale markets. OUTPUT JSON ONLY.`,
         }],
       }),
       cache: "no-store",
