@@ -1754,6 +1754,30 @@ export default function UploadReading({
                   Actual bill total (€)
                   <input type="number" step="0.01" style={inputStyle} value={extracted.total_cost ?? ""} onChange={set("total_cost")} />
                   <span style={{ fontSize: 10.5, color: "var(--muted)" }}>Confirm the amount shown on the bill; it is not calculated from usage.</span>
+                  {(extracted.total_cost === "" || extracted.total_cost === null || extracted.total_cost === undefined) &&
+                    extracted.rate &&
+                    extracted.usage &&
+                    (() => {
+                      const estimate = (parseFloat(extracted.rate) / 100) * parseFloat(extracted.usage);
+                      if (!Number.isFinite(estimate)) return null;
+                      return (
+                        <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", marginTop: 2 }}>
+                          <div style={{ fontSize: 11.5, color: "var(--text)" }}>
+                            Estimated energy cost: <strong>€{estimate.toFixed(2)}</strong>
+                          </div>
+                          <div style={{ fontSize: 10, color: "var(--amber)", marginTop: 2 }}>
+                            Rate × usage only — excludes standing charge, VAT and other levies, so your real bill total will be higher.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setExtracted((f) => ({ ...f, total_cost: estimate.toFixed(2) }))}
+                            style={{ marginTop: 6, background: "none", border: "1px solid var(--border-light)", color: "var(--teal)", borderRadius: 5, padding: "4px 9px", fontSize: 11, cursor: "pointer" }}
+                          >
+                            Use this estimate
+                          </button>
+                        </div>
+                      );
+                    })()}
                 </label>
               </div>
 
