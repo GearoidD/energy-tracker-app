@@ -570,7 +570,9 @@ export default function UploadReading({
             rate: extracted.rate || null,
             standing_charge:
               extracted.standing_charge || null,
-            usage: extracted.usage || null,
+            // Do not store a single bill's kWh as annual account usage.
+            // Annual usage is calculated from the saved bill periods by cost-engine.
+            usage: null,
             contract_end:
               syncContractEnd &&
               contractEndValue
