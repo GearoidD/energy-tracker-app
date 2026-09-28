@@ -2984,6 +2984,39 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></Link>
             <Link href={sectionHref("savings")} className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
           </div>
+          {(() => {
+            const opportunities = enrichedAll
+              .filter((account) => account.saving != null && Number(account.saving) > 20)
+              .sort((a, b) => Number(b.saving || 0) - Number(a.saving || 0))
+              .slice(0, 3);
+            const opportunityTotal = enrichedAll.reduce((sum, account) => sum + (Number(account.saving) > 20 ? Number(account.saving) : 0), 0);
+            return (
+              <section className="gn-savings-command" aria-label="Savings opportunities">
+                <div className="gn-savings-command-head">
+                  <div>
+                    <span className="gn-savings-eyebrow"><TrendingDown size={13}/> SAVINGS OPPORTUNITIES</span>
+                    <h2>{opportunities.length ? `${fmtMoney(opportunityTotal)} potential annual saving identified` : "Build your savings opportunity view"}</h2>
+                    <p>{opportunities.length ? "Indicative unit-rate opportunities from the accounts currently on file. Confirm full annual quotes before switching." : "Add current and market rates to identify where your portfolio may have room to save."}</p>
+                  </div>
+                  <Link href={sectionHref("savings")} className="gn-savings-command-action">Open savings centre <span>→</span></Link>
+                </div>
+                {opportunities.length ? (
+                  <div className="gn-savings-opportunity-list">
+                    {opportunities.map((account, index) => (
+                      <button type="button" className="gn-savings-opportunity" key={account.id} onClick={() => openDashboardAccount(account)}>
+                        <span className="gn-savings-rank">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="gn-savings-opportunity-copy"><strong>{account.name}</strong><small>{account.location || "Location not set"} · {account.fuel_type === "gas" ? "Gas" : "Electricity"} · {account.provider || "Supplier not set"}</small></span>
+                        <span className="gn-savings-opportunity-rate"><small>{account.rate != null ? `${Number(account.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c current` : "Current rate not set"}</small><b>{fmtMoney(account.saving)}<em>/yr indicative</em></b></span>
+                        <span className="gn-savings-chevron">→</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="gn-savings-empty"><span><CircleDollarSign size={17}/></span><div><strong>No opportunities identified yet</strong><small>Once GnóRate has enough rate and usage data, the highest-value accounts will appear here.</small></div><Link href={sectionHref("rates")}>Review rates →</Link></div>
+                )}
+              </section>
+            );
+          })()}
           <div className="gn-insight-grid">
             <article className="gn-card">
               <div className="gn-card-heading"><div><h2>Spend by utility</h2><p>Based on available account estimates</p></div><span className="gn-card-menu">Annual</span></div>
