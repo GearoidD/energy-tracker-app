@@ -2902,6 +2902,61 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               </article>;
             })}</div>
           </section>}
+          {marketSignal && (() => {
+            const styleByLabel = {
+              Low: { bg: "#EAF6EE", border: "#2F8A52", text: "#1E6B3D", tagline: "Market rates are currently low — a good window to consider locking in." },
+              Stable: { bg: "#EAF6F3", border: "var(--teal)", text: "var(--teal-dim)", tagline: "Market rates are stable right now." },
+              Elevated: { bg: "#FCF3E3", border: "#C8790A", text: "#9C5F08", tagline: "Market rates are elevated — worth reviewing upcoming renewals sooner rather than later." },
+              High: { bg: "#FBEAE6", border: "#C0432A", text: "#96341F", tagline: "Market rates are high — worth reviewing renewals closely before committing." },
+            };
+            const s = styleByLabel[marketSignal.pressure_label] || styleByLabel.Stable;
+            return (
+              <Link
+                href="/dashboard/market"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  background: s.bg,
+                  border: `1px solid ${s.border}`,
+                  borderRadius: 12,
+                  padding: "16px 20px",
+                  marginBottom: 18,
+                  textDecoration: "none",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: "50%",
+                      background: s.border,
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 800,
+                      fontSize: 15,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {Math.round(marketSignal.pressure_score)}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".06em", color: s.text, textTransform: "uppercase" }}>
+                      Market signal — {marketSignal.pressure_label}
+                    </div>
+                    <div style={{ fontSize: 14.5, color: s.text, marginTop: 2, fontWeight: 600 }}>{s.tagline}</div>
+                  </div>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: s.text, whiteSpace: "nowrap" }} aria-hidden="true">
+                  View detail →
+                </span>
+              </Link>
+            );
+          })()}
           <div className="gn-welcome-panel">
             <div className="gn-welcome-copy">
               <span className="gn-welcome-eyebrow"><i /> {firstDashboardAction ? "NEXT ACCOUNT ACTION" : summaryStats.total ? "PORTFOLIO STATUS" : "GET STARTED"}</span>
@@ -2939,7 +2994,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString("en-IE")} kWh`}><em>{month.usage ? Math.round(month.usage).toLocaleString("en-IE") : "-"}</em><div className="gn-bar-track"><i style={{ height: month.usage ? `${Math.max(5, (month.usage / max) * 100)}%` : "0%" }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
             </article>
           </div>
-          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("accounts")}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "Portfolio currently on track"} <span aria-hidden="true">→</span></Link>{marketSignal && <Link href="/dashboard/market" style={{ color: "var(--muted)", fontSize: 13 }}>Market: {marketSignal.pressure_label} ({Math.round(marketSignal.pressure_score)}/100) <span aria-hidden="true">→</span></Link>}<Link href={sectionHref("accounts")}>View all accounts <span aria-hidden="true">→</span></Link></div>
+          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("accounts")}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "Portfolio currently on track"} <span aria-hidden="true">→</span></Link><Link href={sectionHref("accounts")}>View all accounts <span aria-hidden="true">→</span></Link></div>
           <div className="gn-task-grid">
             <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Contracts ending within 30 days, rate rises of 5%+, or bill details to verify</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
               {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
