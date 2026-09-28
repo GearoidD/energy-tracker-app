@@ -63,18 +63,24 @@ async function runMarketScanInner() {
   const admin = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: existing } = await admin
+  const { data: existing, error: readError } = await admin
     .from("market_snapshots")
     .select("id")
     .eq("snapshot_date", today)
     .maybeSingle();
+  if (readError) {
+    return NextResponse.json(
+      { version: CODE_VERSION, failed_step: "database read (Supabase)", error: readError.message },
+      { status: 500 }
+    );
+  }
   if (existing) {
     return NextResponse.json({ version: CODE_VERSION, ok: true, skipped: true, reason: "Today's snapshot already exists." });
   }
 
-  const prompt = `Today is ${today}. Provide a brief Irish commercial energy market snapshot using only information you're confident about. Never invent current market figures - set anything you can't support to null, and keep pressure_score at 50 with pressure_label "Stable" when current evidence is unavailable.
+  const prompt = `Today is ${today}. Search for current figures for an Irish commercial energy market snapshot: the SEM (Single Electricity Market) day-ahead price, European wholesale gas price, Brent crude oil price, EU ETS carbon price, and the EUR/USD exchange rate. Use the actual search results - do not rely on memory for these figures, since they change daily and your training data is not current. If a search genuinely returns nothing usable for a specific figure, set that one field to null rather than guessing, but do not leave everything null if searches succeeded.
 
-Respond with ONLY a single compact JSON object, no other text, using exactly these keys: sem_day_ahead_eur_mwh, sem_change_7d_pct, gas_eur_mwh, gas_change_7d_pct, brent_usd_bbl, brent_change_7d_pct, carbon_eur_t, carbon_change_7d_pct, eur_usd, pressure_score, pressure_label (must be "Low", "Stable", "Elevated" or "High"), narrative (under 80 words, must state this is not a retail-price forecast), sources (up to 5 objects with name, url, as_of).`;
+After searching, respond with ONLY a single compact JSON object as your final message, no other text, using exactly these keys: sem_day_ahead_eur_mwh, sem_change_7d_pct, gas_eur_mwh, gas_change_7d_pct, brent_usd_bbl, brent_change_7d_pct, carbon_eur_t, carbon_change_7d_pct, eur_usd, pressure_score (0-100, how much upward pressure current conditions suggest), pressure_label (must be "Low", "Stable", "Elevated" or "High"), narrative (under 80 words, must state this is not a retail-price forecast), sources (up to 5 objects with name, url, as_of, drawn from your actual search results).`;
 
   let claudeRes;
   try {
@@ -87,7 +93,8 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
       },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 1500,
+        max_tokens: 4000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -110,7 +117,8 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
     );
   }
 
-  const textBlock = claudeData.content?.find((c) => c.type === "text");
+  const textBlocks = (claudeData.content || []).filter((c) => c.type === "text");
+  const textBlock = [...textBlocks].reverse().find((b) => b.text?.includes("{")) || textBlocks[textBlocks.length - 1];
   const parsed = textBlock ? extractJsonObject(textBlock.text) : null;
   if (!parsed) {
     return NextResponse.json(
@@ -147,7 +155,10 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
 
   const { error } = await admin.from("market_snapshots").insert(row);
   if (error) {
-    return NextResponse.json({ version: CODE_VERSION, error: error.message, previous_snapshot_retained: true }, { status: 500 });
+    return NextResponse.json(
+      { version: CODE_VERSION, failed_step: "database insert (Supabase) - Anthropic call had already succeeded", error: error.message, previous_snapshot_retained: true },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ version: CODE_VERSION, ok: true, snapshot_date: row.snapshot_date });
