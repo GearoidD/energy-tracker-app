@@ -250,7 +250,7 @@ Pay particular attention to:
 - kWh usage
 - Unit rates
 - Standing charge
-- FINAL BILL TOTAL / AMOUNT DUE
+- Total bill amount
 - Provider
 - Supply address
 - MPRN/GPRN
@@ -313,27 +313,9 @@ standing_charge:
 The daily standing charge in cents per day.
 
 total_cost:
-The FINAL ACTUAL BILL TOTAL for this billing period, in euro.
-This is one of the highest-priority fields. Search the ENTIRE bill carefully before returning null.
-Look specifically for labels such as:
-- Total
-- Total amount
-- Invoice total
-- Amount due
-- Amount payable
-- Balance due
-- Total charges
-- Current bill
-- Total including VAT
-- Total incl. VAT
-- Amount to pay
-- New charges / Current charges when clearly identified as the total for this invoice
-Use the final amount actually payable for THIS BILLING PERIOD, not an old balance, previous balance, payment received, credit carried forward, subtotal, energy-only charge, or account balance.
-If VAT is shown separately, use the total INCLUDING VAT when that is the invoice total/amount payable.
-If the bill has a summary box and a detailed charges section, reconcile them and prefer the clearly labelled final total/amount due.
-If a total is clearly visible anywhere on either uploaded page, return it even if another section is harder to read.
-Do NOT calculate this value from usage, unit rate, standing charge, or any other field.
-Do NOT return null merely because the total is not beside the usage figure.
+The actual total amount due or charged for the billing period in euro.
+Use the amount shown on the bill.
+Do NOT calculate this value from usage and rate.
 
 provider:
 The energy supplier.
@@ -385,8 +367,7 @@ Use:
 
 Again:
 NEVER invent or estimate a value.
-For total_cost specifically, perform a deliberate second visual check of the whole bill for a final total/amount due before returning null.
-Return null only when no actual bill total can be read confidently.
+Return null when it cannot be read confidently.
 `;
 
     // ---------------------------------------------------------
