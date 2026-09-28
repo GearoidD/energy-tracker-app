@@ -685,30 +685,36 @@ export default function UploadReading({
     /*
      * SAVE READING
      */
-    const { error: readingError } =
-      await supabase
-        .from("readings")
-        .insert({
-          account_id: finalAccountId,
-          company_id: companyId,
-          reading_date:
-            extracted.billing_period_end || extracted.reading_date || null,
-          billing_period_start:
-            extracted.billing_period_start || null,
-          billing_period_end:
-            extracted.billing_period_end || extracted.reading_date || null,
-          usage:
-            extracted.usage || null,
-          rate:
-            extracted.rate || null,
-          standing_charge:
-            extracted.standing_charge || null,
-          total_cost:
-            extracted.total_cost === "" || extracted.total_cost == null ? null : Number(extracted.total_cost),
-          source: "upload",
-          confidence:
-            extracted.confidence || null,
-        });
+    const enhancedReading = {
+      account_id: finalAccountId,
+      company_id: companyId,
+      reading_date:
+        extracted.billing_period_end || extracted.reading_date || null,
+      billing_period_start:
+        extracted.billing_period_start || null,
+      billing_period_end:
+        extracted.billing_period_end || extracted.reading_date || null,
+      usage: extracted.usage || null,
+      rate: extracted.rate || null,
+      standing_charge: extracted.standing_charge || null,
+      total_cost:
+        extracted.total_cost === "" || extracted.total_cost == null ? null : Number(extracted.total_cost),
+      source: "upload",
+      confidence: extracted.confidence || null,
+    };
+
+    let { error: readingError } =
+      await supabase.from("readings").insert(enhancedReading);
+
+    // Backward-compatible fallback for databases where the optional billing
+    // period columns have not yet been migrated. This keeps bill uploads
+    // working while the migration is pending.
+    if (readingError && readingError.code === "42703") {
+      const legacyReading = { ...enhancedReading };
+      delete legacyReading.billing_period_start;
+      delete legacyReading.billing_period_end;
+      ({ error: readingError } = await supabase.from("readings").insert(legacyReading));
+    }
 
     if (readingError) {
       const isDuplicate =

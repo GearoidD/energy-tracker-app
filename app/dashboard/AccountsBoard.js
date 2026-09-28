@@ -1865,27 +1865,17 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     const applyCompanyScope = (query) =>
       combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
 
-    // Prefer the enhanced Pass-3 schema, but do not make historical bill visibility
-    // depend on the rate-review migration having been applied to Supabase yet.
+    // Use the legacy-safe readings shape here. The billing-period columns are
+    // optional and are added by a separate Supabase migration. Keeping the
+    // dashboard query compatible with the existing schema prevents a missing
+    // optional column from taking the entire post-login dashboard down.
     let result = await applyCompanyScope(
       supabase
         .from("readings")
-        .select("id, account_id, reading_date, billing_period_start, billing_period_end, rate, usage, standing_charge, total_cost, source, confidence, rate_review_status, rate_reviewed_at, created_at")
+        .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at")
         .order("reading_date", { ascending: false, nullsFirst: false })
     );
-
-    if (result.error) {
-      console.warn("Enhanced readings query failed; retrying with legacy schema:", result.error.message);
-      setRateReviewMigrationPending(true);
-      result = await applyCompanyScope(
-        supabase
-          .from("readings")
-          .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at")
-          .order("reading_date", { ascending: false, nullsFirst: false })
-      );
-    } else {
-      setRateReviewMigrationPending(false);
-    }
+    setRateReviewMigrationPending(true);
 
     if (result.error) {
       console.error("Could not load saved bill readings:", result.error.message);
