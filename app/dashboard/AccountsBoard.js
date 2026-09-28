@@ -4414,31 +4414,39 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       ))}
 
       {showAccountTable && activityItems && activityItems.length > 0 && (
-        <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-          <button
-            onClick={() => setActivityExpanded((v) => !v)}
-            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: activityExpanded ? 14 : 0, width: "100%", textAlign: "left" }}
-          >
-            <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, margin: 0, flexShrink: 0 }}>RECENT ACTIVITY</p>
-            {!activityExpanded && (
-              <span style={{ fontSize: 12, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {activityItems[0].text} · {timeAgo(activityItems[0].timestamp)}
-                {activityItems.length > 1 ? ` · +${activityItems.length - 1} more` : ""}
-              </span>
-            )}
-            <ChevronDown size={13} color="var(--muted)" style={{ transform: activityExpanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease", marginLeft: "auto", flexShrink: 0 }} />
-          </button>
+        <article className="gn-card" style={{ marginTop: 16 }}>
+          <div className="gn-card-heading">
+            <div>
+              <h2>Recent activity</h2>
+              <p>{activityItems.length} update{activityItems.length === 1 ? "" : "s"} across your accounts</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActivityExpanded((v) => !v)}
+              className="gn-card-link"
+              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+            >
+              {activityExpanded ? "Hide" : "Show all"}
+              <ChevronDown size={13} style={{ transform: activityExpanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+            </button>
+          </div>
+          {!activityExpanded && (
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>
+              {activityItems[0].text} · {timeAgo(activityItems[0].timestamp)}
+              {activityItems.length > 1 ? ` · +${activityItems.length - 1} more` : ""}
+            </div>
+          )}
           {activityExpanded && (
             <div className="wp-soft-in" style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {activityItems.map((item) => (
-                <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--muted)" }}>
+                <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)" }}>
                   <span>{item.text}</span>
                   <span style={{ flexShrink: 0, marginLeft: 12 }}>{timeAgo(item.timestamp)}</span>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </article>
       )}
 
       <div style={{ marginTop: 48, paddingTop: 18, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "center", gap: 18 }}>
