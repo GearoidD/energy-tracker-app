@@ -10,9 +10,6 @@ export const maxDuration = 60;
 const CODE_VERSION = "MKT-V9-DIRECT";
 
 function authorised(request) {
-  // TEMPORARY - allows direct browser testing via ?debug=1. Remove after diagnosing.
-  const url = new URL(request.url);
-  if (url.searchParams.get("debug") === "1") return true;
   const secret = process.env.CRON_SECRET;
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
 }
@@ -56,19 +53,6 @@ async function runMarketScan() {
 }
 
 async function runMarketScanInner() {
-  // TEMPORARY DIAGNOSTIC - bypasses the real Anthropic call entirely.
-  // If this fake response ALSO loses fields, the problem has nothing to do with Anthropic at all.
-  return NextResponse.json(
-    {
-      version: CODE_VERSION,
-      error: "FAKE TEST ERROR - no Anthropic call was made",
-      test_field_one: "if you see this, fields survive",
-      test_field_two: 12345,
-      test_nested: { a: 1, b: 2 },
-    },
-    { status: 502 }
-  );
-
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ version: CODE_VERSION, error: "ANTHROPIC_API_KEY is not configured.", key_length_only: (process.env.ANTHROPIC_API_KEY || "").length }, { status: 500 });
   }
@@ -170,7 +154,7 @@ Respond with ONLY a single compact JSON object, no other text, using exactly the
 }
 
 export async function GET(request) {
-  // TEMPORARY - auth check fully removed for diagnosis. MUST be restored after.
+  if (!authorised(request)) return NextResponse.json({ version: CODE_VERSION, error: "Unauthorized" }, { status: 401 });
   return runMarketScan();
 }
 

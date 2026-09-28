@@ -15,17 +15,20 @@ export default function MarketScanTestButton() {
       const res = await fetch("/api/admin/run-market-scan", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        const keyInfo = data.key_length_only !== undefined ? `\nKey length seen by this route: ${data.key_length_only}` : "";
-        const rawInfo = data.anthropic_raw ? `\n\nRaw Anthropic response:\n${JSON.stringify(data.anthropic_raw, null, 2)}` : "";
+        const cronData = data.received_from_cron || {};
+        const keyInfo = cronData.key_length_only !== undefined ? `\nKey length seen: ${cronData.key_length_only}` : "";
+        const rawInfo = cronData.anthropic_raw ? `\n\nRaw Anthropic response:\n${JSON.stringify(cronData.anthropic_raw, null, 2)}` : "";
+        const fullDump = `\n\nFull admin response:\n${JSON.stringify(data, null, 2)}`;
         setMessage({
           ok: false,
-          text: `[${data.version || "NO VERSION - old code still deployed"}] ${data.error || "Couldn't run the scan."}${keyInfo}${rawInfo}${data.stack ? "\n\n" + data.stack : ""}`,
+          text: `[${data.version || "NO VERSION"}] ${data.error || cronData.error || "Couldn't run the scan."}${keyInfo}${rawInfo}${fullDump}`,
         });
         return;
       }
+      const cronData = data.received_from_cron || {};
       setMessage({
         ok: true,
-        text: data.skipped ? data.reason : `Snapshot saved for ${data.snapshot_date}.`,
+        text: cronData.skipped ? cronData.reason : `Snapshot saved for ${cronData.snapshot_date}.`,
       });
       router.refresh();
     } catch (e) {
