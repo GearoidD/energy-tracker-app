@@ -1799,6 +1799,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   const [rateCorrection, setRateCorrection] = useState("");
   const [rateReviewSaving, setRateReviewSaving] = useState(false);
   const [quoteOffers, setQuoteOffers] = useState([]);
+  const [marketSignal, setMarketSignal] = useState(null);
   const [quoteOffersAvailable, setQuoteOffersAvailable] = useState(true);
 
   useEffect(() => {
@@ -1918,6 +1919,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     setSuppliers(data || []);
   }, []);
 
+  const loadMarketSignal = useCallback(async () => {
+    const { data } = await supabase
+      .from("market_snapshots")
+      .select("pressure_score, pressure_label, snapshot_date")
+      .order("snapshot_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setMarketSignal(data || null);
+  }, []);
+
   const loadQuoteOffers = useCallback(async () => {
     let query = supabase.from("quote_offers").select("*").order("created_at", { ascending: false });
     query = combinedMode ? query.in("company_id", companyIds) : query.eq("company_id", companyId);
@@ -1933,6 +1944,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
   }, [companyId, combinedMode, companyIds]);
 
   useEffect(() => { loadQuoteOffers(); }, [loadQuoteOffers]);
+  useEffect(() => { loadMarketSignal(); }, [loadMarketSignal]);
 
   const updateQuoteStatus = async (offer, status) => {
     if (status === "approved" && !window.confirm(`Accept ${offer.supplier_name}'s offer and move this account to Switching?\n\nThis records the commercial decision in GnóRate. It does not replace any supplier contract/authority document unless the supplier's terms are attached and executed.`)) return;
@@ -2927,7 +2939,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
               {billUsageTrend.some((month) => month.usage > 0) ? <div className="gn-bars">{billUsageTrend.map((month) => { const max = Math.max(...billUsageTrend.map((point) => point.usage), 1); return <div className="gn-bar-column" key={month.key} title={`${month.label}: ${Math.round(month.usage).toLocaleString("en-IE")} kWh`}><em>{month.usage ? Math.round(month.usage).toLocaleString("en-IE") : "-"}</em><div className="gn-bar-track"><i style={{ height: month.usage ? `${Math.max(5, (month.usage / max) * 100)}%` : "0%" }}/></div><small>{month.label}</small></div>; })}</div> : <div className="gn-empty-chart">Your monthly usage trend will appear here as bills are uploaded.</div>}
             </article>
           </div>
-          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("accounts")}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "Portfolio currently on track"} <span aria-hidden="true">→</span></Link><Link href={sectionHref("accounts")}>View all accounts <span aria-hidden="true">→</span></Link></div>
+          <div className="gn-overview-foot"><Link className="gn-overview-status" href={summaryStats.needAttention ? "/dashboard/attention" : dashboardRenewals.length ? sectionHref("renewals") : sectionHref("accounts")}><i className="gn-status-dot"/> {summaryStats.needAttention ? `${summaryStats.needAttention} accounts need attention` : dashboardRenewals.length ? "Contract dates are coming up" : "Portfolio currently on track"} <span aria-hidden="true">→</span></Link>{marketSignal && <Link href="/dashboard/market" style={{ color: "var(--muted)", fontSize: 13 }}>Market: {marketSignal.pressure_label} ({Math.round(marketSignal.pressure_score)}/100) <span aria-hidden="true">→</span></Link>}<Link href={sectionHref("accounts")}>View all accounts <span aria-hidden="true">→</span></Link></div>
           <div className="gn-task-grid">
             <article className="gn-card gn-task-card"><div className="gn-card-heading"><div><h2>Needs attention</h2><p>Contracts ending within 30 days, rate rises of 5%+, or bill details to verify</p></div><Link href="/dashboard/attention" className="gn-card-link">View queue →</Link></div>
               {dashboardActions.length ? <div className="gn-task-list">{dashboardActions.map((item) => <button key={item.account.id} onClick={() => openDashboardAccount(item.account)}><span className="gn-task-mark" style={{ background: item.color }}/><span><b>{item.account.name}</b><small>{item.groupLabel}{item.detail ? ` · ${item.detail}` : ""}</small></span><strong>Review →</strong></button>)}</div> : <div className="gn-task-empty">No outstanding account actions.</div>}
