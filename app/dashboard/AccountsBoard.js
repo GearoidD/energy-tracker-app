@@ -66,6 +66,10 @@ const RENEWAL_STATUS_META = {
   renewed: { label: "Renewed", color: "var(--green)" },
 };
 
+function renewalMeta(status) {
+  return RENEWAL_STATUS_META[status] || RENEWAL_STATUS_META.not_started;
+}
+
 function fmtMoney(n) {
   if (n === null || n === undefined || isNaN(n)) return "—";
   return "€" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -241,7 +245,7 @@ function overallStatusFor(a) {
     return { label: "Bill details to check", color: "var(--amber)" };
   }
   if (beingHandled) {
-    return { label: RENEWAL_STATUS_META[renewalStatus].label, color: "var(--teal)" };
+    return { label: renewalMeta(renewalStatus).label, color: "var(--teal)" };
   }
   if (a.status === "soon") {
     return { label: "Renewal coming up", color: "var(--state)" };
@@ -321,7 +325,7 @@ function accountNextSteps(a) {
     steps.push({ kind: "info", action: "market", title: a.comparison ? "Market figure is an estimate" : "No market comparison is saved", detail: "Review available rates and request a supplier quote before making a switching decision. Any savings shown are indicative.", button: "Review rates and quotes" });
   }
   if (renewalInProgress) {
-    steps.push({ kind: "info", action: "renewal", title: "Renewal marked as in progress", detail: `Current stage: ${RENEWAL_STATUS_META[renewalStatus].label}. Update this when the supplier process changes.`, button: "Update renewal stage" });
+    steps.push({ kind: "info", action: "renewal", title: "Renewal marked as in progress", detail: `Current stage: ${renewalMeta(renewalStatus).label}. Update this when the supplier process changes.`, button: "Update renewal stage" });
   }
   if (!steps.length) {
     steps.push({ kind: "info", action: null, title: "No action currently flagged", detail: "This is a status summary based on the information saved in GnóRate. Review it when you receive a new bill or supplier update.", button: null });
@@ -2432,7 +2436,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         const q = search.toLowerCase();
         const matchesSearch =
           !q ||
-          a.name.toLowerCase().includes(q) ||
+          (a.name || "").toLowerCase().includes(q) ||
           (a.location || "").toLowerCase().includes(q) ||
           (a.provider || "").toLowerCase().includes(q) ||
           (a.account_number || "").toLowerCase().includes(q) ||
@@ -2556,7 +2560,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     enrichedAll.forEach((a) => {
       const status = a.renewal_status || "not_started";
       const beingHandled = status === "quote_requested" || status === "switching";
-      const statusSuffix = beingHandled ? ` — ${RENEWAL_STATUS_META[status].label}` : "";
+      const statusSuffix = beingHandled ? ` — ${renewalMeta(status).label}` : "";
 
       if ((a.status === "overdue" || a.status === "urgent") && status !== "renewed") {
         items.push({
@@ -2570,7 +2574,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       } else if (a.daysLeft !== null && a.daysLeft > 30 && a.daysLeft <= 60 && status !== "renewed") {
         items.push({ id: `${a.id}-renewal-action`, account: a, severity: 2, color: "var(--amber)", groupLabel: "Renewal action due within 60 days", detail: `${a.daysLeft} days until contract end${statusSuffix}. Next: ${renewalNextStep(a)}.` });
       } else if (beingHandled) {
-        items.push({ id: `${a.id}-renewal-progress`, account: a, severity: 2.2, color: "var(--amber)", groupLabel: "Renewal in progress — follow-up required", detail: `${RENEWAL_STATUS_META[status].label}. Next: ${renewalNextStep(a)}.` });
+        items.push({ id: `${a.id}-renewal-progress`, account: a, severity: 2.2, color: "var(--amber)", groupLabel: "Renewal in progress — follow-up required", detail: `${renewalMeta(status).label}. Next: ${renewalNextStep(a)}.` });
       }
       const latest = readingSummaries[a.id]?.[0];
       if (latest?.confidence === "low") {
@@ -4047,9 +4051,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         style={{
                           fontSize: 12,
                           fontWeight: 600,
-                          color: RENEWAL_STATUS_META[a.renewal_status || "not_started"].color,
+                          color: renewalMeta(a.renewal_status || "not_started").color,
                           background: "var(--bg)",
-                          border: `1px solid ${RENEWAL_STATUS_META[a.renewal_status || "not_started"].color}55`,
+                          border: `1px solid ${renewalMeta(a.renewal_status || "not_started").color}55`,
                           borderRadius: 6,
                           padding: "4px 8px",
                           cursor: "pointer",
