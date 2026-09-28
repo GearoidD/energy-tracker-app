@@ -32,11 +32,36 @@ export default async function MarketPage() {
   const sources = latest?.source_meta?.sources || [];
 
   const metrics = [
-    ["SEM day-ahead", fmt(latest?.sem_day_ahead_eur_mwh, " €/MWh"), latest?.sem_change_7d_pct],
-    ["European gas", fmt(latest?.gas_eur_mwh, " €/MWh"), latest?.gas_change_7d_pct],
-    ["Brent crude", fmt(latest?.brent_usd_bbl, " $/bbl"), latest?.brent_change_7d_pct],
-    ["EU carbon", fmt(latest?.carbon_eur_t, " €/t"), latest?.carbon_change_7d_pct],
-    ["EUR / USD", fmt(latest?.eur_usd), null],
+    [
+      "SEM day-ahead",
+      fmt(latest?.sem_day_ahead_eur_mwh, " €/MWh"),
+      latest?.sem_change_7d_pct,
+      "Ireland & NI's wholesale electricity price for tomorrow — an early signal for where rates are heading.",
+    ],
+    [
+      "European gas",
+      fmt(latest?.gas_eur_mwh, " €/MWh"),
+      latest?.gas_change_7d_pct,
+      "Wholesale gas price across Europe. Gas plants often set the electricity price too, so this feeds through directly.",
+    ],
+    [
+      "Brent crude",
+      fmt(latest?.brent_usd_bbl, " $/bbl"),
+      latest?.brent_change_7d_pct,
+      "The global oil benchmark. Tends to move alongside gas and broader energy costs, even though it's a different fuel.",
+    ],
+    [
+      "EU carbon",
+      fmt(latest?.carbon_eur_t, " €/t"),
+      latest?.carbon_change_7d_pct,
+      "The cost of emitting CO2 under EU rules. A higher price adds directly to the cost of gas and coal-fired power.",
+    ],
+    [
+      "EUR / USD",
+      fmt(latest?.eur_usd),
+      null,
+      "The exchange rate. Energy is often priced in dollars internationally, so a weaker euro can push local costs up.",
+    ],
   ];
 
   return (
@@ -54,10 +79,10 @@ export default async function MarketPage() {
             {profile?.is_platform_admin && <MarketScanTestButton />}
           </div>
           {latest && (
-            <div style={{ textAlign: "right" }}>
+            <div style={{ textAlign: "right", maxWidth: 220 }}>
               <strong style={{ fontSize: 34 }}>{Math.round(latest.pressure_score)}</strong>
               <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                directional pressure / 100
+                how much upward pressure on prices, out of 100
                 <br />
                 updated {latest.snapshot_date}
                 <br />
@@ -69,8 +94,8 @@ export default async function MarketPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 16 }}>
-        {metrics.map(([label, value, change]) => (
-          <div className="gn-card" style={{ padding: 16 }} key={label}>
+        {metrics.map(([label, value, change, explanation]) => (
+          <div className="gn-card" style={{ padding: 16, display: "flex", flexDirection: "column" }} key={label}>
             <small style={{ color: "var(--muted)" }}>{label}</small>
             <div style={{ fontSize: 20, fontWeight: 800, marginTop: 6 }}>{value}</div>
             {change !== null && change !== undefined && (
@@ -78,6 +103,9 @@ export default async function MarketPage() {
                 {change >= 0 ? "+" : ""}
                 {Number(change).toFixed(1)}% over 7 days
               </div>
+            )}
+            {explanation && (
+              <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.45, marginTop: 10, marginBottom: 0 }}>{explanation}</p>
             )}
           </div>
         ))}
