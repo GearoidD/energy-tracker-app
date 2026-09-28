@@ -372,3 +372,219 @@ a {
 /* Portfolio readiness turns missing data into a guided setup task. */
 .gn-readiness-card{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:28px;align-items:center;background:linear-gradient(135deg,var(--panel),#f2f8f4);border:1px solid var(--border-light);border-radius:14px;padding:22px 24px;margin:0 0 18px;box-shadow:0 8px 24px rgba(19,61,43,.05)}
 .gn-readiness-copy>span{display:block;font-size:10px;font-weight:800;letter-spacing:.12em;color:var(--teal);margin-bottom:7px}.gn-readiness-copy>strong{display:block;font-family:'Manrope',sans-serif;font-size:18px;color:var(--text);margin-bottom:5px}.gn-readiness-copy>p{font-size:12.5px;color:var(--muted);margin:0 0 12px;max-width:680px}.gn-readiness-missing{display:flex;gap:7px;flex-wrap:wrap}.gn-readiness-missing span{font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--border);padding:5px 8px;border-radius:999px}.gn-readiness-missing b{color:var(--text)}.gn-readiness-score{text-align:right}.gn-readiness-score>strong{display:block;font-family:'IBM Plex Mono',monospace;font-size:28px;color:var(--text)}.gn-readiness-score>span{font-size:11px;color:var(--muted)}.gn-readiness-score>div{height:6px;background:var(--border-light);border-radius:99px;overflow:hidden;margin:10px 0}.gn-readiness-score>div i{display:block;height:100%;background:var(--teal);border-radius:99px}.gn-readiness-score>a{font-size:11.5px;font-weight:700;color:var(--teal);text-decoration:none}@media(max-width:720px){.gn-readiness-card{grid-template-columns:1fr}.gn-readiness-score{text-align:left}}
+
+/* ================================================================
+   GnóRate UI refinement — commercial B2B SaaS pass
+   ================================================================ */
+:root {
+  --bg: #f6f8f7;
+  --panel: #ffffff;
+  --panel2: #f8faf9;
+  --border: #e2e8e4;
+  --border-light: #d5dfd9;
+  --text: #17352b;
+  --muted: #6e7f77;
+  --teal: #08784e;
+  --teal-dim: #e6f4ec;
+  --green: #1f8a59;
+  --amber: #a96d13;
+  --red: #b64b3b;
+}
+
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+
+.portal-layout { grid-template-columns: 236px minmax(0,1fr); background:var(--bg); }
+.portal-sidebar {
+  background: #0c3528;
+  padding: 22px 14px 18px;
+  border-right: 1px solid #092c22;
+  box-shadow: 8px 0 30px rgba(14,54,40,.04);
+}
+.portal-brand { padding: 4px 11px 20px; border-bottom-color: rgba(255,255,255,.10); }
+.portal-nav-label { padding: 0 11px; margin-top: 3px; color:#91b4a4; font-size:9px; letter-spacing:1.35px; }
+.portal-nav { gap:3px; margin-top:7px; }
+.portal-nav a {
+  min-height:42px;
+  padding:10px 11px;
+  border:1px solid transparent;
+  border-radius:9px;
+  color:#c8ddd4;
+  font-size:12px;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;
+}
+.portal-nav a svg { opacity:.82; }
+.portal-nav a:hover { background:rgba(255,255,255,.055); color:#fff; transform:translateX(1px); }
+.portal-nav a.active {
+  background:#ffffff12;
+  border-color:#ffffff12;
+  color:#fff;
+  box-shadow:inset 3px 0 0 #47c98c;
+}
+.portal-nav a.active svg { color:#72d9a8; opacity:1; }
+.portal-sidebar-foot { color:#86a99a; border-top-color:rgba(255,255,255,.10); font-size:10px; }
+
+.portal-main > header { background:rgba(255,255,255,.96); border-bottom:1px solid var(--border); }
+.portal-content { max-width:1480px; padding:30px 36px 64px; }
+.portal-heading { margin-bottom:24px; }
+.portal-kicker { color:#14845b; font-size:9px; letter-spacing:1.45px; margin-bottom:7px; }
+.portal-heading h1 { font-size:29px; letter-spacing:-1px; }
+.portal-heading p { color:#74837d; font-size:12px; }
+
+.gn-welcome-panel {
+  min-height:190px;
+  padding:27px 30px;
+  border-radius:16px;
+  border-color:#164c39;
+  background:radial-gradient(circle at 88% 15%,#25825b 0,transparent 29%),linear-gradient(118deg,#0d382a 0%,#124d37 58%,#176247 100%);
+  box-shadow:0 12px 32px rgba(17,62,44,.10);
+}
+.gn-welcome-copy h2 { font-size:29px; letter-spacing:-1.1px; }
+.gn-welcome-copy p { color:#c8ddd3; font-size:11.5px; }
+.gn-welcome-actions { gap:14px; margin-top:18px; }
+.gn-welcome-actions .gn-welcome-primary { border-radius:7px; padding:9px 12px; }
+.gn-welcome-insight { width:226px; padding:15px 16px; border-radius:11px; background:rgba(255,255,255,.085); }
+.gn-welcome-insight strong { font-size:20px; }
+
+.gn-kpis { gap:12px; }
+.gn-kpi,.gn-card {
+  border-color:#e1e8e4;
+  border-radius:12px;
+  box-shadow:0 3px 13px rgba(24,61,42,.045);
+}
+.gn-kpi { min-height:126px; padding:17px; }
+.gn-kpi:hover { transform:translateY(-1px); border-color:#afd1bd; box-shadow:0 8px 22px rgba(24,61,42,.08); }
+.gn-kpi > span { color:#60736a; font-size:10.5px; margin-bottom:9px; }
+.gn-kpi strong { font-size:24px; }
+.gn-kpi small { color:#829089; font-size:10px; }
+.gn-kpi-icon { width:34px; height:34px; right:15px; bottom:15px; border-radius:9px; }
+.gn-kpi-line { right:15px; bottom:17px; height:3px; }
+
+.gn-card { padding:18px 19px; }
+.gn-card-heading h2 { font-size:13.5px; }
+.gn-card-heading p { font-size:10px; }
+.gn-card-menu { border:1px solid #e3e9e5; background:#f8faf9; }
+
+/* Give data tables a proper enterprise hierarchy. */
+.gn-usage-account-row,
+.gn-usage-no-record-row { transition:background .14s ease; }
+.gn-usage-account-row { padding:13px 8px; border-radius:7px; }
+.gn-usage-account-row:hover { background:#f8fbf9; }
+.gn-usage-account-row strong { font-size:10.5px; }
+.gn-usage-account-name>strong { font-size:11px; color:#1b4031; }
+.gn-usage-account-name>span { color:#7b8983; }
+
+.gn-section-summary {
+  padding:12px 15px;
+  margin:2px 0 17px;
+  border:1px solid #dcebe2;
+  background:#f1f8f4;
+  border-radius:9px;
+}
+.gn-section-summary strong { font-size:21px; }
+.gn-inline-action { border-color:#cfe0d5; }
+
+/* Buttons: consistent GnóRate control language. */
+button,
+.gn-inline-action,
+.gn-usage-empty button,
+.gn-usage-empty-panel button,
+.gn-usage-account-row>button {
+  transition:background .14s ease,border-color .14s ease,color .14s ease,transform .14s ease,box-shadow .14s ease;
+}
+button:hover:not(:disabled),
+.gn-inline-action:hover,
+.gn-usage-empty button:hover,
+.gn-usage-empty-panel button:hover,
+.gn-usage-account-row>button:hover {
+  transform:translateY(-1px);
+}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {
+  outline:2px solid #46b982;
+  outline-offset:2px;
+}
+
+/* Empty states should feel useful, not like missing product content. */
+.gn-dashboard-load-state,
+.gn-usage-empty-panel {
+  border-color:#dce7e1;
+  background:#fbfcfb;
+  border-radius:10px;
+}
+.gn-usage-empty-panel { padding:16px; }
+
+/* Readiness card: quieter, more executive. */
+.gn-readiness-card {
+  grid-template-columns:minmax(0,1fr) 190px;
+  gap:24px;
+  padding:19px 21px;
+  margin-bottom:16px;
+  border-radius:12px;
+  border-color:#dfe7e2;
+  background:linear-gradient(105deg,#fff 0%,#f6faf8 100%);
+  box-shadow:0 5px 18px rgba(19,61,43,.045);
+}
+.gn-readiness-copy>span { font-size:9px; letter-spacing:.13em; }
+.gn-readiness-copy>strong { font-size:17px; }
+.gn-readiness-copy>p { font-size:11.5px; }
+.gn-readiness-missing span { font-size:10px; padding:4px 7px; }
+.gn-readiness-score>strong { font-family:Manrope,sans-serif; font-size:25px; }
+.gn-readiness-score>div { height:5px; margin:8px 0; }
+
+/* Company cards. */
+.gn-company-overview-grid { gap:11px; }
+.gn-company-overview-card { padding:15px; border-radius:11px; box-shadow:0 3px 12px rgba(24,61,42,.04); }
+.gn-company-overview-card h3 { font-size:13px; }
+.gn-company-overview-stats { gap:7px; }
+
+/* Responsive behaviour for the actual portal, not just the cards. */
+@media (max-width:1100px) {
+  .portal-layout { grid-template-columns:210px minmax(0,1fr); }
+  .portal-content { padding:26px 24px 54px; }
+  .gn-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .gn-welcome-panel { align-items:flex-start; }
+}
+@media (max-width:760px) {
+  .portal-layout { display:block; }
+  .portal-sidebar {
+    position:relative;
+    width:100%;
+    height:auto;
+    max-height:none;
+    padding:12px 14px;
+    display:block;
+    overflow:visible;
+  }
+  .portal-brand { display:flex; padding:5px 8px 12px; margin-bottom:10px; }
+  .portal-nav-label { display:none; }
+  .portal-sidebar > div:not(.portal-sidebar-foot) { overflow-x:auto; }
+  .portal-sidebar > div:not(.portal-sidebar-foot) .portal-nav {
+    display:flex;
+    gap:4px;
+    width:max-content;
+    padding-bottom:2px;
+  }
+  .portal-sidebar > div:not(.portal-sidebar-foot) .portal-nav a { min-height:36px; padding:8px 10px; }
+  .portal-sidebar > div:nth-of-type(n+2) { display:none; }
+  .portal-sidebar-foot { display:none; }
+  .portal-content { padding:22px 16px 44px; }
+  .portal-heading { align-items:flex-start; margin-bottom:19px; }
+  .portal-heading h1 { font-size:24px; }
+  .gn-welcome-panel { flex-direction:column; padding:22px; }
+  .gn-welcome-insight { width:100%; max-width:none; }
+  .gn-insight-grid { grid-template-columns:1fr; }
+  .gn-usage-content { grid-template-columns:1fr; }
+  .gn-donut-row { justify-content:center; }
+  .gn-readiness-card { grid-template-columns:1fr; }
+  .gn-readiness-score { text-align:left; }
+}
+@media (max-width:520px) {
+  .gn-kpis { grid-template-columns:1fr; }
+  .gn-kpi { min-height:112px; }
+  .gn-welcome-copy h2 { font-size:24px; }
+  .gn-welcome-copy p { font-size:11px; }
+  .gn-welcome-actions { align-items:flex-start; flex-direction:column; gap:11px; }
+  .gn-welcome-actions .gn-welcome-primary { width:100%; justify-content:center; }
+  .portal-content { padding-left:13px; padding-right:13px; }
+}
