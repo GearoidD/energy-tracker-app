@@ -1872,7 +1872,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     let result = await applyCompanyScope(
       supabase
         .from("readings")
-        .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at, rate_review_status, rate_reviewed_at, rate_reviewed_by")
+        .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at")
         .order("reading_date", { ascending: false, nullsFirst: false })
     );
     setRateReviewMigrationPending(true);
@@ -3914,18 +3914,6 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                 </div>
 
                 <div className="gn-account-info-grid">
-                  <div className="gn-account-tariff-grid" aria-label="Current tariff">
-                    <div className="gn-account-tariff-card">
-                      <small>Current unit rate</small>
-                      <strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong>
-                      <span>{a.rate ? "Current supplier rate" : "Add from latest bill"}</span>
-                    </div>
-                    <div className="gn-account-tariff-card">
-                      <small>Standing charge</small>
-                      <strong>{a.standing_charge ? `${Number(a.standing_charge).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/day` : "Not recorded"}</strong>
-                      <span>{a.standing_charge ? "Daily supplier charge" : "Add from latest bill"}</span>
-                    </div>
-                  </div>
                   <div className="gn-account-info-cell"><small>Supplier <em>Saved detail</em></small><strong>{a.provider || "Not recorded"}</strong>{isExpanded && !a.provider && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add supplier</button>}</div>
                   <div className="gn-account-info-cell"><small>Current unit rate <em>From saved details or bill</em></small><strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong>{isExpanded && !a.rate && <button type="button" onClick={() => setUploadingFor(a.id)}>Add rate from bill</button>}</div>
                   <div className="gn-account-info-cell"><small>Standing charge <em>Daily supplier charge</em></small><strong>{a.standing_charge ? `${Number(a.standing_charge).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/day` : "Not recorded"}</strong>{isExpanded && !a.standing_charge && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add standing charge</button>}</div>
@@ -4372,13 +4360,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                                 <span style={{ color: "var(--muted)" }}>{r.reading_date || "no date"}</span>
                                 <span>{r.usage ? `${r.usage} kWh` : "—"}</span>
                                 <span>{r.rate ? `${r.rate}c/kWh` : "—"}</span>
-                                <span title={r.total_cost != null ? "Actual total amount shown on the bill" : "Estimated from rate × usage - excludes standing charge, VAT and levies"}>
-                                  {r.total_cost != null
-                                    ? `Bill total ${fmtMoney(Number(r.total_cost))}`
-                                    : r.rate && r.usage
-                                    ? `~${fmtMoney((parseFloat(r.rate) / 100) * parseFloat(r.usage))} est.`
-                                    : "Bill total —"}
-                                </span>
+                                <span title="Actual total amount shown on the bill">Bill total {r.total_cost != null ? fmtMoney(Number(r.total_cost)) : "—"}</span>
                                 <span style={{ color: "var(--muted)", fontSize: 10 }}>{r.source}</span>
                                 <button
                                   onClick={() => deleteReading(r.id, a.id)}
