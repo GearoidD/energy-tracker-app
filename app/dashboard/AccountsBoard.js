@@ -418,13 +418,6 @@ function annualCostDetail(acc, readings, quote = null) {
   return projectedAnnualCost(acc, readings, quote);
 }
 
-function annualSaving(acc) {
-  const rate = parseFloat(acc.rate);
-  const market = parseFloat(acc.market_rate);
-  const usage = parseFloat(acc.usage);
-  if (isNaN(rate) || isNaN(market) || isNaN(usage)) return null;
-  return ((rate - market) / 100) * usage;
-}
 
 function Gauge({ daysLeft, status, size = 64 }) {
   const stroke = 6;
@@ -2396,15 +2389,14 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       const currentRate = latestReading?.rate ?? a.rate;
       const comparison = marketComparisonFor({ ...a, rate: currentRate }, benchmarks, masterRates);
       const preliminaryCost = annualCostDetail({ ...a, rate: currentRate }, readingSummaries[a.id]);
-      // Savings opportunities use the same evidence threshold as annual cost projections.
-      // Do not calculate or display an annual saving from a single bill, a short history,
-      // or an unverified annual-usage figure. Four months (120 days) of measured coverage
-      // is the minimum unless the account has a trusted full-year usage value saved.
       const usageNum = Number(preliminaryCost.usage);
       const rateNum = parseFloat(currentRate);
-      const savingsEligible = preliminaryCost?.projectionEligible === true;
+      // Savings are only meaningful once GnóRate has enough measured history
+      // to support an annual usage figure. Never annualise a 1–3 month account
+      // simply because an account-level usage value happens to exist.
+      const savingEligible = Boolean(preliminaryCost?.projectionEligible && Number.isFinite(usageNum) && !isNaN(rateNum));
       const saving =
-        savingsEligible && comparison && Number.isFinite(usageNum) && !isNaN(rateNum)
+        comparison && savingEligible
           ? ((rateNum - comparison.rate) / 100) * usageNum
           : null;
       const confidence = accountConfidence(a, latestReading);
@@ -2979,9 +2971,9 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
           </section>}
           <div className="gn-kpis">
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Total energy cost</span><strong>{summaryStats.hasAnyCost ? fmtMoney(summaryStats.totalSpend) : "Awaiting bills"}</strong><small>{summaryStats.realBillCount} accounts with a spend estimate</small><i className="gn-kpi-line" /></Link>
-            <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Rate opportunity</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Unit-rate estimate; excludes other bill charges" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
+            <Link href={sectionHref("savings")} className="gn-kpi gn-kpi-highlight"><span>Rate opportunity</span><strong>{summaryStats.hasAnyComparison ? fmtMoney(summaryStats.potentialSavings) : "—"}</strong><small>{summaryStats.hasAnyComparison ? "Eligible unit-rate opportunity; excludes other bill charges" : "Add rates to identify opportunities"}</small><i className="gn-kpi-line" /></Link>
             <Link href={sectionHref("accounts")} className="gn-kpi"><span>Tracked accounts</span><strong>{summaryStats.total}</strong><small>{summaryStats.renewingSoon90} renewing in the next 90 days</small><i className="gn-kpi-icon"><FileText size={20}/></i></Link>
-            <Link href={sectionHref("savings")} className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive savings estimates over €20/yr</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
+            <Link href={sectionHref("savings")} className="gn-kpi"><span>Rate opportunities</span><strong>{opportunityCount}</strong><small>Positive opportunities over €20/yr with sufficient usage history</small><i className="gn-kpi-icon"><TrendingDown size={20}/></i></Link>
           </div>
           {(() => {
             const opportunities = enrichedAll
@@ -3038,7 +3030,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
         </section>
       )}
 
-      {showAccountTable && section !== "accounts" && !lockedLocation && section !== "usage" && <div className="gn-section-summary"><strong>{enriched.length}</strong><span>{section === "rates" ? "accounts with a current market comparison" : section === "renewals" ? "contracts overdue or ending within the next 120 days" : `${fmtMoney(enriched.reduce((sum, account) => sum + (account.saving > 20 ? account.saving : 0), 0))} estimated savings per year across positive comparisons`}</span>{section === "rates" && <button className="gn-inline-action" onClick={() => setShowBenchmarks(true)}>Market benchmarks →</button>}</div>}
+      {showAccountTable && section !== "accounts" && !lockedLocation && section !== "usage" && <div className="gn-section-summary"><strong>{enriched.length}</strong><span>{section === "rates" ? "accounts with a current market comparison" : section === "renewals" ? "contracts overdue or ending within the next 120 days" : `${fmtMoney(enriched.reduce((sum, account) => sum + (account.saving > 20 ? account.saving : 0), 0))} potential annual savings across eligible comparisons`}</span>{section === "rates" && <button className="gn-inline-action" onClick={() => setShowBenchmarks(true)}>Market benchmarks →</button>}</div>}
 
       {section === "usage" && !lockedLocation && (
         <section className="gn-card gn-usage-explorer" aria-label="Recorded account usage">
@@ -3925,7 +3917,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   <div className="gn-account-info-cell"><small>Annual usage <em>{a.costDetail?.usageEstimate?.source === "bills" ? "Calculated from bill periods" : a.costDetail?.usageEstimate?.source === "historical-bills" ? "Estimated from historical bill dates" : "Manually entered"}</em></small><strong>{a.costDetail?.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong><span>{a.costDetail?.usageEstimate?.detail || "Upload bills with exact billing-period dates to calculate a more reliable annual projection."}</span>{isExpanded && !a.costDetail?.usage && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add annual usage</button>}</div>
                   <div className="gn-account-info-cell"><small>Latest bill on file <em>Reading date</em></small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong>{isExpanded && (!readingSummaries[a.id]?.[0]?.reading_date || a.confidence.missingBill) && <button type="button" onClick={() => setUploadingFor(a.id)}>{readingSummaries[a.id]?.[0]?.reading_date ? "Add newer bill" : "Upload first bill"}</button>}</div>
                   <div className="gn-account-info-cell"><small>Contract end date <em>Saved detail</em></small><strong>{formatAccountDate(a.contract_end)}</strong>{isExpanded && !a.contract_end && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add end date</button>}</div>
-                  <div className="gn-account-info-cell gn-account-estimate"><small>Total energy cost <em>{a.costDetail?.projectionEligible ? "Annualised tariff basis" : "Insufficient bill history"}</em></small><strong>{a.costDetail?.projectionEligible && a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>{a.costDetail?.projectionEligible ? "Annualised from measured usage and saved tariff components; this is a comparison basis, not a bill total." : "GnóRate requires at least four months (120 days) of measured bill coverage before showing an annualised cost."}</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>{isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>{a.costDetail.usageEstimate?.method} · {a.costDetail.usageEstimate?.coverageDays || 0} days covered · {a.costDetail.usageEstimate?.billCount || 0} bills used · usage confidence {a.costDetail.usageEstimate?.confidence || 0}%</span><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
+                  <div className="gn-account-info-cell gn-account-estimate"><small>Total energy cost <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>Transparent projection from annual usage and saved tariff components; open the account for the calculation basis.</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>{isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>{a.costDetail.usageEstimate?.method} · {a.costDetail.usageEstimate?.coverageDays || 0} days covered · {a.costDetail.usageEstimate?.billCount || 0} bills used · usage confidence {a.costDetail.usageEstimate?.confidence || 0}%</span><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
                   <div className="gn-account-status-detail" style={{ borderColor: `${overall.color}44` }}><strong style={{ color: overall.color }}>{overall.label}</strong><span>{accountStatusDetail(a)}</span></div>
                 </div>
 
