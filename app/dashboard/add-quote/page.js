@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Zap } from "lucide-react";
 import AddQuoteForm from "./AddQuoteForm";
+import { projectedAnnualCost } from "@/lib/cost-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,15 @@ export default async function AddQuotePage() {
   const { data: accounts } = profile?.active_company_id
     ? await supabase.from("accounts").select("id,name,location,fuel_type,usage,rate,standing_charge").eq("company_id", profile.active_company_id).order("name")
     : { data: [] };
+  const { data: readings } = profile?.active_company_id
+    ? await supabase.from("readings").select("account_id,reading_date,rate,usage,standing_charge,total_cost,created_at").eq("company_id", profile.active_company_id).order("reading_date", { ascending: false })
+    : { data: [] };
+  const grouped = {};
+  (readings || []).forEach((r) => { (grouped[r.account_id] ||= []).push(r); });
+  const enrichedAccounts = (accounts || []).map((a) => {
+    const costDetail = projectedAnnualCost(a, grouped[a.id] || []);
+    return { ...a, projectionEligible: !!costDetail.projectionEligible, projectedUsage: costDetail.usage, projectedCost: costDetail.projected, coverageDays: costDetail.usageEstimate?.coverageDays || 0, billCount: costDetail.usageEstimate?.billCount || 0, trailingIsAnnual: !!costDetail.trailingIsAnnual, trailingRecorded: costDetail.trailingRecorded };
+  });
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", padding: "40px 24px", fontFamily: "DM Sans, sans-serif" }}>
@@ -38,7 +48,7 @@ export default async function AddQuotePage() {
           used across every account's comparison, not just yours.
         </p>
 
-        <AddQuoteForm accounts={accounts || []} />
+        <AddQuoteForm accounts={enrichedAccounts} />
       </div>
     </div>
   );

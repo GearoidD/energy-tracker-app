@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Mail, Zap, Flame } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { projectedAnnualCost } from "@/lib/cost-engine";
 
 const RATE_JUMP_THRESHOLD = 5;
 
@@ -19,35 +20,18 @@ function fmtMoney(n) {
   return "€" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-function estimatedAnnualSpend(acc, readings) {
-  const rated = (readings || []).filter((r) => r.usage != null && r.rate != null && r.reading_date);
-
-  if (rated.length === 0) {
-    const rate = parseFloat(acc.rate);
-    const usage = parseFloat(acc.usage);
-    const standing = parseFloat(acc.standing_charge) || 0;
-    if (isNaN(rate) || isNaN(usage)) return null;
-    return (rate / 100) * usage + (standing / 100) * 365;
+function annualSpendDisplay(acc, readings) {
+  const detail = projectedAnnualCost(acc, readings || []);
+  // Do not surface an annualised estimate until the same 120-day minimum used
+  // everywhere else in GnóRate. A full-year trailing invoice total is still a
+  // valid recorded figure.
+  if (detail.trailingIsAnnual && detail.trailingRecorded != null) {
+    return { value: detail.trailingRecorded, label: "actual annual bills" };
   }
-
-  const sorted = [...rated].sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
-  const first = new Date(sorted[0].reading_date);
-  const last = new Date(sorted[sorted.length - 1].reading_date);
-  const daySpan = Math.max((last - first) / 86400000, 30);
-  const scaleFactor = 365 / daySpan;
-
-  const allHaveTotalCost = sorted.every((r) => r.total_cost !== null && r.total_cost !== undefined);
-
-  if (allHaveTotalCost) {
-    const totalActualCost = sorted.reduce((sum, r) => sum + parseFloat(r.total_cost), 0);
-    return totalActualCost * scaleFactor;
+  if (detail.projectionEligible && detail.projected != null) {
+    return { value: detail.projected, label: "projected annual" };
   }
-
-  const totalEnergyCost = sorted.reduce((sum, r) => sum + (parseFloat(r.rate) / 100) * parseFloat(r.usage), 0);
-  const standing = parseFloat(acc.standing_charge) || 0;
-  const annualStanding = (standing / 100) * 365;
-
-  return totalEnergyCost * scaleFactor + annualStanding;
+  return null;
 }
 
 function daysUntil(dateStr) {
@@ -231,13 +215,14 @@ function AttentionQueueInner({ companyId, companyName }) {
                       </button>
                       <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
                         {items.slice(0, 5).map((item) => {
-                          const spend = fmtMoney(estimatedAnnualSpend(item.account, readingSummaries[item.account.id]));
+                          const spendInfo = annualSpendDisplay(item.account, readingSummaries[item.account.id]);
+                          const spend = spendInfo ? fmtMoney(spendInfo.value) : null;
                           return (
                             <div key={item.account.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--muted)", padding: "5px 0", flexWrap: "wrap" }}>
                               {item.account.fuel_type === "gas" ? <Flame size={11} color="var(--amber)" /> : <Zap size={11} color="var(--teal)" />}
                               <strong style={{ color: "var(--text)", fontSize: 12 }}>{item.account.name}</strong>
                               {item.detail && <span>{item.detail}</span>}
-                              {spend && <span style={{ marginLeft: "auto", color: "var(--text)", fontWeight: 600, flexShrink: 0 }}>~{spend}/yr est.</span>}
+                              {spend && <span style={{ marginLeft: "auto", color: "var(--text)", fontWeight: 600, flexShrink: 0 }}>{spend}/{spendInfo.label}</span>}
                               <button type="button" onClick={() => router.push(`/dashboard?section=accounts&search=${encodeURIComponent(item.account.name)}`)} style={{ marginLeft: "auto", border: "1px solid var(--border-light)", borderRadius: 6, padding: "5px 8px", color: "var(--teal)", background: "var(--panel)", fontSize: 10.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Review account →</button>
                             </div>
                           );
