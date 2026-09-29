@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { Zap, Check, ShieldCheck, ArrowLeft, UserPlus, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { authStyles as s } from "../authStyles";
 import { HeroCard } from "../AuthHero";
