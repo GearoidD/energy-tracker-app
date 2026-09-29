@@ -619,15 +619,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .gn-savings-empty a{color:#08784e;font-size:9.5px;font-weight:800;text-decoration:none;white-space:nowrap}
 @media(max-width:760px){.gn-savings-command-head{flex-direction:column}.gn-savings-command-action{width:max-content}.gn-savings-opportunity{grid-template-columns:30px minmax(0,1fr) 20px}.gn-savings-opportunity-rate{display:none}}
 
-/* Account form polish */
-.gn-account-form-titlebar{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border)}
-.gn-account-form-titlebar>div:first-child{min-width:0}
-.gn-account-form-eyebrow{margin-bottom:5px;color:var(--teal);font-size:9px;font-weight:800;letter-spacing:1.25px}
-.gn-account-form-titlebar h2{margin:0;color:var(--text);font:800 21px/1.15 Manrope,sans-serif;letter-spacing:-.4px}
-.gn-account-form-titlebar p{max-width:620px;margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
-.gn-account-form-titlebar button{flex:none;margin-top:1px}
-@media(max-width:700px){.gn-account-form-titlebar h2{font-size:19px}.gn-account-form-titlebar p{font-size:10.5px}}
-
-/* Make the two commercial tariff figures visually dominant on account cards */
-.gn-account-info-grid .gn-account-tariff-cell strong{font-family:'IBM Plex Mono',monospace;letter-spacing:-.2px}
-.gn-account-info-grid .gn-account-tariff-cell small{color:#557064}
+/* GnóRate signup / account presentation refinement */
+.gn-signup-password-note{display:flex;align-items:flex-start;gap:8px;padding:10px 11px;border:1px solid #e2ece6;border-radius:8px;background:#f7faf8;color:#718278;font-size:9.5px;line-height:1.5}
+.gn-signup-password-note svg{flex:none;color:#0b9569;margin-top:1px}
+.gn-account-tariff-grid{grid-column:1/-1;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px!important;padding:11px!important;border:0!important;background:#f4f9f6!important}
+.gn-account-tariff-card{display:grid;gap:5px;padding:13px 14px;border:1px solid #cfe3d6;border-radius:9px;background:#fff;box-shadow:0 3px 10px #183d2a08}
+.gn-account-tariff-card small{color:#658073!important;font-size:9px!important;letter-spacing:.5px;font-weight:800!important;text-transform:uppercase}
+.gn-account-tariff-card strong{color:#08784e!important;font:800 20px Manrope,sans-serif!important;letter-spacing:-.4px}
+.gn-account-tariff-card span{color:#87958c;font-size:9px}
+.gn-account-info-cell.gn-rate-highlight{background:#f4faf6}
+.gn-account-info-cell.gn-rate-highlight strong{color:#08784e;font-size:15px}
+@media(max-width:700px){.gn-account-tariff-grid{grid-template-columns:1fr}}
