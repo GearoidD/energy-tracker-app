@@ -517,19 +517,28 @@ function AccountForm({ initial, existingLocations = [], existingAccounts = [], o
       onClick={onCancel}
     >
       <div
-        style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 12, width: 560, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", padding: 24 }}
+        style={{ background: "var(--panel)", border: "1px solid var(--border-light)", borderRadius: 14, width: 760, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", padding: 26, boxShadow: "0 24px 70px rgba(10,38,27,.22)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 600, margin: 0 }}>
-            {initial ? "Edit account" : "Add account"}
-          </h2>
+        <div className="gn-account-form-titlebar">
+          <div>
+            <div className="gn-account-form-eyebrow">ACCOUNT MANAGEMENT</div>
+            <h2>{initial ? "Edit energy account" : "Create energy account"}</h2>
+            <p>{initial ? "Keep the commercial and contract details current so GnóRate can assess the account accurately." : "Add the core site, tariff and contract information GnóRate needs to monitor this account."}</p>
+          </div>
           <button onClick={onCancel} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}>
             <X size={20} />
           </button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div className="gn-account-form-section">
+          <div className="gn-account-form-section-heading">
+            <div>
+              <strong>Account details</strong>
+              <span>Identify the site, meter and supplier.</span>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <Field label="Site / account name" required hint="Use the same format for every site — makes search and sorting easier later.">
             <input style={inputStyle} value={form.name} onChange={set("name")} placeholder="e.g. 12 Main Street, Unit 3" />
           </Field>
@@ -587,15 +596,48 @@ function AccountForm({ initial, existingLocations = [], existingAccounts = [], o
           <Field label="Contract end date">
             <input type="date" style={inputStyle} value={form.contract_end || ""} onChange={set("contract_end")} />
           </Field>
-          <Field label="Annual usage (kWh)">
-            <input type="number" style={inputStyle} value={form.usage || ""} onChange={set("usage")} placeholder="e.g. 45000" />
-          </Field>
-          <Field label="Current unit rate (c/kWh)">
-            <input type="number" step="0.01" style={inputStyle} value={form.rate || ""} onChange={set("rate")} placeholder="e.g. 24.5" />
-          </Field>
-          <Field label="Standing charge (c/day)">
-            <input type="number" step="0.01" style={inputStyle} value={form.standing_charge || ""} onChange={set("standing_charge")} placeholder="e.g. 90" />
-          </Field>
+          </div>
+        </div>
+
+        <div className="gn-account-form-section gn-account-tariff-form-section">
+          <div className="gn-account-form-section-heading">
+            <div>
+              <strong>Current tariff</strong>
+              <span>These are the key figures GnóRate uses to assess current cost and compare market opportunities.</span>
+            </div>
+            <span className="gn-account-form-priority">Key commercial data</span>
+          </div>
+          <div className="gn-account-tariff-form-grid">
+            <div className="gn-account-tariff-input">
+              <Field label="Current unit rate (c/kWh)" required hint="Use the latest confirmed supplier rate from the bill or contract.">
+                <div className="gn-account-input-with-unit"><input type="number" step="0.01" style={{ ...inputStyle, borderColor: "#8fc7a7", fontWeight: 700, fontSize: 17 }} value={form.rate || ""} onChange={set("rate")} placeholder="e.g. 24.5" /><span>c/kWh</span></div>
+              </Field>
+            </div>
+            <div className="gn-account-tariff-input">
+              <Field label="Standing charge (c/day)" required hint="Daily supplier charge; keep separate from the unit rate.">
+                <div className="gn-account-input-with-unit"><input type="number" step="0.01" style={{ ...inputStyle, borderColor: "#8fc7a7", fontWeight: 700, fontSize: 17 }} value={form.standing_charge || ""} onChange={set("standing_charge")} placeholder="e.g. 90" /><span>c/day</span></div>
+              </Field>
+            </div>
+            <div className="gn-account-tariff-input">
+              <Field label="Annual usage (kWh)" hint="Prefer a projected figure based on uploaded bill periods rather than a single bill.">
+                <div className="gn-account-input-with-unit"><input type="number" style={{ ...inputStyle, fontWeight: 700, fontSize: 17 }} value={form.usage || ""} onChange={set("usage")} placeholder="e.g. 45000" /><span>kWh/yr</span></div>
+              </Field>
+            </div>
+          </div>
+          <div className="gn-account-tariff-help">
+            <span>Why it matters</span>
+            <p>Unit rate and standing charge are the core current-cost inputs. GnóRate keeps them separate so a low unit rate cannot hide a high daily charge.</p>
+          </div>
+        </div>
+
+        <div className="gn-account-form-section">
+          <div className="gn-account-form-section-heading">
+            <div>
+              <strong>Technical &amp; procurement details</strong>
+              <span>Optional information used for tariff matching, market comparisons and renewal preparation.</span>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           {form.fuel_type !== "gas" && (
             <Field label="MIC / capacity (kVA)">
               <input
@@ -642,6 +684,7 @@ function AccountForm({ initial, existingLocations = [], existingAccounts = [], o
             <Field label="Notes">
               <textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={form.notes || ""} onChange={set("notes")} placeholder="Broker contact, special clauses, etc." />
             </Field>
+          </div>
           </div>
         </div>
 
@@ -3915,10 +3958,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
 
                 <div className="gn-account-info-grid">
                   <div className="gn-account-info-cell"><small>Supplier <em>Saved detail</em></small><strong>{a.provider || "Not recorded"}</strong>{isExpanded && !a.provider && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add supplier</button>}</div>
-                  <div className="gn-account-info-cell"><small>Current unit rate <em>From saved details or bill</em></small><strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong>{isExpanded && !a.rate && <button type="button" onClick={() => setUploadingFor(a.id)}>Add rate from bill</button>}</div>
-                  <div className="gn-account-info-cell"><small>Standing charge <em>Daily supplier charge</em></small><strong>{a.standing_charge ? `${Number(a.standing_charge).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/day` : "Not recorded"}</strong>{isExpanded && !a.standing_charge && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add standing charge</button>}</div>
+                  <div className={`gn-account-info-cell gn-account-tariff-cell ${a.rate ? "has-value" : "is-missing"}`}><small>Current unit rate <em>Latest trusted rate</em></small><strong>{a.rate ? `${Number(a.rate).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/kWh` : "Not recorded"}</strong><span>{a.rate ? "Core current tariff input" : "Needed for market comparison"}</span>{isExpanded && !a.rate && <button type="button" onClick={() => setUploadingFor(a.id)}>Add rate from bill</button>}</div>
+                  <div className={`gn-account-info-cell gn-account-tariff-cell ${a.standing_charge ? "has-value" : "is-missing"}`}><small>Standing charge <em>Daily supplier charge</em></small><strong>{a.standing_charge ? `${Number(a.standing_charge).toLocaleString("en-IE", { maximumFractionDigits: 2 })}c/day` : "Not recorded"}</strong><span>{a.standing_charge ? "Core current tariff input" : "Needed for full cost comparison"}</span>{isExpanded && !a.standing_charge && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add standing charge</button>}</div>
                   <div className="gn-account-info-cell"><small>Projected annual usage <em>{a.costDetail?.usageEstimate?.source === "bills" ? "Calculated from bill periods" : a.costDetail?.usageEstimate?.source === "historical-bills" ? "Estimated from historical bill dates" : "Manually entered"}</em></small><strong>{a.costDetail?.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong><span>{a.costDetail?.usageEstimate?.detail || "Upload bills with exact billing-period dates to calculate a more reliable annual projection."}</span>{isExpanded && !a.costDetail?.usage && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add annual usage</button>}</div>
                   <div className="gn-account-info-cell"><small>Latest bill on file <em>Reading date</em></small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong>{isExpanded && (!readingSummaries[a.id]?.[0]?.reading_date || a.confidence.missingBill) && <button type="button" onClick={() => setUploadingFor(a.id)}>{readingSummaries[a.id]?.[0]?.reading_date ? "Add newer bill" : "Upload first bill"}</button>}</div>
+                  <div className="gn-account-info-cell"><small>Latest actual bill <em>Invoice total</em></small><strong>{readingSummaries[a.id]?.[0]?.total_cost != null ? fmtMoney(Number(readingSummaries[a.id][0].total_cost)) : "Not recorded"}</strong><span>{readingSummaries[a.id]?.[0]?.total_cost != null ? "Actual bill figure on file" : "Upload a bill with the current bill total"}</span>{isExpanded && readingSummaries[a.id]?.[0]?.total_cost == null && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload / re-read bill</button>}</div>
                   <div className="gn-account-info-cell"><small>Contract end date <em>Saved detail</em></small><strong>{formatAccountDate(a.contract_end)}</strong>{isExpanded && !a.contract_end && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add end date</button>}</div>
                   <div className="gn-account-info-cell gn-account-estimate"><small>Projected annual energy cost <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : "Not enough bill data"}</strong><span>Transparent projection from annual usage and saved tariff components; open the account for the calculation basis.</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>{isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>{a.costDetail.usageEstimate?.method} · {a.costDetail.usageEstimate?.coverageDays || 0} days covered · {a.costDetail.usageEstimate?.billCount || 0} bills used · usage confidence {a.costDetail.usageEstimate?.confidence || 0}%</span><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
                   <div className="gn-account-status-detail" style={{ borderColor: `${overall.color}44` }}><strong style={{ color: overall.color }}>{overall.label}</strong><span>{accountStatusDetail(a)}</span></div>
