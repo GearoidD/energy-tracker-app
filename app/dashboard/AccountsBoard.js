@@ -1872,7 +1872,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     let result = await applyCompanyScope(
       supabase
         .from("readings")
-        .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at")
+        .select("id, account_id, reading_date, rate, usage, standing_charge, total_cost, source, confidence, created_at, rate_review_status, rate_reviewed_at, rate_reviewed_by")
         .order("reading_date", { ascending: false, nullsFirst: false })
     );
     setRateReviewMigrationPending(true);
@@ -4360,7 +4360,13 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                                 <span style={{ color: "var(--muted)" }}>{r.reading_date || "no date"}</span>
                                 <span>{r.usage ? `${r.usage} kWh` : "—"}</span>
                                 <span>{r.rate ? `${r.rate}c/kWh` : "—"}</span>
-                                <span title="Actual total amount shown on the bill">Bill total {r.total_cost != null ? fmtMoney(Number(r.total_cost)) : "—"}</span>
+                                <span title={r.total_cost != null ? "Actual total amount shown on the bill" : "Estimated from rate × usage - excludes standing charge, VAT and levies"}>
+                                  {r.total_cost != null
+                                    ? `Bill total ${fmtMoney(Number(r.total_cost))}`
+                                    : r.rate && r.usage
+                                    ? `~${fmtMoney((parseFloat(r.rate) / 100) * parseFloat(r.usage))} est.`
+                                    : "Bill total —"}
+                                </span>
                                 <span style={{ color: "var(--muted)", fontSize: 10 }}>{r.source}</span>
                                 <button
                                   onClick={() => deleteReading(r.id, a.id)}
