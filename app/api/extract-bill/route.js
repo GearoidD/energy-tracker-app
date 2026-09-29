@@ -276,6 +276,7 @@ Use exactly this structure:
   "rate": number or null,
   "standing_charge": number or null,
   "total_cost": number or null,
+  "total_cost_source": "current_bill, amount_due, invoice_total, or null",
   "provider": "string or null",
   "supply_address": "string or null",
   "account_number": "string or null",
@@ -313,9 +314,26 @@ standing_charge:
 The daily standing charge in cents per day.
 
 total_cost:
-The actual total amount due or charged for the billing period in euro.
-Use the amount shown on the bill.
-Do NOT calculate this value from usage and rate.
+The ACTUAL CURRENT BILL COST for this billing period in euro.
+
+IMPORTANT PRIORITY RULE:
+1. If the bill explicitly shows a value labelled "Current Bill", "Current Charges", "This Bill" or an equivalent label, USE THAT VALUE for total_cost.
+2. If there is no Current Bill value, use the bill's "Invoice Total" or equivalent final charge for the current billing period.
+3. Only use "Total Due", "Amount Due" or "Amount Payable" when it clearly represents ONLY the current billing period and does not include a previous balance, arrears, carried-forward balance, or other prior amount.
+4. If both "Current Bill" and "Total Due" are shown and they are different, ALWAYS use the Current Bill value. Do NOT use Total Due.
+5. Never use "Account Balance", "Balance Brought Forward", "Previous Balance", "Arrears", "Amount Outstanding" or similar cumulative balances as total_cost.
+6. Do NOT calculate this value from usage and rate.
+
+Examples:
+- Current Bill €3,351.42 + Total Due €4,102.18 -> total_cost = 3351.42
+- Current Bill €2,450.00 + Previous Balance €500.00 -> total_cost = 2450.00
+- Total Due €1,850.00 with no previous balance shown -> total_cost = 1850.00 if it clearly represents the current bill.
+
+total_cost_source:
+Return "current_bill" when the selected value came from a Current Bill/current charges label.
+Return "invoice_total" when it came from an invoice/final total for the current billing period.
+Return "amount_due" only when Total Due/Amount Due clearly represents the current billing period and contains no prior balance.
+Otherwise return null.
 
 provider:
 The energy supplier.
@@ -565,6 +583,10 @@ Return null when it cannot be read confidently.
 
       total_cost:
         extracted.total_cost ??
+        null,
+
+      total_cost_source:
+        extracted.total_cost_source ??
         null,
 
       provider:
