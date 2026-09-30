@@ -2396,12 +2396,16 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       const currentRate = latestReading?.rate ?? a.rate;
       const comparison = marketComparisonFor({ ...a, rate: currentRate }, benchmarks, masterRates);
       const preliminaryCost = annualCostDetail({ ...a, rate: currentRate }, readingSummaries[a.id]);
-      const usageNum = Number(preliminaryCost.usage);
+      const usageNum = preliminaryCost.usage !== null ? Number(preliminaryCost.usage) : null;
       const rateNum = parseFloat(currentRate);
       const saving =
-        comparison && Number.isFinite(usageNum) && !isNaN(rateNum)
+        comparison && usageNum !== null && Number.isFinite(usageNum) && !isNaN(rateNum)
           ? ((rateNum - comparison.rate) / 100) * usageNum
           : null;
+      // When usage isn't reliable enough for a euro figure, a rate-percentage
+      // comparison still works - it doesn't need an annual usage estimate at all.
+      const ratePercentDiff =
+        comparison && !isNaN(rateNum) && comparison.rate > 0 ? ((rateNum - comparison.rate) / comparison.rate) * 100 : null;
       const confidence = accountConfidence(a, latestReading);
       const lowConfidenceBill = latestReading?.confidence === "low";
 
@@ -2416,7 +2420,7 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       }
 
       const costDetail = preliminaryCost;
-      return { ...a, rate: currentRate, daysLeft, status, saving, cost: costDetail.projected, costDetail, comparison, confidence, lowConfidenceBill, rateChange };
+      return { ...a, rate: currentRate, daysLeft, status, saving, ratePercentDiff, cost: costDetail.projected, costDetail, comparison, confidence, lowConfidenceBill, rateChange };
     });
   }, [accounts, benchmarks, masterRates, readingSummaries]);
 
@@ -3924,7 +3928,28 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                   <div className="gn-account-info-cell"><small>Projected annual usage <em>{a.costDetail?.usageEstimate?.source === "bills" ? "Calculated from bill periods" : a.costDetail?.usageEstimate?.source === "historical-bills" ? "Estimated from historical bill dates" : "Manually entered"}</em></small><strong>{a.costDetail?.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh` : "Not recorded"}</strong><span>{a.costDetail?.usageEstimate?.detail || "Upload bills with exact billing-period dates to calculate a more reliable annual projection."}</span>{isExpanded && !a.costDetail?.usage && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add annual usage</button>}</div>
                   <div className="gn-account-info-cell"><small>Latest bill on file <em>Reading date</em></small><strong>{formatAccountDate(readingSummaries[a.id]?.[0]?.reading_date)}</strong>{isExpanded && (!readingSummaries[a.id]?.[0]?.reading_date || a.confidence.missingBill) && <button type="button" onClick={() => setUploadingFor(a.id)}>{readingSummaries[a.id]?.[0]?.reading_date ? "Add newer bill" : "Upload first bill"}</button>}</div>
                   <div className="gn-account-info-cell"><small>Contract end date <em>Saved detail</em></small><strong>{formatAccountDate(a.contract_end)}</strong>{isExpanded && !a.contract_end && <button type="button" onClick={() => { setEditing(a); setShowForm(true); }}>Add end date</button>}</div>
-                  <div className="gn-account-info-cell gn-account-estimate"><small>Projected annual energy cost <em>Estimate · not a bill total</em></small><strong>{a.cost !== null && a.cost !== undefined ? `~${fmtMoney(a.cost)}/yr` : a.costDetail?.insufficientCoverage ? "Not enough bill history yet" : "Not enough bill data"}</strong><span>{a.cost !== null && a.cost !== undefined ? "Transparent projection from annual usage and saved tariff components; open the account for the calculation basis." : a.costDetail?.insufficientCoverage ? `Needs around ${a.costDetail.daysUntilSufficientCoverage} more day${a.costDetail.daysUntilSufficientCoverage === 1 ? "" : "s"} of bill coverage before a reliable projection can be shown.` : "Upload a bill to start building this estimate."}</span>{isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}</div>{isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>{a.costDetail.usageEstimate?.method} · {a.costDetail.usageEstimate?.coverageDays || 0} days covered · {a.costDetail.usageEstimate?.billCount || 0} bills used · usage confidence {a.costDetail.usageEstimate?.confidence || 0}%</span><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
+                  <div className="gn-account-info-cell gn-account-estimate">
+                    <small>{a.cost !== null && a.cost !== undefined ? "Projected annual energy cost" : "Spend to date"} <em>{a.cost !== null && a.cost !== undefined ? "Estimate · not a bill total" : "Actual recorded bills · not a full-year figure"}</em></small>
+                    <strong>
+                      {a.cost !== null && a.cost !== undefined
+                        ? `~${fmtMoney(a.cost)}/yr`
+                        : a.costDetail?.trailingRecorded != null
+                        ? fmtMoney(a.costDetail.trailingRecorded)
+                        : "No bills recorded yet"}
+                    </strong>
+                    <span>
+                      {a.cost !== null && a.cost !== undefined
+                        ? "Transparent projection from annual usage and saved tariff components; open the account for the calculation basis."
+                        : a.costDetail?.insufficientCoverage
+                        ? (() => {
+                            const months = Math.ceil(a.costDetail.daysUntilSufficientCoverage / 30);
+                            return `A reliable full-year projection needs close to a year of bills - about ${months} more month${months === 1 ? "" : "s"} of coverage${a.costDetail.trailingRecorded != null ? ". The figure above is what's actually been billed so far." : "."}`;
+                          })()
+                        : "Upload a bill to start tracking spend."}
+                    </span>
+                    {isExpanded && <button type="button" onClick={() => setUploadingFor(a.id)}>Upload a bill to improve estimate</button>}
+                  </div>
+                  {isExpanded && a.costDetail && <div className="gn-account-info-cell"><small>Cost calculation <em>{a.costDetail.confidence}% data confidence</em></small><strong>{a.costDetail.usage != null ? `${Number(a.costDetail.usage).toLocaleString("en-IE")} kWh × ${a.costDetail.rate ?? "—"}c/kWh` : "Annual usage needed"}</strong><span>{a.costDetail.usageEstimate?.method} · {a.costDetail.usageEstimate?.coverageDays || 0} days covered · {a.costDetail.usageEstimate?.billCount || 0} bills used · usage confidence {a.costDetail.usageEstimate?.confidence || 0}%</span><span>Energy {fmtMoney(a.costDetail.components.energy)} · Standing {fmtMoney(a.costDetail.components.standing)} · Capacity/fixed {fmtMoney((a.costDetail.components.capacity||0)+(a.costDetail.components.other||0))}</span><span>{a.costDetail.trailingRecorded != null ? `Recorded invoice totals: ${fmtMoney(a.costDetail.trailingRecorded)}${a.costDetail.trailingIsAnnual ? " across approximately a year" : " (not annualised)"}.` : "No invoice totals recorded yet."}</span></div>}
                   <div className="gn-account-status-detail" style={{ borderColor: `${overall.color}44` }}><strong style={{ color: overall.color }}>{overall.label}</strong><span>{accountStatusDetail(a)}</span></div>
                 </div>
 
@@ -4100,7 +4125,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
                         >
                           {a.comparison.source === "quoted" ? "quoted rate" : a.comparison.source === "verified" ? "verified rate" : "estimated rate"}
                         </span>
-                        {a.saving !== null && a.saving > 20 && ` · estimated unit-rate difference ~${fmtMoney(a.saving)}/yr`}
+                        {a.saving !== null && a.saving > 20
+                          ? ` · estimated unit-rate difference ~${fmtMoney(a.saving)}/yr`
+                          : a.ratePercentDiff !== null && Math.abs(a.ratePercentDiff) >= 3
+                          ? ` · your rate is ${Math.abs(a.ratePercentDiff).toFixed(1)}% ${a.ratePercentDiff > 0 ? "above" : "below"} this market rate`
+                          : ""}
                       </div>
                     )}
                     {a.comparison?.source === "verified" && (a.comparison.supplierName || a.comparison.note) && (
