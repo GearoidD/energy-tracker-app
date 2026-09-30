@@ -2623,7 +2623,11 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
     const groups = { electricity: 0, gas: 0 };
     enrichedAll.forEach((account) => {
       const fuel = account.fuel_type === "gas" ? "gas" : "electricity";
-      if (account.cost != null) groups[fuel] += account.cost;
+      // Use actual recorded bill totals here, not the gated full-year projection -
+      // this chart shows spend so far, which doesn't need 4+ months of history
+      // the way a reliable annual projection does.
+      const recorded = account.costDetail?.trailingRecorded;
+      if (recorded != null) groups[fuel] += recorded;
     });
     return groups;
   }, [enrichedAll]);
