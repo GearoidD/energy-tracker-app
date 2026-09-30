@@ -22,8 +22,9 @@ export default async function AllCompaniesPage({ searchParams }) {
 
   const { data: memberships } = await supabase
     .from("company_members")
-    .select("company_id, role, companies(id, name)")
-    .eq("user_id", user.id);
+    .select("company_id, role, created_at, companies(id, name)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
 
   const companies = (memberships || [])
     .filter((m) => m.companies)

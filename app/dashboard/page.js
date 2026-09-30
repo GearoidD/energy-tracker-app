@@ -20,8 +20,9 @@ export default async function DashboardPage({ searchParams }) {
 
   const { data: memberships } = await supabase
     .from("company_members")
-    .select("company_id, role, companies(id, name)")
-    .eq("user_id", user.id);
+    .select("company_id, role, created_at, companies(id, name)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
 
   const companies = (memberships || [])
     .filter((m) => m.companies)
@@ -42,10 +43,15 @@ export default async function DashboardPage({ searchParams }) {
     profile = healedProfile;
   }
 
-  const activeCompanyId =
-    profile?.active_company_id && companies.some((c) => c.id === profile.active_company_id)
-      ? profile.active_company_id
-      : companies[0].id;
+  const savedCompanyIsValid = profile?.active_company_id && companies.some((c) => c.id === profile.active_company_id);
+  const activeCompanyId = savedCompanyIsValid ? profile.active_company_id : companies[0].id;
+
+  // If the saved company was missing or invalid, persist this fallback choice now,
+  // so the next visit lands on the same company instead of re-evaluating and
+  // potentially landing on a different one.
+  if (!savedCompanyIsValid) {
+    await supabase.from("profiles").update({ active_company_id: activeCompanyId }).eq("id", user.id);
+  }
 
   const companyName = companies.find((c) => c.id === activeCompanyId)?.name || "";
   const params = await searchParams;
