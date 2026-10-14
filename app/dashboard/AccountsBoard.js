@@ -2259,17 +2259,46 @@ export default function AccountsBoard({ companyId, companyName, lockedLocation, 
       rate_reviewed_by: user?.id || null,
       ...(decision === "corrected" ? { rate: trustedRate, confidence: "high" } : {}),
     };
-    const { error: readingError } = await supabase.from("readings").update(readingUpdate).eq("id", change.readingId);
-    if (readingError) { alert("Couldn't review the rate: " + readingError.message); setRateReviewSaving(false); return; }
-    if (decision !== "dismissed") {
-      const { error: accountError } = await supabase.from("accounts").update({ rate: trustedRate, updated_at: reviewedAt }).eq("id", account.id);
-      if (accountError) { alert("The bill was reviewed, but the account rate couldn't be updated: " + accountError.message); }
+    // Select the updated row so a zero-row update (for example, due to RLS)
+    // cannot be mistaken for a successful save. Supabase can return no error
+    // when an UPDATE matches no visible rows.
+    const { data: savedReading, error: readingError } = await supabase
+      .from("readings")
+      .update(readingUpdate)
+      .eq("id", change.readingId)
+      .select("id, rate_review_status, rate_reviewed_at")
+      .maybeSingle();
+    if (readingError || !savedReading) {
+      console.error("Rate review was not saved:", readingError);
+      alert("Couldn't save this rate review" + (readingError?.message ? ": " + readingError.message : ". The bill record was not updated. Check Supabase permissions and the rate-review migration, then try again."));
+      setRateReviewSaving(false);
+      return;
     }
-    await supabase.from("activity_log").insert({
+    if (savedReading.rate_review_status !== decision) {
+      alert("Supabase did not confirm the rate review status. Please try again.");
+      setRateReviewSaving(false);
+      return;
+    }
+    if (decision !== "dismissed") {
+      const { data: savedAccount, error: accountError } = await supabase
+        .from("accounts")
+        .update({ rate: trustedRate, updated_at: reviewedAt })
+        .eq("id", account.id)
+        .select("id, rate")
+        .maybeSingle();
+      if (accountError || !savedAccount) {
+        alert("The bill review was saved, but the account rate could not be confirmed as updated" + (accountError?.message ? ": " + accountError.message : ". Check account permissions and try updating the account rate again."));
+        setRateReviewSaving(false);
+        await Promise.all([loadReadingSummaries(), refetchReadings(account.id)]);
+        return;
+      }
+    }
+    const { error: activityError } = await supabase.from("activity_log").insert({
       company_id: account.company_id || companyId, account_id: account.id, actor_id: user?.id || null,
       event_type: `rate_${decision}`,
       detail: decision === "dismissed" ? `Reviewed ${change.from}c → ${change.to}c/kWh rate alert and dismissed it without changing the account rate.` : decision === "corrected" ? `Corrected detected bill rate from ${change.to}c to ${trustedRate}c/kWh and updated the trusted account rate.` : `Confirmed detected bill rate increase from ${change.from}c to ${change.to}c/kWh and updated the trusted account rate.`,
     });
+    if (activityError) console.error("Rate review saved, but activity history could not be written:", activityError.message);
     setRateReviewFor(null); setRateCorrection(""); setRateReviewSaving(false);
     await Promise.all([loadAccounts(), loadReadingSummaries(), refetchReadings(account.id), loadActivity()]);
   };
